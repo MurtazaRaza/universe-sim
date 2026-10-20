@@ -1,0 +1,78 @@
+# Normalize line endings for text files.
+* text=auto
+
+# Source and documentation
+*.cs        text diff=csharp
+*.csproj    text
+*.props     text
+*.targets   text
+*.sln       text
+*.slnx      text
+*.py        text diff=python
+*.md        text diff=markdown
+*.json      text
+*.yml       text
+*.yaml      text
+*.sh        text eol=lf
+
+# Unity YAML assets (the project uses Force Text serialization).
+# Optional: enable Unity Smart Merge locally, see
+# https://docs.unity3d.com/Manual/SmartMerge.html
+*.unity           text
+*.prefab          text
+*.asset           text
+*.mat             text
+*.meta            text
+*.anim            text
+*.controller      text
+*.overrideController text
+*.physicMaterial  text
+*.mask            text
+*.playable        text
+*.shadergraph     text
+*.shadersubgraph  text
+*.inputactions    text
+*.uxml            text
+*.uss             text
+*.asmdef          text
+*.asmref          text
+*.shader          text
+*.hlsl            text
+*.cginc           text
+
+# NAIF text kernels (PCK, LSK, FK) are text; binary kernels are binary.
+*.tpc       text
+*.tls       text
+*.tf        text
+*.bsp       binary
+*.bpc       binary
+
+# Binary assets
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.tga       binary
+*.tif       binary
+*.tiff      binary
+*.psd       binary
+*.exr       binary
+*.hdr       binary
+*.ktx       binary
+*.ktx2      binary
+*.fbx       binary
+*.blend     binary
+*.wav       binary
+*.mp3       binary
+*.ogg       binary
+*.mp4       binary
+*.ttf       binary
+*.otf       binary
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.bin       binary
+*.pdf       binary
+*.uspack    binary
+
+# Git LFS is not configured (see docs/adr/0005). If large binary assets are added later,
+# install git-lfs and add tracking rules here in the same change.

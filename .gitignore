@@ -1,0 +1,35 @@
+# Root ignore rules for the whole repository.
+# Unity-specific rules live in UniverseSim/.gitignore (patterns there are rooted at the Unity project).
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDEs and editors
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+*.swp
+
+# .NET build output (core/, tools/)
+bin/
+obj/
+*.nupkg
+TestResults/
+BenchmarkDotNet.Artifacts/
+coverage*.xml
+coverage*.json
+
+# Python (tools/reference)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Data: raw downloads and generated packs are reproducible from data/sources.lock.json.
+# See docs/adr/0005-data-provenance-and-storage.md.
+/data/raw/
+/data/packs/
