@@ -22,5 +22,9 @@ namespace UniverseSim.Unity.Native
         // Marshalled as IntPtr on purpose: a string return type would make the runtime free it.
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_version_string")]
         internal static extern IntPtr VersionString();
+
+        // Returns a pointer to a static, null-terminated string ("ok", "invalid_argument", ..., or "unknown").
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_status_name")]
+        internal static extern IntPtr StatusName(int status);
     }
 }

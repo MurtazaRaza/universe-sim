@@ -19,5 +19,12 @@ namespace UniverseSim.Unity.Native
 
         /// <summary>True when the loaded library speaks the ABI this binding expects.</summary>
         public static bool IsCompatible => AbiVersion == ExpectedAbiVersion;
+
+        /// <summary>
+        /// The core's name for a status code, for example "out_of_coverage", or "unknown" for a value the
+        /// library does not define. Useful in log messages.
+        /// </summary>
+        public static string StatusName(Status status) =>
+            Marshal.PtrToStringUTF8(NativeMethods.StatusName((int)status)) ?? string.Empty;
     }
 }
