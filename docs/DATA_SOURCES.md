@@ -108,8 +108,10 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | Provides | The TAI - UTC leap second table and the constants SPICE uses for its TDB-TT model. |
 | File | `naif0012.tls` (latest in the NAIF directory as of 2026-10-20) |
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/ |
+| Checksums | No publisher checksum list (the `lsk` directory has no `aa_checksums.txt`; checked 2026-10-20). `naif0012.tls`: 5257 bytes, SHA-256 678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b (retrieved 2026-10-20). |
 | Cross-check | IERS Bulletin C (leap second announcements): https://hpiers.obspm.fr/iers/bul/bulc/ |
-| Notes | Check Bulletin C when updating. If a new leap second is announced, NAIF releases a new LSK. |
+| Used by | Phase 1 unit test fixtures (`tools/scripts/generate_spice_test_fixtures.py`); from Phase 2, the data pack. |
+| Notes | Check Bulletin C when updating. If a new leap second is announced, NAIF releases a new LSK. The kernel's last entry is TAI - UTC = 37 s from 2017-01-01. |
 
 ### S-NAIF-MOONPA: high-precision lunar orientation (Tier 1, Phase 6 optional)
 

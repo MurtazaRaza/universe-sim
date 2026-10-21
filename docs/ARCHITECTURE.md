@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v0.2 |
+| Status | Draft v0.3 |
 | Last updated | 2026-10-20 |
 | Related | [SPEC.md](SPEC.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [adr/](adr/) |
 
@@ -72,11 +72,12 @@ Universe-Simulation/                    repository root
 │   │   ├── include/usim/usim.h         the C ABI, the contract for non-C++ hosts
 │   │   └── src/
 │   ├── apps/usim-cli/                  headless host (usim)
-│   ├── tests/                          Catch2 unit tests
+│   ├── tests/                          Catch2 unit tests, one folder per module
+│   │   └── fixtures/                   generated reference data (CSPICE oracle values)
 │   └── build/<preset>/                 build output (ignored)
 ├── tools/
 │   ├── pipeline/                       (planned, Phase 2) Python: fetch, verify, build, info, reference
-│   └── scripts/                        build-core-for-unity.sh, ...
+│   └── scripts/                        build-core-for-unity.sh, generate_spice_test_fixtures.py
 ├── data/                               (planned, Phase 2)
 │   ├── sources.json                    declared sources (committed)
 │   ├── sources.lock.json               resolved files and checksums (committed)
@@ -121,60 +122,73 @@ Note: the Unity project folder is named `UniverseSim/`. It was not renamed, so t
 | `usim` | executable | Headless CLI host (FR-CLI-01). |
 | `usim_core_tests` | executable | Catch2 unit tests, run through `ctest`. |
 
-### 3.3 Modules (planned)
+### 3.3 Modules
 
 Each module is a subdirectory of `include/usim/` and `src/` with a matching nested namespace.
 
-| Module | Responsibility | Key types (illustrative) |
-|---|---|---|
-| `usim::math` | Double-precision linear algebra and numerics | `Vec3`, `Mat3`, `Quat`, Chebyshev evaluation, angle helpers |
-| `usim::time` | Instants, time scales, calendars | `Instant` (TDB, two-part), `TimeScale`, `LeapSecondTable`, `JulianDate`, `CalendarDate` |
-| `usim::frames` | Reference frames and transforms | `FrameId`, `FrameTransform`, `RotationModel` |
-| `usim::catalog` | Bodies, hierarchy, sourced quantities | `BodyId`, `BodyKind`, `Body`, `BodyCatalog`, `Quantity`, `SourceRef`, `Source` |
-| `usim::ephemeris` | Evaluation of ephemeris segments from the pack | `ChebyshevSegment` (SPK types 2 and 3), `EphemerisChain`, `Coverage` |
-| `usim::propagation` | Non-ephemeris motion (Phase 7 and later) | `KeplerPropagator`, `Integrator`, `Dop853`, `Ias15`, `ForceModel` |
-| `usim::sim` | The facade that hosts use | `Simulation`, `SimulationClock`, `BodyState`, `StateQuality`, `Result` |
-| `usim::presentation` | Engine-agnostic view math | `ViewOrigin`, `ScaleMode`, `AxisConvention`, `OrbitPathSampler` |
-| `usim::data` | Data pack reading | `DataPackReader`, `DataPackHeader`, `FormatVersion` |
-| `usim/constants.hpp` | Definitional constants only, each with a citation | `constants::k_au_km`, `constants::k_c_km_s`, ... |
+| Module | Status | Responsibility | Key types |
+|---|---|---|---|
+| `usim/result.hpp` | Phase 1 | Error model (P1-08) | `Result<T>`, `Result<void>`, `Error`, `ErrorCode` |
+| `usim/constants.hpp` | Phase 1 | Definitional constants only, each with a citation | `constants::k_au_km`, `k_c_km_s`, `k_j2000_jd`, `k_tt_minus_tai_s`, `k_eclipj2000_obliquity_rad`, ... |
+| `usim::math` | Phase 1 | Double-precision linear algebra and numerics | `Vec3`, `Mat3`, `Quat`, `chebyshev_on_interval`, angle helpers |
+| `usim::time` | Phase 1 | Instants, time scales, calendars, ISO 8601 | `TimePoint<Scale>` (`Instant` = TDB, `TtTime`, `TaiTime`), `TimeScales`, `LeapSecondTable`, `TdbModel`, `CalendarDate`, `DateTime`, `Calendar` |
+| `usim::frames` | Phase 1 (inertial); body-fixed in P4-03 | Reference frames and transforms | `FrameId`, `FrameTransform`, `StateVector`, `FrameSystem` |
+| `usim::catalog` | Phase 1 | Bodies, hierarchy, sourced quantities | `BodyId`, `BodyKind`, `Body`, `BodyCatalog`, `Quantity`, `SourceRef`, `Source` |
+| `usim::presentation` | Phase 1 (axes); more in Phase 4 | Engine-agnostic view math | `AxisConvention`; planned: `ViewOrigin`, `ScaleMode`, `OrbitPathSampler` |
+| `usim::ephemeris` | Planned (Phase 3) | Evaluation of ephemeris segments from the pack | `ChebyshevSegment` (SPK types 2 and 3), `EphemerisChain`, `Coverage` |
+| `usim::propagation` | Planned (Phase 7) | Non-ephemeris motion | `KeplerPropagator`, `Integrator`, `Dop853`, `Ias15`, `ForceModel` |
+| `usim::sim` | Planned (Phase 4) | The facade that hosts use | `Simulation`, `SimulationClock`, `BodyState`, `StateQuality` |
+| `usim::data` | Planned (Phase 2) | Data pack reading | `DataPackReader`, `DataPackHeader`, `FormatVersion` |
 
-### 3.4 Key type sketches (illustrative, not binding)
+### 3.4 Key types
+
+The Phase 1 types below exist; the headers are the reference. The Phase 3 and 4 types are sketches and not binding.
 
 ```cpp
 namespace usim {
 
-// TDB instant stored in two parts to keep resolution over millennia.
-class Instant {
-public:
-    static Instant from_tdb_seconds_since_j2000(double seconds);
-    std::int64_t days_since_j2000() const;   // whole TDB days relative to J2000.0
-    double seconds_of_day() const;           // [0, 86400)
-    double tdb_seconds_since_j2000() const;  // for evaluation; fine within the DE440 span
-};
+// Fallible operations return Result<T>; the core's public API never throws (usim/result.hpp).
+template <typename T> class Result;          // value or Error{ErrorCode code; std::string message}
 
+namespace time {
+// A reading of a uniform time scale in two parts: whole days since J2000.0 on that scale plus seconds of
+// day in [0, 86400). The scale is part of the type, so a TT reading cannot be passed as TDB.
+template <TimeScale Scale> class TimePoint;
+using Instant = TimePoint<TimeScale::tdb>;   // the simulation's time; seconds past J2000 equal SPICE ET
+using TtTime  = TimePoint<TimeScale::tt>;
+using TaiTime = TimePoint<TimeScale::tai>;
+// UTC is not uniform (leap seconds), so UTC readings are DateTime values, converted by TimeScales using
+// an injected LeapSecondTable and TdbModel (the SPICE DELTET model, parameters from the LSK).
+}
+
+namespace catalog {
 // Value with provenance. A missing value is explicit, never 0 or NaN.
 struct Quantity {
-    std::optional<double> value;             // in the canonical unit for this field
+    std::optional<double> value;             // in `unit`, one of the internal units
+    Unit unit;
     std::optional<double> uncertainty;       // 1-sigma, same unit, when the source gives one
-    SourceRef source;                        // registry id plus locator (file, keyword or table)
-    bool is_derived;                         // computed by the pipeline from other quantities
+    SourceRef source;                        // registry id plus locator (file and keyword, or table)
+    std::string derivation;                  // formula and inputs for derived values, else empty
 };
+}
 
+// Sketches (Phase 3 and 4):
 struct BodyState {
-    BodyId body;
-    Vec3 position_km;                        // relative to the requested center, in the requested frame
-    Vec3 velocity_km_s;
+    catalog::BodyId body;
+    math::Vec3 position_km;                  // relative to the requested center, in the requested frame
+    math::Vec3 velocity_km_s;
     StateQuality quality;                    // Ephemeris, Integrated, Analytic or OutOfCoverage
 };
 
 class Simulation {
 public:
     static Result<Simulation> load(std::span<const std::byte> pack);
-    const BodyCatalog& catalog() const;
+    const catalog::BodyCatalog& catalog() const;
     SimulationClock& clock();
 
-    Result<BodyState> state(BodyId target, BodyId center, FrameId frame, Instant t) const;
-    Result<Quat> orientation(BodyId body, FrameId frame, Instant t) const;
+    Result<BodyState> state(catalog::BodyId target, catalog::BodyId center, frames::FrameId frame,
+                            time::Instant t) const;
+    Result<math::Quat> orientation(catalog::BodyId body, frames::FrameId frame, time::Instant t) const;
 
     // No allocation: fills the caller's buffer for the current clock time, returns the count.
     std::size_t fill_snapshot(const SnapshotRequest& request, std::span<BodySnapshot> out) const;
@@ -183,12 +197,19 @@ public:
 } // namespace usim
 ```
 
+Time conventions implemented in Phase 1 (SPEC section 7.2):
+
+- TDB - TT uses the SPICE DELTET model with the parameters from the leap seconds kernel. TT to TDB is a direct evaluation; TDB to TT is solved by fixed-point iteration. Both agree with CSPICE `unitim` to the last bit in the unit tests.
+- UTC exists only from the first leap second table entry (1972-01-01). Earlier UTC requests fail with `out_of_range`; CSPICE instead extrapolates.
+- In the mixed calendar the dates 1582-10-05 to 1582-10-14 are rejected; CSPICE instead reads them as Gregorian dates.
+- Formatting rounds the seconds and carries correctly into minutes, days and leap seconds (23:59:60).
+
 ### 3.5 The C ABI (`core/capi/include/usim/usim.h`)
 
 The C ABI is the contract for every host that is not C++. Rules (also in the header):
 
 - Only plain C types: fixed-width integers, `double`, and structs of those. No `bool`, and no enums inside structs (use `int32_t`).
-- Every function catches all exceptions and returns a status code. A thread-local `usim_last_error_message()` gives details.
+- Every fallible function catches all exceptions and returns an `int32_t` status: `USIM_STATUS_OK` (0) or one of the `USIM_STATUS_*` codes, which equal `usim::ErrorCode` one-to-one (static assertions in `usim_capi.cpp`; `usim_status_name()` returns the name, and the C# `Status` enum is checked against it in a Unity test). A thread-local `usim_last_error_message()` (planned) gives details.
 - Handles are opaque pointers (`usim_simulation*`) created and destroyed by paired functions.
 - Arrays are caller-owned buffers with an explicit capacity and an out-count.
 - Strings are UTF-8. The lifetime of each library-owned string is documented, and callers never free them.
@@ -305,7 +326,7 @@ For the left-handed hosts the axis map S has determinant -1, so rotations transf
 | `Assets/UniverseSim/Runtime/` (asmdef `UniverseSim.Unity`) | `CoreStartupCheck` (logs the core version and verifies the ABI at startup). Planned: `SimulationHost` (loads the pack from StreamingAssets, owns the simulation handle, runs the frame loop), `BodyView`, `CameraRig`, `OrbitPathView`, `LabelView`, the time controls and info panel controllers. | Started |
 | `Assets/UniverseSim/Editor/` (asmdef `UniverseSim.Unity.Editor`) | `NativePluginImportSettings`: enforces plugin import settings on import and after each domain reload. Planned: menu items to build the core and copy the data pack. | Started |
 | `Assets/UniverseSim/Scenes/Main.unity` | The main scene and first build scene (camera, directional light, global volume from the URP template). | Done |
-| `Assets/UniverseSim/Tests/EditMode/` | Native library load and ABI check, plugin import settings, main scene in build settings with no missing scripts. Planned: snapshot-to-transform mapping. | Started |
+| `Assets/UniverseSim/Tests/EditMode/` | Native library load and ABI check, C# `Status` codes match the core, plugin import settings, main scene in build settings with no missing scripts. Planned: snapshot-to-transform mapping. | Started |
 | `Assets/UniverseSim/UI/` | UI Toolkit UXML and USS files. | Planned |
 | `Assets/UniverseSim/Shaders/` | Sun-direction lighting for bodies (URP point lights cannot cover system distances), rings, atmosphere (visual only). | Planned |
 | `Assets/StreamingAssets/UniverseSim/` | The data pack, copied by script. Ignored by git. | Planned |
@@ -322,7 +343,7 @@ Rules for Unity code:
 
 | Level | Location | Runs with | Purpose |
 |---|---|---|---|
-| Unit | `core/tests/` | `ctest --preset dev` (Catch2) | Math, time, frames, catalog, pack reader, presentation math, the C ABI |
+| Unit | `core/tests/` | `ctest --preset dev` (Catch2) | Math, time, frames, catalog, pack reader, presentation math, the C ABI. Time, frame, quaternion and Chebyshev tests compare against CSPICE values in `core/tests/fixtures/spice_reference.hpp`, generated by `tools/scripts/generate_spice_test_fixtures.py` (pinned SpiceyPy; P2-10 takes this over). |
 | Validation | `core/tests/validation/` (planned) | `ctest --preset dev -L validation` | VAL-01 to VAL-07 against `data/reference/`. Needs a built pack. |
 | Pipeline | `tools/pipeline/tests/` (planned) | `pytest` | Checksum verification, kernel extraction, pack writer, reproducibility |
 | Pack round trip | `core/tests/` (planned) | `ctest` | The C++ reader reads what the Python writer wrote |

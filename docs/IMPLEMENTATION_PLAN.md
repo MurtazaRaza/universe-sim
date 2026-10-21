@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Last updated | 2026-10-20 |
-| Current phase | Phase 1: Core foundations (not started). Phase 0 complete on 2026-10-20. |
+| Current phase | Phase 2: Data pipeline and data pack (not started). Phase 1 complete on 2026-10-20. |
 | Related | [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 ## How to use this plan
@@ -82,8 +82,9 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
 
 **Goal:** the building blocks every later phase depends on, fully unit tested. All code is in `core/include/usim/` and `core/src/`.
 
-- [ ] **P1-01** `usim::math`: `Vec3`, `Mat3`, `Quat` (normalization, multiplication, conversion to and from matrices, slerp), angle helpers, and Chebyshev evaluation of a value and its derivative (Clenshaw recurrence).
-- [ ] **P1-02** `usim/constants.hpp`: definitional constants only, each with a citation comment and a test. Include:
+- [x] **P1-01** `usim::math`: `Vec3`, `Mat3`, `Quat` (normalization, multiplication, conversion to and from matrices, slerp), angle helpers, and Chebyshev evaluation of a value and its derivative (Clenshaw recurrence).
+  - 2026-10-20: Done. Quaternions use the SPICE convention (scalar first, Hamilton, active rotation; `from_matrix` returns w >= 0), checked against CSPICE `axisar` and `m2q`. Chebyshev value and derivative agree with CSPICE `chbint` to 1.8e-15.
+- [x] **P1-02** `usim/constants.hpp`: definitional constants only, each with a citation comment and a test. Include:
   - the astronomical unit (149,597,870.700 km exactly, IAU 2012 Resolution B2)
   - the speed of light (299,792.458 km/s, SI definition)
   - J2000.0 (JD 2451545.0 TDB)
@@ -92,17 +93,27 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
   - the ECLIPJ2000 obliquity as used by SPICE
 
   Measured quantities (GM, radii and so on) must **not** go here; they come from data packs.
-- [ ] **P1-03** `usim::time`: `Instant` (two-part TDB), Julian date conversions, calendar conversion (Gregorian, Julian, and Horizons-style mixed mode), and ISO 8601 parsing and formatting with an explicit time scale suffix.
-- [ ] **P1-04** `usim::time`: conversions TDB <-> TT <-> TAI <-> UTC. The leap second table is injected as data (loaded from the pack in Phase 2; test fixtures until then). Document the TDB-TT model used. Matching SPICE's model is recommended for parity with the validation oracle.
-- [ ] **P1-05** `usim::frames`: `FrameId`, the ICRF <-> ECLIPJ2000 rotation, composition of frame transforms, and a placeholder for body-fixed frames (completed in P4-03).
-- [ ] **P1-06** `usim::catalog`: `BodyId` (namespace + value), `BodyKind`, `Body`, `BodyCatalog` (tree with primary links), `Quantity` (optional value, unit, uncertainty, `SourceRef`, derived flag) and `Source`.
-- [ ] **P1-07** `usim::presentation::AxisConvention` for Unity, Godot and Unreal, for vectors and quaternions. Test against matrix conversion over random rotations (formulas in ARCHITECTURE section 5.4).
-- [ ] **P1-08** Error model: a `Result<T>` type (value or error code plus message) and an error code enum that maps one-to-one to the C ABI status codes. No exceptions in the core's public API.
-- [ ] **P1-09** Doc comments (`///`) on every public declaration, stating units, frame and time scale where relevant.
+  - 2026-10-20: Done, plus the light-year and the Julian year and century. The obliquity (84381.448 arcsec) reproduces CSPICE `pxform("J2000", "ECLIPJ2000")` to 2e-16.
+- [x] **P1-03** `usim::time`: `Instant` (two-part TDB), Julian date conversions, calendar conversion (Gregorian, Julian, and Horizons-style mixed mode), and ISO 8601 parsing and formatting with an explicit time scale suffix.
+  - 2026-10-20: Done. Deviation: `Instant` is `TimePoint<TimeScale::tdb>`, with `TtTime` and `TaiTime` as distinct types of the same template, so scales cannot be mixed up. Julian day numbers match CSPICE for 24 dates (4714 B.C. to 9999) in each of the three calendars. Unlike CSPICE, the mixed calendar rejects 1582-10-05 to 1582-10-14.
+- [x] **P1-04** `usim::time`: conversions TDB <-> TT <-> TAI <-> UTC. The leap second table is injected as data (loaded from the pack in Phase 2; test fixtures until then). Document the TDB-TT model used. Matching SPICE's model is recommended for parity with the validation oracle.
+  - 2026-10-20: Done with the SPICE DELTET model; its parameters are injected too (`TdbModel`), so no measured value is typed into the core. Test data comes from `naif0012.tls` through `tools/scripts/generate_spice_test_fixtures.py` (SpiceyPy 8.2.0, CSPICE N0067) into `core/tests/fixtures/spice_reference.hpp`. Measured against CSPICE at the fixture epochs: TDB <-> TT identical to `unitim` as doubles in both directions, TAI within 3.3e-12 s, UTC -> TDB within 2.1e-12 s of `str2et`, and `et2utc` text identical. Finding: CSPICE's UTC string parser rounds decimal fractions (".816") with errors up to 1.7e-9 s, so the fixture epochs use binary fractions. UTC before 1972 fails with `out_of_range` (CSPICE extrapolates).
+- [x] **P1-05** `usim::frames`: `FrameId`, the ICRF <-> ECLIPJ2000 rotation, composition of frame transforms, and a placeholder for body-fixed frames (completed in P4-03).
+  - 2026-10-20: Done. `FrameTransform` carries R and dR/dt (like SPICE `sxform`) so rotating frames slot in later. `FrameSystem` returns `unsupported` for body-fixed frames until P4-03.
+- [x] **P1-06** `usim::catalog`: `BodyId` (namespace + value), `BodyKind`, `Body`, `BodyCatalog` (tree with primary links), `Quantity` (optional value, unit, uncertainty, `SourceRef`, derived flag) and `Source`.
+  - 2026-10-20: Done. The derived flag is a `derivation` string (formula and inputs; empty means not derived). `BodyCatalog::create` rejects duplicates, missing primaries, cycles, non-finite values and values citing unregistered sources. `Body` has GM, mean radius and the triaxial radii; more fields come with the pack format (P2-07).
+- [x] **P1-07** `usim::presentation::AxisConvention` for Unity, Godot and Unreal, for vectors and quaternions. Test against matrix conversion over random rotations (formulas in ARCHITECTURE section 5.4).
+  - 2026-10-20: Done, with `from_host` inverses. 2000 random rotations per convention match S R S^T to 1e-15.
+- [x] **P1-08** Error model: a `Result<T>` type (value or error code plus message) and an error code enum that maps one-to-one to the C ABI status codes. No exceptions in the core's public API.
+  - 2026-10-20: Done in `usim/result.hpp` (namespace `usim`, not `usim::sim`). Added `USIM_STATUS_*` and `usim_status_name()` to the C ABI (additive, ABI version stays 1), static assertions tying them to `ErrorCode`, and a C# `Status` enum checked against the library in a Unity test (6 of 6 EditMode tests pass).
+- [x] **P1-09** Doc comments (`///`) on every public declaration, stating units, frame and time scale where relevant.
+  - 2026-10-20: Done. SPEC NFR-09 said "XML documentation" (left over from C#); corrected to `///` comments.
 
 **Acceptance criteria**
 - Unit tests cover the edge cases: calendar reform dates, leap second boundaries, negative Julian dates, the quaternion sign ambiguity.
 - The build is warning-free with warnings as errors, and the tests pass under the `asan` preset.
+
+Met on 2026-10-20: 71 tests pass under the `dev`, `release` and `asan` presets with no warnings.
 
 ---
 
@@ -131,7 +142,7 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
   - Embed the source table and the lock file hash.
 - [ ] **P2-08** Reproducibility test: building twice from the same lock file yields identical bytes. No wall-clock time in the content hash.
 - [ ] **P2-09** Round-trip test: a small synthetic pack written by the pipeline is committed as a test fixture (`core/tests/fixtures/`), and the C++ reader tests load it.
-- [ ] **P2-10** `reference` command: reference vectors from CSPICE on the same kernels (states, orientations, time conversions) and Horizons API captures, committed to `data/reference/` with provenance headers.
+- [ ] **P2-10** `reference` command: reference vectors from CSPICE on the same kernels (states, orientations, time conversions) and Horizons API captures, committed to `data/reference/` with provenance headers. It also takes over `tools/scripts/generate_spice_test_fixtures.py` (the Phase 1 unit test oracle) and keeps producing `core/tests/fixtures/spice_reference.hpp`.
 - [ ] **P2-11** **(user)** Decide the default pack time window (for example 1900 to 2100, or the full de440s span) and whether a prebuilt default pack is committed through Git LFS (OQ-02). Record the decision in an ADR.
 
 **Acceptance criteria**

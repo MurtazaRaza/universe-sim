@@ -8,7 +8,7 @@ A physically accurate simulation of the universe, built on real data from verifi
 
 ## Status
 
-Phase 0 (foundation) is complete on macOS: the core builds and passes its tests, and Unity loads it as a native plugin. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+Phases 0 and 1 are complete on macOS. The core has its foundations (math, time scales and calendars, reference frames, the body catalog model, host axis conventions and the error model), checked against NASA's CSPICE toolkit, and Unity loads it as a native plugin. Phase 2 (the data pipeline) is next. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## Documentation
 

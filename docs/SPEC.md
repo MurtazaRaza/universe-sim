@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v0.2 |
+| Status | Draft v0.3 |
 | Last updated | 2026-10-20 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
@@ -135,7 +135,7 @@ In rough order (details in the [implementation plan](IMPLEMENTATION_PLAN.md)):
 | NFR-06 | Accuracy | Validation thresholds are defined in [section 9](#9-accuracy-and-validation) and enforced by automated tests. |
 | NFR-07 | Data size | The default development data pack is at most 50 MB. Larger optional packs are allowed. |
 | NFR-08 | Platforms | Desktop first: macOS (Apple Silicon) and Windows. Other targets are an open question. |
-| NFR-09 | Documentation | Every public core API member has XML documentation that states units, frame and time scale wherever they apply. |
+| NFR-09 | Documentation | Every public core API member has a `///` doc comment that states units, frame and time scale wherever they apply. The C ABI header and the C# bindings document their members the same way. |
 | NFR-10 | Licensing | Every redistributed dataset and asset has its license or terms recorded in the source registry or an attribution file. |
 
 ## 7. Domain conventions
@@ -158,10 +158,11 @@ Display units (au, light-years, degrees, calendar dates) are applied only in pre
 ### 7.2 Time
 
 - The internal time scale is **TDB** (Barycentric Dynamical Time), the independent variable of the JPL ephemerides.
-- An `Instant` is stored in two parts (for example whole days plus seconds of day since J2000.0) to keep sub-microsecond resolution across millennia.
+- An `Instant` is stored in two parts (whole days since J2000.0 plus seconds of day) to keep sub-microsecond resolution across millennia. TT and TAI readings use the same representation as distinct types; UTC readings are calendar fields, because UTC days are not uniform.
+- TDB - TT follows the model SPICE uses (DELTET; Moyer 1981), with its parameters read from the leap seconds kernel. The kernel states it is accurate to about 30 microseconds, and it matches the validation oracle exactly.
 - J2000.0 = JD 2451545.0 TDB = 2000-01-01T12:00:00 TDB.
-- UTC conversions use the leap second table from the registered source (NAIF LSK, IERS Bulletin C). UTC with leap seconds is defined only from 1972-01-01. For earlier dates the UI shows TDB or TT; a ΔT model for historical UT is a later task (OQ-04).
-- Calendar display matches JPL Horizons by default: Gregorian on and after 1582-10-15, Julian before that, with an option for proleptic Gregorian.
+- UTC conversions use the leap second table from the registered source (NAIF LSK, IERS Bulletin C), including 23:59:60 during a leap second. UTC with leap seconds is defined only from 1972-01-01; earlier UTC requests fail with an explicit error. For earlier dates the UI shows TDB or TT; a ΔT model for historical UT is a later task (OQ-04). After the last table entry no further leap seconds are assumed.
+- Calendar display matches JPL Horizons by default: Gregorian on and after 1582-10-15, Julian before that, with options for proleptic Gregorian and proleptic Julian. In the default calendar the dates 1582-10-05 to 1582-10-14 do not exist and are rejected. Years use astronomical numbering (year 0 is 1 B.C.) and ISO 8601 text carries an explicit scale suffix, for example `2000-01-01T12:00:00 TDB`.
 
 ### 7.3 Reference frames
 

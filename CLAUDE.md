@@ -55,7 +55,10 @@ A universe simulation built on real, verified data. It starts with the Solar Sys
   - Functions and variables are `snake_case`.
   - Constants are `k_snake_case`.
   - Private members have a trailing underscore (`value_`).
-- Fallible operations return a `Result<T>` (P1-08) rather than throwing. Mark pure query functions `[[nodiscard]]` and `noexcept` where it holds.
+- Fallible operations return a `usim::Result<T>` (`usim/result.hpp`) rather than throwing. Mark pure query functions `[[nodiscard]]` and `noexcept` where it holds.
+- `usim::ErrorCode` values equal the C ABI `USIM_STATUS_*` codes. A new code needs the `USIM_STATUS_` define, the static assertion in `usim_capi.cpp` and the C# `Status` value in the same change. Never renumber codes.
+- Simulation time is `usim::time::Instant` (TDB, two-part). TT and TAI readings have their own types; UTC is only ever calendar fields (`DateTime`). Convert through `time::TimeScales`, never by adding offsets by hand.
+- Tests never hand-type expected physical values. Use CSPICE results from `core/tests/fixtures/spice_reference.hpp` (regenerate with the command below), or synthetic values that are obviously not real data.
 - No allocation in per-frame paths. Use `std::span` for caller-provided buffers.
 - Warnings are errors. Fix the cause; do not suppress warnings without a comment explaining why.
 - Format with `.clang-format`. Every public declaration gets a `///` doc comment that states units, frame and time scale where relevant.
@@ -99,6 +102,11 @@ tools/scripts/build-core-for-unity.sh
 # Unity EditMode tests, headless (the Editor must not have the project open)
 /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics \
   -projectPath UniverseSim -runTests -testPlatform EditMode -testResults /tmp/editmode.xml
+
+# Regenerate the CSPICE test oracle (only when adding cases); pinned versions are in the script's docstring
+python3 -m venv /tmp/usim-fixtures-venv && /tmp/usim-fixtures-venv/bin/pip install spiceypy==8.2.0 numpy==2.5.3
+/tmp/usim-fixtures-venv/bin/python -I tools/scripts/generate_spice_test_fixtures.py \
+  --lsk data/raw/naif/naif0012.tls --out core/tests/fixtures/spice_reference.hpp
 ```
 
 Python: the repository pins 3.12.8 in `.python-version` (pyenv), so `python3` at the repo root is 3.12.8. The data pipeline commands (`tools/pipeline`) are added in Phase 2.
