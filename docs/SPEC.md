@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v0.3 |
-| Last updated | 2026-10-20 |
+| Status | Draft v0.4 |
+| Last updated | 2026-10-21 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 This document defines **what** the project is and the requirements it must meet. How the system is structured is in [ARCHITECTURE.md](ARCHITECTURE.md). The order of work is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Decisions and their rationale are recorded as ADRs in [adr/](adr/).
@@ -36,7 +36,7 @@ Three properties define the project:
 
 ### 3.1 Version 1: Solar System MVP
 
-- Sun, the eight planets, the Moon, and Pluto, plus the system barycenters, positioned from the JPL DE440 planetary ephemeris (see [ADR-0004](adr/0004-ephemeris-baseline-de440.md)).
+- Sun, the eight planets, the Moon, and Pluto, plus the system barycenters, positioned from the JPL DE440 planetary ephemeris (see [ADR-0004](adr/0004-ephemeris-baseline-de440.md)). Note: `de440s.bsp` gives the centers of the Sun, Mercury, Venus, Earth and the Moon, but only the system barycenters of Mars to Pluto; how v1 positions those planet centers is OQ-08.
 - Default time coverage of 1849-12-26 to 2150-01-22 (the span of `de440s.bsp`). The full DE440 span (1549-12-31 to 2650-01-25) is optional.
 - Physical properties (radii, GM, rotation models) from IAU and JPL sources.
 - Body orientation from the IAU WGCCRE 2015 rotation models.
@@ -211,7 +211,7 @@ Validation tests compare the core against independent references. Reference data
 
 (*) Horizons uses DE441 while the core uses DE440. The two ephemerides come from the same fit and are expected to agree closely in the modern era. Phase 3 measures the actual differences and sets a final threshold with the measurement recorded.
 
-(**) SPICE and SOFA use different TDB-TT models, so small sub-millisecond differences are expected. Timing errors matter only when a user-entered UTC time is mapped to TDB. At Earth's orbital speed of about 30 km/s, 0.1 ms corresponds to about 3 m, well below the VAL-02 threshold. The final threshold is set once measured.
+(**) SPICE and SOFA use different TDB-TT models, so small sub-millisecond differences are expected. Timing errors matter only when a user-entered UTC time is mapped to TDB. At Earth's orbital speed of about 30 km/s, 0.1 ms corresponds to about 3 m, well below the VAL-02 threshold. Measured 2026-10-21 against CSPICE with the same leap seconds kernel (the default pack's time data): at most 4.9e-7 s over 1972 to 2150, which is the resolution of CSPICE's one-double TDB seconds near 2150, not a model difference. The threshold stays provisional until a comparison with SOFA.
 
 Rules:
 
@@ -251,12 +251,13 @@ These items are not scheduled in detail, but the design must not block them:
 | ID | Question | Status |
 |---|---|---|
 | OQ-01 | Baseline ephemeris: DE440 (chosen) or the newer DE442? | Decided in [ADR-0004](adr/0004-ephemeris-baseline-de440.md), revisit after Phase 3 |
-| OQ-02 | Default data span and pack size. How should large data be distributed (download on first run or Git LFS)? | Open, Phase 2 |
+| OQ-02 | Default data span and pack size. How should large data be distributed (download on first run or Git LFS)? | Decided in [ADR-0006](adr/0006-default-pack-window-and-storage.md): full `de440s.bsp` span, default pack committed through Git LFS |
 | OQ-03 | Target platforms beyond desktop (web, mobile, VR)? | Open |
 | OQ-04 | Which ΔT model to use for historical dates before 1972 (UT display)? | Open, pick from a verified source |
 | OQ-05 | License for the project itself? | Open |
 | OQ-06 | Should observer views show apparent (light-time and aberration corrected) positions? | Open, after v1 |
 | OQ-07 | Should the Unity Editor hot-reload the native plugin (load a uniquely named copy) so the Editor does not need a restart after each core rebuild? | Open, decide before Phase 5 |
+| OQ-08 | `de440s.bsp` has no segments for the centers of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto (only their system barycenters). Should v1 add the planet-center segments from the JPL satellite ephemerides (S-NAIF-SAT, trimmed into the pack), or show those planets at their system barycenter, flagged as approximate? | Open, decide before P3-03 |
 
 ## 14. Glossary
 

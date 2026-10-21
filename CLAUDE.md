@@ -58,7 +58,8 @@ A universe simulation built on real, verified data. It starts with the Solar Sys
 - Fallible operations return a `usim::Result<T>` (`usim/result.hpp`) rather than throwing. Mark pure query functions `[[nodiscard]]` and `noexcept` where it holds.
 - `usim::ErrorCode` values equal the C ABI `USIM_STATUS_*` codes. A new code needs the `USIM_STATUS_` define, the static assertion in `usim_capi.cpp` and the C# `Status` value in the same change. Never renumber codes.
 - Simulation time is `usim::time::Instant` (TDB, two-part). TT and TAI readings have their own types; UTC is only ever calendar fields (`DateTime`). Convert through `time::TimeScales`, never by adding offsets by hand.
-- Tests never hand-type expected physical values. Use CSPICE results from `core/tests/fixtures/spice_reference.hpp` (regenerate with the command below), or synthetic values that are obviously not real data.
+- Tests never hand-type expected physical values. Use CSPICE results from `core/tests/fixtures/spice_reference.hpp` or `data/reference/` (regenerate with the commands below), or synthetic values that are obviously not real data.
+- The data pack format is specified in `docs/formats/DATA_PACK.md` and implemented twice (Python writer, C++ reader in `usim::data`). Change the specification first, then both implementations and the round-trip fixture.
 - No allocation in per-frame paths. Use `std::span` for caller-provided buffers.
 - Warnings are errors. Fix the cause; do not suppress warnings without a comment explaining why.
 - Format with `.clang-format`. Every public declaration gets a `///` doc comment that states units, frame and time scale where relevant.
@@ -103,13 +104,32 @@ tools/scripts/build-core-for-unity.sh
 /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics \
   -projectPath UniverseSim -runTests -testPlatform EditMode -testResults /tmp/editmode.xml
 
-# Regenerate the CSPICE test oracle (only when adding cases); pinned versions are in the script's docstring
-python3 -m venv /tmp/usim-fixtures-venv && /tmp/usim-fixtures-venv/bin/pip install spiceypy==8.2.0 numpy==2.5.3
-/tmp/usim-fixtures-venv/bin/python -I tools/scripts/generate_spice_test_fixtures.py \
-  --lsk data/raw/naif/naif0012.tls --out core/tests/fixtures/spice_reference.hpp
+# Validation tests only (the default pack against data/reference/; they also run with the full ctest)
+cd core && ctest --preset dev -L validation
+
+# Data pipeline: one-time setup of its virtual environment (packages pinned by hash)
+python3 -m venv tools/pipeline/.venv
+tools/pipeline/.venv/bin/pip install --require-hashes -r tools/pipeline/requirements.txt
+
+# Download and pin sources, re-check them, build the packs, print a pack
+tools/pipeline/usim-pipeline fetch          # fetch --update re-pins after a publisher change (review first)
+tools/pipeline/usim-pipeline verify
+tools/pipeline/usim-pipeline build          # data/packs/solar-system-<version>.uspack, byte-reproducible
+tools/pipeline/usim-pipeline info
+
+# Regenerate reference data: unit-fixtures, test-pack, spice (all three: offline), horizons (network)
+tools/pipeline/usim-pipeline reference offline
+
+# Pipeline tests
+tools/pipeline/.venv/bin/python -m pytest tools/pipeline
 ```
 
-Python: the repository pins 3.12.8 in `.python-version` (pyenv), so `python3` at the repo root is 3.12.8. The data pipeline commands (`tools/pipeline`) are added in Phase 2.
+Python: the repository pins 3.12.8 in `.python-version` (pyenv), so `python3` at the repo root is 3.12.8. On this machine that interpreter prints harmless "blake2" import errors (Homebrew `libb2` is missing); SHA-256 and MD5 work.
+
+Data rules for agents:
+- The default pack in `data/packs/` is committed through Git LFS (ADR-0006). After a change that alters pack bytes (pipeline, sources, catalog selection), rebuild it, run the tests, and bump `version` in `data/catalog/packs.json` if the content changed; remove the old pack file in the same change.
+- After changing the pack writer, regenerate the round-trip fixture (`reference test-pack`). Never edit generated files in `core/tests/fixtures/` or `data/reference/` by hand.
+- Kernel values are the correctly rounded text of the kernel, cross-checked against CSPICE (ADR-0007). Do not switch to raw `gdpool` values.
 
 ## Writing style for documents
 

@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Status | Active |
-| Last updated | 2026-10-20 |
+| Last updated | 2026-10-21 |
 | Related | [SPEC.md section 10](SPEC.md#10-data-provenance), [ADR-0005](adr/0005-data-provenance-and-storage.md) |
 
-This is the human-readable registry of the sources the simulation may use. The machine-readable counterparts are `data/sources.json` (declared sources) and `data/sources.lock.json` (exact files, sizes, checksums and retrieval dates), both created in Phase 2.
+This is the human-readable registry of the sources the simulation may use. The machine-readable counterparts are `data/sources.json` (declared sources and files) and `data/sources.lock.json` (exact files, sizes, checksums and retrieval dates), maintained by `tools/pipeline/usim-pipeline fetch`. Keep the three consistent: a source is added here and to `sources.json` in the same change.
 
 **Rule: a source must be listed here, with its tier, before any of its data is used.**
 
@@ -41,6 +41,10 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | Publisher MD5 | `de440s.bsp` 3917ee56769db332790c751e2168843d, `de440.bsp` c9d581bfd84209dbeee8b1583939b148 (from `aa_checksums.txt`, 2026-10-20) |
 | Docs | `de440_tech-comments.txt` in the same directory; https://ssd.jpl.nasa.gov/planets/eph_export.html |
 | Citation | Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H. (2021). The JPL Planetary and Lunar Ephemerides DE440 and DE441. *The Astronomical Journal*, 161:105. https://doi.org/10.3847/1538-3881/abd414 |
+| Pinned | `de440s.bsp`: 32,726,016 bytes, SHA-256 c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2, publisher MD5 verified, retrieved 2026-10-20 |
+| Terms | NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged. The same terms apply to every NAIF kernel below. The data pack holds re-encoded extracts with their attribution. |
+| Contents | 14 segments of SPK type 2, all 1849-12-26 to 2150-01-22 TDB: barycenters 1 to 9 and the Sun relative to the SSB, Earth and Moon relative to the Earth-Moon barycenter, Mercury and Venus relative to their barycenters. No segments for the centers of Mars to Pluto (SPEC OQ-08). |
+| Used by | The default data pack (ephemeris); VAL-01 reference states. |
 | Notes | The v1 baseline; see [ADR-0004](adr/0004-ephemeris-baseline-de440.md). |
 
 ### S-JPL-DE441: long-span companion of DE440 (Tier 1)
@@ -77,7 +81,9 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 |---|---|
 | Provides | State vectors, observer tables and orbital elements for nearly all Solar System objects and many spacecraft. It can also generate SPK files for small bodies. |
 | URL | https://ssd.jpl.nasa.gov/horizons/ ; API: https://ssd.jpl.nasa.gov/api/horizons.api ; API docs: https://ssd-api.jpl.nasa.gov/doc/horizons.html |
-| Notes | API version 1.2 as of 2026-10-20. Used to generate reference vectors (VAL-02, VAL-05) and small-body SPKs (P7-02). Record the full query with every saved response. |
+| Citation | Giorgini, J. D., Yeomans, D. K., Chamberlin, A. B., Chodas, P. W., Jacobson, R. A., Keesey, M. S., Lieske, J. H., Ostro, S. J., Standish, E. M., Wimberly, R. N. (1996). JPL's On-Line Solar System Data Service. *Bulletin of the American Astronomical Society*, 28(3), 1158 (as listed in the Horizons manual, read 2026-10-21). |
+| Used by | `data/reference/horizons/` (VAL-02 captures, 2026-10-21): each file records the full request URL, the API signature and the retrieval time. Horizons reports DE441 as the source of planetary states. |
+| Notes | API version 1.2 as of 2026-10-20. Used to generate reference vectors (VAL-02, VAL-05) and small-body SPKs (P7-02). Record the full query with every saved response. Reference data only, never a pack input. |
 
 ## 4. Solar System: physical constants, orientation and time
 
@@ -89,7 +95,9 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | File | `pck00011.tpc` (text kernel, 128 KB) |
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ |
 | Underlying source | Archinal, B. A., et al. (2018). Report of the IAU Working Group on Cartographic Coordinates and Rotational Elements: 2015. *Celestial Mechanics and Dynamical Astronomy*, 130:22. https://doi.org/10.1007/s10569-017-9805-5 (cited in the kernel header) |
-| Notes | The kernel's comments record body-specific caveats (for example bodies for which the IAU report no longer gives rotational elements). Read them when building the catalog. |
+| Checksums | No publisher checksum list (the `pck` directory has no `aa_checksums.txt`; checked 2026-10-20). Pinned: 131,226 bytes, SHA-256 3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1, retrieved 2026-10-20. |
+| Used by | The default data pack: triaxial radii (and the derived mean radius) and IAU rotation elements of the v1 bodies; VAL-04 reference orientations. |
+| Notes | The kernel's comments record body-specific caveats (for example bodies for which the IAU report no longer gives rotational elements). Read them when building the catalog. Its Mars system phase angles are quadratic (`BODY4_MAX_PHASE_DEGREE = 2`), which CSPICE supports from N0067; `pck00011_n0066.tpc` is the variant for older toolkits. The NAIF `aareadme.txt` erratum: the constant 12.711923222 in angle M5 (line 1294) should be 12.71192322; NAIF states the effect on Phobos is at round-off level, and the pack keeps the file's value. CSPICE reads 9 of its 2896 numeric values one ulp away from their text ([ADR-0007](adr/0007-text-kernel-values.md)). |
 
 ### S-NAIF-GM440: gravitational parameters (Tier 1)
 
@@ -99,7 +107,9 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | File | `gm_de440.tpc` |
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ |
 | Underlying sources | Per the file header: DE440 values for the Sun, the planets, the barycenters and the Moon (Park et al. 2021). JPL satellite solution release forms for the other satellites. SB441-N16 for the small-body perturbers. |
-| Notes | GM values differ slightly between sources. For example, Earth's GM is 398600.43550702266 km^3/s^2 in `gm_de440.tpc` but 398600.435436 in the Horizons object data header (both checked 2026-10-20). Always record which file supplied a value. |
+| Checksums | No publisher checksum list (the `pck` directory has no `aa_checksums.txt`; checked 2026-10-20). Pinned: 12,406 bytes, SHA-256 924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140, retrieved 2026-10-20. |
+| Used by | The default data pack: GM of the v1 bodies and barycenters (none for the SSB, which the file does not give). |
+| Notes | GM values differ slightly between sources. For example, Earth's GM is 398600.43550702266 km^3/s^2 in `gm_de440.tpc` but 398600.435436 in the Horizons object data header (both checked 2026-10-20). Always record which file supplied a value. Per the file header, the values for 1 to 10, 199, 299, 301 and 399 are DE440's; those for the other planets (499 to 999) come from the JPL satellite solutions (for example SAT441L, URA116, NEP100/101, PLU058). CSPICE reads 36 of its 227 numeric values up to 5 ulps away from their text ([ADR-0007](adr/0007-text-kernel-values.md)). |
 
 ### S-NAIF-LSK: leap seconds kernel (Tier 1)
 
@@ -110,8 +120,17 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/ |
 | Checksums | No publisher checksum list (the `lsk` directory has no `aa_checksums.txt`; checked 2026-10-20). `naif0012.tls`: 5257 bytes, SHA-256 678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b (retrieved 2026-10-20). |
 | Cross-check | IERS Bulletin C (leap second announcements): https://hpiers.obspm.fr/iers/bul/bulc/ |
-| Used by | Phase 1 unit test fixtures (`tools/scripts/generate_spice_test_fixtures.py`); from Phase 2, the data pack. |
+| Used by | The default data pack (leap seconds and the TDB - TT model); the unit test fixtures (`usim-pipeline reference unit-fixtures`); VAL-03 reference conversions. |
 | Notes | Check Bulletin C when updating. If a new leap second is announced, NAIF releases a new LSK. The kernel's last entry is TAI - UTC = 37 s from 2017-01-01. |
+
+### S-NAIF-IDS: NAIF integer ID codes and body names (Tier 1)
+
+| | |
+|---|---|
+| Provides | The NAIF integer ID of each body and its standard name (for example 3 = EARTH BARYCENTER, 999 = PLUTO). |
+| URL | https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/naif_ids.html |
+| Form | Built into the SPICE Toolkit; the pipeline reads it with `bodc2n` from CSPICE N0067 (SpiceyPy 8.2.0). No file to pin; the toolkit version is recorded in each pack's metadata. |
+| Used by | Body names in the data pack (title-cased for display, for example "Earth Barycenter"). |
 
 ### S-NAIF-MOONPA: high-precision lunar orientation (Tier 1, Phase 6 optional)
 

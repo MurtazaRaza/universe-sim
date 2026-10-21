@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v0.3 |
-| Last updated | 2026-10-20 |
+| Status | Draft v0.4 |
+| Last updated | 2026-10-21 |
 | Related | [SPEC.md](SPEC.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [adr/](adr/) |
 
 This document describes how the system is built. Requirements live in [SPEC.md](SPEC.md). Where this document says "planned", the code does not exist yet. Update this document whenever the implementation diverges from it.
@@ -45,7 +45,7 @@ This document describes how the system is built. Requirements live in [SPEC.md](
                  +----------------------+  +-------------------+  +---------------------------+
 ```
 
-Dependencies point one way. Hosts depend on the core, and the core depends on nothing but the C++ standard library. The pipeline and the core share no code. They share the data pack format specification (`docs/formats/DATA_PACK.md`, Phase 2).
+Dependencies point one way. Hosts depend on the core, and the core depends on nothing but the C++ standard library. The pipeline and the core share no code. They share the data pack format specification ([docs/formats/DATA_PACK.md](formats/DATA_PACK.md)).
 
 ## 2. Repository layout
 
@@ -62,7 +62,7 @@ Universe-Simulation/                    repository root
 │   ├── IMPLEMENTATION_PLAN.md          phased tasks and status
 │   ├── DATA_SOURCES.md                 verified source registry (human-readable)
 │   ├── adr/                            architecture decision records
-│   └── formats/                        (planned) DATA_PACK.md and other file format specs
+│   └── formats/DATA_PACK.md            the data pack format, implemented by the pipeline and the core
 ├── core/                               engine-agnostic simulation (C++20, CMake)
 │   ├── CMakeLists.txt, CMakePresets.json
 │   ├── cmake/                          shared compiler options
@@ -73,18 +73,19 @@ Universe-Simulation/                    repository root
 │   │   └── src/
 │   ├── apps/usim-cli/                  headless host (usim)
 │   ├── tests/                          Catch2 unit tests, one folder per module
-│   │   └── fixtures/                   generated reference data (CSPICE oracle values)
+│   │   ├── fixtures/                   generated: CSPICE oracle values, synthetic round-trip pack
+│   │   └── validation/                 validation tests (ctest label `validation`) on data/
 │   └── build/<preset>/                 build output (ignored)
 ├── tools/
-│   ├── pipeline/                       (planned, Phase 2) Python: fetch, verify, build, info, reference
-│   └── scripts/                        build-core-for-unity.sh, generate_spice_test_fixtures.py
-├── data/                               (planned, Phase 2)
+│   ├── pipeline/                       Python data pipeline (section 4): usim-pipeline, usim_pipeline/, tests/
+│   └── scripts/                        build-core-for-unity.sh
+├── data/
 │   ├── sources.json                    declared sources (committed)
-│   ├── sources.lock.json               resolved files and checksums (committed)
-│   ├── catalog/                        body selection and manual entries (committed)
-│   ├── reference/                      validation vectors with provenance (committed)
+│   ├── sources.lock.json               pinned files and checksums (committed)
+│   ├── catalog/                        packs.json, body selections, manual/ entries (committed)
+│   ├── reference/                      validation vectors with provenance; horizons/ API captures (committed)
 │   ├── raw/                            downloaded source files (ignored)
-│   └── packs/                          generated data packs (ignored)
+│   └── packs/                          built packs (ignored, except the default pack, committed via LFS)
 └── UniverseSim/                        Unity 6 project (rendering layer)
     └── Assets/
         ├── UniverseSim/                project-owned Unity content
@@ -132,13 +133,13 @@ Each module is a subdirectory of `include/usim/` and `src/` with a matching nest
 | `usim/constants.hpp` | Phase 1 | Definitional constants only, each with a citation | `constants::k_au_km`, `k_c_km_s`, `k_j2000_jd`, `k_tt_minus_tai_s`, `k_eclipj2000_obliquity_rad`, ... |
 | `usim::math` | Phase 1 | Double-precision linear algebra and numerics | `Vec3`, `Mat3`, `Quat`, `chebyshev_on_interval`, angle helpers |
 | `usim::time` | Phase 1 | Instants, time scales, calendars, ISO 8601 | `TimePoint<Scale>` (`Instant` = TDB, `TtTime`, `TaiTime`), `TimeScales`, `LeapSecondTable`, `TdbModel`, `CalendarDate`, `DateTime`, `Calendar` |
-| `usim::frames` | Phase 1 (inertial); body-fixed in P4-03 | Reference frames and transforms | `FrameId`, `FrameTransform`, `StateVector`, `FrameSystem` |
+| `usim::frames` | Phase 1 (inertial); body-fixed in P4-03 | Reference frames and transforms; IAU rotation elements (data in Phase 2, evaluation in P4-03) | `FrameId`, `FrameTransform`, `StateVector`, `FrameSystem`, `IauRotationElements` |
 | `usim::catalog` | Phase 1 | Bodies, hierarchy, sourced quantities | `BodyId`, `BodyKind`, `Body`, `BodyCatalog`, `Quantity`, `SourceRef`, `Source` |
 | `usim::presentation` | Phase 1 (axes); more in Phase 4 | Engine-agnostic view math | `AxisConvention`; planned: `ViewOrigin`, `ScaleMode`, `OrbitPathSampler` |
 | `usim::ephemeris` | Planned (Phase 3) | Evaluation of ephemeris segments from the pack | `ChebyshevSegment` (SPK types 2 and 3), `EphemerisChain`, `Coverage` |
 | `usim::propagation` | Planned (Phase 7) | Non-ephemeris motion | `KeplerPropagator`, `Integrator`, `Dop853`, `Ias15`, `ForceModel` |
 | `usim::sim` | Planned (Phase 4) | The facade that hosts use | `Simulation`, `SimulationClock`, `BodyState`, `StateQuality` |
-| `usim::data` | Planned (Phase 2) | Data pack reading | `DataPackReader`, `DataPackHeader`, `FormatVersion` |
+| `usim::data` | Phase 2 | Data pack reading and validation, SHA-256 | `DataPack`, `DataPackHeader`, `FormatVersion`, `EphemerisSegment`, `SourceFile`, `sha256` |
 
 ### 3.4 Key types
 
@@ -244,31 +245,36 @@ USIM_API int32_t usim_fill_snapshot(const usim_simulation* sim, const usim_snaps
 - Each segment gives a target relative to a center (for example Moon relative to the Earth-Moon barycenter). `EphemerisChain` resolves any target and center pair through their common ancestor. For example, Moon relative to Earth = (Moon wrt EMB) - (Earth wrt EMB).
 - The authoritative references for record layout and evaluation are the NAIF "SPK Required Reading" and "DAF Required Reading".
 
-### 3.7 Data pack (planned, format v1)
+### 3.7 Data pack (format v1)
 
-The data pack is the contract between the pipeline (Python writer) and the core (C++ reader). Both implement `docs/formats/DATA_PACK.md` (written in Phase 2), and round-trip tests keep them consistent. Planned contents:
+The data pack is the contract between the pipeline (Python writer) and the core (C++ reader, `usim::data::DataPack`). Both implement [docs/formats/DATA_PACK.md](formats/DATA_PACK.md), and a round-trip fixture keeps them consistent (`core/tests/fixtures/test_pack_v1.uspack`, written by the pipeline, with its expected contents in `test_pack_expected.hpp`). Contents:
 
-- Header: magic bytes, format version, endianness marker, hash of `sources.lock.json`, content hash.
-- String table.
-- Source table: the registry entries used, with citations and checksums.
-- Catalog: bodies, hierarchy and `Quantity` fields with source references.
-- Rotation models: IAU coefficients per body.
-- Leap second table.
-- Ephemeris segments: Chebyshev records, optionally trimmed to a time window.
+- Header: magic, format version, endianness marker, SHA-256 of the content (verified on load), SHA-256 of the canonical lock file.
+- Sections: metadata, string table, sources, source files (from the lock file), bodies, quantities with per-value source and derivation, IAU rotation elements, time data (leap seconds and the TDB - TT model), ephemeris segment descriptors, and the Chebyshev records.
 
-All multi-byte values are little-endian, and doubles are IEEE 754 binary64. The core never parses JSON (ADR-0005).
+All multi-byte values are little-endian, and doubles are IEEE 754 binary64. Sections are 8-byte aligned. Minor format versions only add sections, which older readers skip. The core never parses JSON (ADR-0005). `DataPack::parse` validates everything (bounds, codes, units, hierarchy, coverage, TT - TAI = 32.184 s) and returns `data_format` or `incompatible_version` errors; it keeps no pointers into the input buffer.
 
-## 4. Data pipeline: `tools/pipeline/` (planned, Phase 2)
+The default pack, `data/packs/solar-system-1.0.0.uspack` (32.7 MB, the full span of `de440s.bsp`), is committed through Git LFS ([ADR-0006](adr/0006-default-pack-window-and-storage.md)).
 
-A Python package (Python 3.12 or newer, pinned to 3.12.8 in `.python-version`; dependencies pinned in `requirements.txt`, for example SpiceyPy and numpy). It runs only on developer machines (and in CI once it exists).
+## 4. Data pipeline: `tools/pipeline/`
+
+A Python package (`usim_pipeline`; Python 3.12.8 from `.python-version`; SpiceyPy 8.2.0, numpy 2.5.3 and pytest 9.1.1 pinned by version and hash in `requirements.txt`, generated by `pin_requirements.py`). It runs only on developer machines (and in CI once it exists). The `tools/pipeline/usim-pipeline` script runs it in its virtual environment (`tools/pipeline/.venv`) from any directory.
 
 | Command | Does |
 |---|---|
-| `fetch` | Downloads every file in `data/sources.json` into `data/raw/`, verifies the publisher checksum (where one exists) and the SHA-256, and writes `data/sources.lock.json` (URL, size, hashes, retrieval time). With an existing lock file it verifies instead of updating. |
+| `fetch` | Downloads every file declared in `data/sources.json` over HTTPS into `data/raw/`, checks the size against Content-Length, the publisher's MD5 list where one exists (NAIF `aa_checksums.txt`), and records size, SHA-256, MD5 and retrieval time in `data/sources.lock.json`. With an existing lock entry the download must match it; `fetch --update` re-pins after review. |
 | `verify` | Re-checks `data/raw/` against the lock file. |
-| `build` | Parses the kernels (through SpiceyPy/CSPICE) and the catalog inputs, derives values (recording their derivations), extracts and trims the ephemeris segments, and writes `data/packs/<name>-<version>.uspack`. The output is byte-for-byte reproducible. |
-| `info` | Prints the contents of a pack: bodies, coverage, sources, sizes. |
-| `reference` | Generates validation vectors with CSPICE from the same kernels, and captures Horizons API responses, into `data/reference/`. Every file has a header recording the tool versions, kernels, query parameters and retrieval date. |
+| `build` | Builds the packs defined in `data/catalog/packs.json` into `data/packs/<name>-<version>.uspack`. Byte-for-byte reproducible: no wall-clock time, deterministic order, derived values computed in decimal arithmetic (no platform libm). |
+| `info` | Prints a pack: header, metadata, sources, files, bodies with every value and its source, time data, and segment coverage. |
+| `reference` | `unit-fixtures` (core/tests/fixtures/spice_reference.hpp), `test-pack` (the round-trip fixture), `spice` (VAL-01, VAL-03 and VAL-04 vectors and the kernel values the default pack must match), `offline` (all three), `horizons` (VAL-02 captures of the Horizons API, network). Outputs carry provenance headers: tools, kernels with their lock entries, queries, and retrieval time for API captures. |
+
+How `build` assembles a pack:
+
+- **Bodies** come from a selection file (`data/catalog/bodies-v1.json`: NAIF ID, kind, primary). Names come from the NAIF ID table built into CSPICE (`bodc2n`), title-cased.
+- **Constants** come from text kernels: radii and IAU rotation elements from `pck00011.tpc`, GM from `gm_de440.tpc`, leap seconds and the TDB - TT model from `naif0012.tls`. Values are the correctly rounded value of the kernel's text, cross-checked against CSPICE's kernel pool ([ADR-0007](adr/0007-text-kernel-values.md)). Each value records its file and variable.
+- **Derived values** record their formula: the mean radius is cbrt(a b c), the radius of the sphere with the ellipsoid's volume.
+- **Manual entries** (`data/catalog/manual/*.json`) are accepted only with source id, URL, access date, table and transcriber note, only for declared sources, and never for a field a kernel provides. None exist yet.
+- **Ephemeris segments** of SPK types 2 and 3 are read with the DAF routines and copied bit for bit, optionally trimmed to the pack's time window.
 
 CSPICE is an independent oracle for validation. It is never a runtime dependency.
 
@@ -343,10 +349,10 @@ Rules for Unity code:
 
 | Level | Location | Runs with | Purpose |
 |---|---|---|---|
-| Unit | `core/tests/` | `ctest --preset dev` (Catch2) | Math, time, frames, catalog, pack reader, presentation math, the C ABI. Time, frame, quaternion and Chebyshev tests compare against CSPICE values in `core/tests/fixtures/spice_reference.hpp`, generated by `tools/scripts/generate_spice_test_fixtures.py` (pinned SpiceyPy; P2-10 takes this over). |
-| Validation | `core/tests/validation/` (planned) | `ctest --preset dev -L validation` | VAL-01 to VAL-07 against `data/reference/`. Needs a built pack. |
-| Pipeline | `tools/pipeline/tests/` (planned) | `pytest` | Checksum verification, kernel extraction, pack writer, reproducibility |
-| Pack round trip | `core/tests/` (planned) | `ctest` | The C++ reader reads what the Python writer wrote |
+| Unit | `core/tests/` | `ctest --preset dev` (Catch2) | Math, time, frames, catalog, pack reader, SHA-256, presentation math, the C ABI. Time, frame, quaternion and Chebyshev tests compare against CSPICE values in `core/tests/fixtures/spice_reference.hpp` (`usim-pipeline reference unit-fixtures`). |
+| Validation | `core/tests/validation/` (`usim_validation_tests`) | `ctest --preset dev -L validation` | The default pack against `data/reference/`: kernel values match exactly (Phase 2), VAL-03 (Phase 2); VAL-01, VAL-02 (Phase 3), VAL-04 (Phase 4). They run with the other tests and skip if the pack is missing. |
+| Pipeline | `tools/pipeline/tests/` | `tools/pipeline/.venv/bin/python -m pytest tools/pipeline` | Registry and lock validation, fetch and verify (fake server), the kernel parser, pack writer and reader, trimming, manual entries, reproducibility, SPK bytes against the raw file, committed fixtures current |
+| Pack round trip | `core/tests/data/` | `ctest` | The C++ reader reads the pipeline-written fixture and finds exactly the recorded contents; damaged packs are rejected |
 | Unity EditMode | `UniverseSim/Assets/UniverseSim/Tests/EditMode` | Unity Test Runner | Native load, ABI, import settings, adapter mapping |
 | Unity PlayMode | `UniverseSim/Assets/UniverseSim/Tests/PlayMode` (planned) | Unity Test Runner | Scene loads, bodies spawn, positions match the CLI |
 
@@ -366,7 +372,7 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev    # core
 ./build/dev/apps/usim-cli/usim --version
 cd ..
 tools/scripts/build-core-for-unity.sh                                       # universal plugin into Unity
-python -m pipeline fetch && python -m pipeline build                        # (planned, Phase 2)
+tools/pipeline/usim-pipeline fetch && tools/pipeline/usim-pipeline build    # data pack (section 4)
 ```
 
 ## 9. Paths to other engines

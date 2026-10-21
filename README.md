@@ -8,7 +8,7 @@ A physically accurate simulation of the universe, built on real data from verifi
 
 ## Status
 
-Phases 0 and 1 are complete on macOS. The core has its foundations (math, time scales and calendars, reference frames, the body catalog model, host axis conventions and the error model), checked against NASA's CSPICE toolkit, and Unity loads it as a native plugin. Phase 2 (the data pipeline) is next. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+Phases 0 to 2 are complete on macOS. The core has its foundations (math, time scales and calendars, reference frames, the body catalog model, host axis conventions and the error model), checked against NASA's CSPICE toolkit, and Unity loads it as a native plugin. A reproducible Python pipeline builds the data pack from pinned NAIF kernels, the core reads and validates it, and reference data for validation is in `data/reference/`. Phase 3 (the ephemeris engine) is next. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## Documentation
 
@@ -18,6 +18,7 @@ Phases 0 and 1 are complete on macOS. The core has its foundations (math, time s
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, C ABI, host contract and repository layout |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phases, tasks and status |
 | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) | Registry of verified data sources |
+| [docs/formats/DATA_PACK.md](docs/formats/DATA_PACK.md) | The data pack file format |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 | [CLAUDE.md](CLAUDE.md) | Rules and conventions for AI agents and contributors |
 
@@ -26,8 +27,8 @@ Phases 0 and 1 are complete on macOS. The core has its foundations (math, time s
 ```
 docs/          specification, architecture, plan, data sources, ADRs
 core/          C++20 simulation library, C ABI, CLI host and tests (CMake)
-tools/         scripts (build-core-for-unity); Python data pipeline (planned)
-data/          source registry, lock file, catalog inputs, reference vectors (planned)
+tools/         scripts (build-core-for-unity); Python data pipeline (tools/pipeline)
+data/          source registry, lock file, catalog inputs, reference vectors, the default pack (Git LFS)
 UniverseSim/   Unity 6 project (rendering layer)
 ```
 
@@ -36,7 +37,7 @@ UniverseSim/   Unity 6 project (rendering layer)
 - Git with Git LFS (`git lfs install` once per machine)
 - CMake 3.25 or newer, Ninja, and a C++20 compiler (Apple Clang from Xcode on macOS)
 - Unity 6000.5.1f1 (URP)
-- Python 3.12 or newer (from Phase 2, for the data pipeline). The repository pins 3.12.8 in `.python-version` for pyenv users.
+- Python 3.12 or newer, only to rebuild data or reference files. The repository pins 3.12.8 in `.python-version` for pyenv users.
 
 On macOS with Homebrew: `brew install git-lfs cmake ninja`.
 
@@ -55,6 +56,16 @@ tools/scripts/build-core-for-unity.sh
 
 # 3. Open UniverseSim/ in Unity 6000.5.1f1 and open Assets/UniverseSim/Scenes/Main.unity.
 #    Entering Play mode logs the core version.
+```
+
+The default data pack (`data/packs/solar-system-1.0.0.uspack`) is committed through Git LFS, so a clone has data without running the pipeline. To rebuild data from the sources:
+
+```
+python3 -m venv tools/pipeline/.venv
+tools/pipeline/.venv/bin/pip install --require-hashes -r tools/pipeline/requirements.txt
+tools/pipeline/usim-pipeline fetch     # download and verify the pinned NAIF kernels
+tools/pipeline/usim-pipeline build     # rebuild the pack (byte-identical to the committed one)
+tools/pipeline/usim-pipeline info      # list bodies, values with sources, and coverage
 ```
 
 The plugin build currently targets macOS. A Windows build is deferred (P0-13); it can be cross-compiled on macOS when needed.

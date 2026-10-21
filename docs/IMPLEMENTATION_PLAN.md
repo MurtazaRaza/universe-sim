@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Last updated | 2026-10-20 |
-| Current phase | Phase 2: Data pipeline and data pack (not started). Phase 1 complete on 2026-10-20. |
+| Current phase | Phase 3: Ephemeris engine (not started). Phase 2 complete on 2026-10-21. Decide OQ-08 (P3-09) before P3-03. |
 | Related | [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 ## How to use this plan
@@ -121,34 +121,47 @@ Met on 2026-10-20: 71 tests pass under the `dev`, `release` and `asan` presets w
 
 **Goal:** a reproducible path from verified sources to a versioned data pack, plus independent reference data for validation. Uses Python 3.12.8 (pinned in `.python-version`) with a virtual environment in `tools/pipeline/.venv`.
 
-- [ ] **P2-01** `tools/pipeline/`: a Python package (`pyproject.toml`, pinned `requirements.txt`, pytest) with the commands `fetch`, `verify`, `build`, `info` and `reference` (ARCHITECTURE section 4).
-- [ ] **P2-02** Write `data/sources.json` with the v1 sources from DATA_SOURCES.md: `de440s.bsp`, `pck00011.tpc`, `gm_de440.tpc` and `naif0012.tls`. Implement `fetch`:
+- [x] **P2-01** `tools/pipeline/`: a Python package (`pyproject.toml`, pinned `requirements.txt`, pytest) with the commands `fetch`, `verify`, `build`, `info` and `reference` (ARCHITECTURE section 4).
+  - 2026-10-21: Done. Package `usim_pipeline`, run through `tools/pipeline/usim-pipeline`. `requirements.txt` pins every package by version and by the SHA-256 of every PyPI file (`pin_requirements.py`; `pip install --require-hashes`): SpiceyPy 8.2.0, numpy 2.5.3, pytest 9.1.1 and its dependencies, each at least two weeks old. 87 pytest tests.
+- [x] **P2-02** Write `data/sources.json` with the v1 sources from DATA_SOURCES.md: `de440s.bsp`, `pck00011.tpc`, `gm_de440.tpc` and `naif0012.tls`. Implement `fetch`:
   - HTTPS download with a size check
   - publisher MD5 check (from NAIF `aa_checksums.txt` where available)
   - SHA-256
   - writes `data/sources.lock.json`
-- [ ] **P2-03** Segment extraction for SPK types 2 and 3 through SpiceyPy (the DAF functions). Record the layout of the extracted records (init, interval length, coefficients) in the pack specification.
-- [ ] **P2-04** Constants from text kernels through the SpiceyPy kernel pool (`furnsh`, `gdpool`, `bodvrd`). Every value records its file and keyword.
-- [ ] **P2-05** Catalog builder for the v1 bodies: SSB, Sun, the planet system barycenters, the planets, the Moon and Pluto.
+  - 2026-10-20: Done, plus `S-NAIF-IDS` and `S-JPL-HORIZONS` (no files). Only `spk/planets` publishes an MD5 list (`de440s.bsp` verified); `pck` and `lsk` have none. An existing lock entry is never changed silently: a different download fails until `fetch --update`. Tested with a fake server (MD5 and size mismatches, publisher changes, stale entries).
+- [x] **P2-03** Segment extraction for SPK types 2 and 3 through SpiceyPy (the DAF functions). Record the layout of the extracted records (init, interval length, coefficients) in the pack specification.
+  - 2026-10-20: Done (`dafopr`, `dafgs`, `dafus`, `dafgda`); layout in DATA_PACK.md, section EPHS. A test compares the pack's records with the raw bytes of the SPK file, read without SpiceyPy. Finding: `de440s.bsp` has no segments for the centers of Mars to Pluto, only their barycenters (OQ-08, P3-09).
+- [x] **P2-04** Constants from text kernels through the SpiceyPy kernel pool (`furnsh`, `gdpool`, `bodvrd`). Every value records its file and keyword.
+  - 2026-10-20: Done with a deviation (ADR-0007). Finding: CSPICE's text kernel parser is not correctly rounded (36 of 227 values in `gm_de440.tpc` and 9 of 2896 in `pck00011.tpc` differ from their text by 1 to 5 ulps). The pack keeps the correctly rounded value of the text, parsed by the pipeline and cross-checked against the kernel pool within 16 ulps (measured maximum 5). Kernels are loaded one at a time, so each value's file is certain.
+- [x] **P2-05** Catalog builder for the v1 bodies: SSB, Sun, the planet system barycenters, the planets, the Moon and Pluto.
   - Radii and rotation elements come from `pck00011.tpc`.
   - GM comes from `gm_de440.tpc`.
   - Names and IDs come from NAIF.
   - Derived values (for example mean radius from the triaxial radii) record their formula.
-- [ ] **P2-06** Manual entry mechanism: `data/catalog/manual/*.json` with a schema requiring source id, URL, access date, table or section, and transcriber note. The pipeline rejects entries missing any of these. Use it only when no machine-readable Tier 1 source exists.
-- [ ] **P2-07** Data pack format v1:
+  - 2026-10-20: Done. Selection in `data/catalog/bodies-v1.json` (21 bodies; the Moon's primary is the Earth-Moon barycenter, mirroring the ephemeris, SPEC 7.5). 64 values: GM for 20 bodies (the file gives none for the SSB), radii and the derived mean radius for 11; IAU rotation elements for 11, including the quadratic Mars phase angles. The mean radius is cbrt(a b c), computed in 50-digit decimal arithmetic so no platform libm affects the bytes. Names come from CSPICE `bodc2n`, title-cased (new registry entry S-NAIF-IDS).
+- [x] **P2-06** Manual entry mechanism: `data/catalog/manual/*.json` with a schema requiring source id, URL, access date, table or section, and transcriber note. The pipeline rejects entries missing any of these. Use it only when no machine-readable Tier 1 source exists.
+  - 2026-10-20: Done (`usim_pipeline/manual.py`, schema in its docstring). Also rejected: undeclared sources, wrong units, unknown keys, and entries for a field a kernel already provides. v1 needs no manual entries.
+- [x] **P2-07** Data pack format v1:
   - Write `docs/formats/DATA_PACK.md`.
   - Implement the writer in Python and the reader in C++ (`usim::data`).
   - Support trimming ephemeris segments to a time window.
   - Embed the source table and the lock file hash.
-- [ ] **P2-08** Reproducibility test: building twice from the same lock file yields identical bytes. No wall-clock time in the content hash.
-- [ ] **P2-09** Round-trip test: a small synthetic pack written by the pipeline is committed as a test fixture (`core/tests/fixtures/`), and the C++ reader tests load it.
-- [ ] **P2-10** `reference` command: reference vectors from CSPICE on the same kernels (states, orientations, time conversions) and Horizons API captures, committed to `data/reference/` with provenance headers. It also takes over `tools/scripts/generate_spice_test_fixtures.py` (the Phase 1 unit test oracle) and keeps producing `core/tests/fixtures/spice_reference.hpp`.
-- [ ] **P2-11** **(user)** Decide the default pack time window (for example 1900 to 2100, or the full de440s span) and whether a prebuilt default pack is committed through Git LFS (OQ-02). Record the decision in an ADR.
+  - 2026-10-21: Done. `usim::data::DataPack` validates everything and verifies the content hash with a new C++ SHA-256 (FIPS 180-4 examples and hashlib vectors). It also carries the source files from the lock, IAU rotation elements (`usim::frames::IauRotationElements`, data only until P4-03) and the time data. The lock hash is over canonical JSON, so line endings do not change it. Default pack: 32,681,168 bytes; it loads in about 0.17 s (release build, SHA-256 included).
+- [x] **P2-08** Reproducibility test: building twice from the same lock file yields identical bytes. No wall-clock time in the content hash.
+  - 2026-10-21: Done. A pytest builds twice and compares; another checks the committed default pack equals a fresh build. A simulated clean clone (fresh downloads into an empty root) built the identical file.
+- [x] **P2-09** Round-trip test: a small synthetic pack written by the pipeline is committed as a test fixture (`core/tests/fixtures/`), and the C++ reader tests load it.
+  - 2026-10-21: Done. `test_pack_v1.uspack` (3592 bytes, Git LFS) and `test_pack_expected.hpp` (`usim-pipeline reference test-pack`). The C++ tests compare every field bit for bit and check that damaged packs are rejected.
+- [x] **P2-10** `reference` command: reference vectors from CSPICE on the same kernels (states, orientations, time conversions) and Horizons API captures, committed to `data/reference/` with provenance headers. It also takes over `tools/scripts/generate_spice_test_fixtures.py` (the Phase 1 unit test oracle) and keeps producing `core/tests/fixtures/spice_reference.hpp`.
+  - 2026-10-21: Done. VAL-01: 966 states for 21 target and center pairs (`spkgeo`). VAL-03: 182 UTC and 101 TDB epochs. VAL-04: 341 orientations with rates (`sxform`). VAL-02: 14 Horizons captures (barycenters, Sun, Mercury, Venus, Earth, Moon relative to the SSB, 1900 to 2100 every 397 days; DE441). Also `pack_kernel_values.csv`, the kernel text of every pack value. The old generator script was removed; its output is identical apart from the first line. VAL-03 already passes against the pack's time data: at most 4.9e-7 s, the resolution of CSPICE's one-double TDB seconds near 2150.
+- [x] **P2-11** **(user)** Decide the default pack time window (for example 1900 to 2100, or the full de440s span) and whether a prebuilt default pack is committed through Git LFS (OQ-02). Record the decision in an ADR.
+  - 2026-10-20: The project owner chose the full `de440s.bsp` span and committing the default pack through Git LFS (ADR-0006).
 
 **Acceptance criteria**
 - From a clean clone: `fetch` then `build` produces a pack. All checksums verify. `info` lists bodies, coverage and sources.
 - The C++ reader loads the pack, and the catalog values match the source kernels exactly.
 - Reference vector files exist for VAL-01 to VAL-04.
+
+Met on 2026-10-21: a simulated clean clone ran `fetch` (all files matched the lock), `verify`, `build` (identical to the committed pack) and `info`. The validation tests confirm every catalog, rotation and time value equals the kernel text exactly. Reference files exist for VAL-01 to VAL-04. 85 core tests pass under `dev`, `release` and `asan`; 87 pipeline tests pass.
 
 ---
 
@@ -167,6 +180,7 @@ Met on 2026-10-20: 71 tests pass under the `dev`, `release` and `asan` presets w
   - Meet NFR-03.
 - [ ] **P3-07** Validation tests VAL-01 (against CSPICE) and VAL-02 (against Horizons), labeled `validation` in ctest. Measure the DE440 vs Horizons (DE441) differences, record them here, and set the final VAL-02 threshold.
 - [ ] **P3-08** Make the validation tests easy to run locally (one command that builds the pack if missing and runs `ctest -L validation`). Add them to CI once CI exists (P0-11).
+- [ ] **P3-09** **(user)** Decide OQ-08 before P3-03: `de440s.bsp` has no segments for the centers of Mars to Pluto. Either add the planet-center segments from the JPL satellite ephemerides (S-NAIF-SAT; large downloads, trimmed into the pack) or show those planets at their system barycenter, flagged as approximate (FR-SIM-03, FR-SIM-04). Record the decision in an ADR.
 
 **Acceptance criteria**
 - VAL-01 and VAL-02 pass.

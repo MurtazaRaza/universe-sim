@@ -13,6 +13,8 @@ Write an ADR when a choice affects module boundaries, data formats, units or fra
 | [0003](0003-units-time-and-reference-frames.md) | Units, time scale and reference frames | Accepted |
 | [0004](0004-ephemeris-baseline-de440.md) | JPL DE440 as the baseline planetary ephemeris | Accepted |
 | [0005](0005-data-provenance-and-storage.md) | Data provenance, pipeline and storage of large data | Accepted |
+| [0006](0006-default-pack-window-and-storage.md) | Default pack window and storage | Accepted |
+| [0007](0007-text-kernel-values.md) | Reading values from text kernels | Accepted |
 
 ## Template
 
