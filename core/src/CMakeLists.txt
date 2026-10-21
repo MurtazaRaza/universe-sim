@@ -1,6 +1,15 @@
 # usim_core: the engine-agnostic simulation library (C++20, standard library only).
 
 add_library(usim_core STATIC
+    catalog/catalog.cpp
+    frames/frames.cpp
+    math/chebyshev.cpp
+    math/quat.cpp
+    presentation/axis_convention.cpp
+    result.cpp
+    time/calendar.cpp
+    time/iso8601.cpp
+    time/time_scales.cpp
     version.cpp)
 add_library(usim::core ALIAS usim_core)
 

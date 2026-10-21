@@ -41,6 +41,25 @@ USIM_API uint32_t usim_abi_version(void);
  * The string has static storage duration and must not be freed. */
 USIM_API const char* usim_version_string(void);
 
+/* Status codes. Fallible functions return one of these as int32_t: 0 on success, otherwise the reason.
+ * Each non-zero value equals the C++ usim::ErrorCode with the same name. Codes are never renumbered,
+ * but new ones may be appended, so hosts must treat unknown non-zero values as generic failures. */
+#define USIM_STATUS_OK 0
+#define USIM_STATUS_INVALID_ARGUMENT 1     /* an argument is outside its domain */
+#define USIM_STATUS_PARSE_ERROR 2          /* text could not be parsed */
+#define USIM_STATUS_OUT_OF_RANGE 3         /* outside the range a model supports (e.g. UTC before 1972) */
+#define USIM_STATUS_OUT_OF_COVERAGE 4      /* no data covers the requested instant */
+#define USIM_STATUS_NOT_FOUND 5            /* unknown body, frame or source */
+#define USIM_STATUS_UNSUPPORTED 6          /* valid, but not implemented by this version */
+#define USIM_STATUS_DATA_FORMAT 7          /* malformed or inconsistent input data */
+#define USIM_STATUS_INCOMPATIBLE_VERSION 8 /* input data format version not supported */
+#define USIM_STATUS_IO_ERROR 9             /* a file could not be read */
+#define USIM_STATUS_INTERNAL 10            /* a bug in the core */
+
+/* Returns the lowercase name of a status code without the prefix ("ok", "invalid_argument", ...), or
+ * "unknown" for an unrecognized value. The string has static storage duration and must not be freed. */
+USIM_API const char* usim_status_name(int32_t status);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

@@ -1,0 +1,4 @@
+# clangd (editor language server): read compile flags from the dev preset's build.
+# Run `cd core && cmake --preset dev` once so core/build/dev/compile_commands.json exists.
+CompileFlags:
+  CompilationDatabase: core/build/dev

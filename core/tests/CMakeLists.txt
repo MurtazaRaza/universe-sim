@@ -10,9 +10,24 @@ FetchContent_Declare(Catch2
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(usim_core_tests
-    test_version.cpp)
+    catalog/test_catalog.cpp
+    frames/test_frames.cpp
+    math/test_chebyshev.cpp
+    math/test_quat.cpp
+    math/test_vec_mat.cpp
+    presentation/test_axis_convention.cpp
+    test_constants.cpp
+    test_result.cpp
+    test_version.cpp
+    time/test_calendar.cpp
+    time/test_iso8601.cpp
+    time/test_time_point.cpp
+    time/test_time_scales.cpp)
 
 target_link_libraries(usim_core_tests PRIVATE usim::core Catch2::Catch2WithMain)
+
+# Tests include shared helpers (test_support.hpp) and generated reference data (fixtures/) by path.
+target_include_directories(usim_core_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # The C ABI tests link the shared library, so they exercise the exported symbols.
 if(TARGET usim::capi)
