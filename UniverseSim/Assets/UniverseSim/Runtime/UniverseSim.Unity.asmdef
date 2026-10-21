@@ -1,0 +1,14 @@
+{
+    "name": "UniverseSim.Unity",
+    "rootNamespace": "UniverseSim.Unity",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
