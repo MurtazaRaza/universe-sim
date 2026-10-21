@@ -1,0 +1,26 @@
+# C++ formatting for core/. Run: clang-format -i <files>  (install with: brew install clang-format)
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+IndentWidth: 4
+ColumnLimit: 110
+PointerAlignment: Left
+ReferenceAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+NamespaceIndentation: None
+FixNamespaceComments: true
+IndentPPDirectives: AfterHash
+IncludeBlocks: Regroup
+IncludeCategories:
+  # The file's own header and other usim headers first, then third-party, then the standard library.
+  - Regex: '^"usim/'
+    Priority: 1
+  - Regex: '^<catch2/'
+    Priority: 2
+  - Regex: '^<'
+    Priority: 3
+SortIncludes: CaseSensitive

@@ -2,13 +2,15 @@
 * text=auto
 
 # Source and documentation
+*.h         text diff=cpp
+*.hpp       text diff=cpp
+*.cpp       text diff=cpp
+*.cmake     text
+CMakeLists.txt text
 *.cs        text diff=csharp
-*.csproj    text
-*.props     text
-*.targets   text
-*.sln       text
-*.slnx      text
 *.py        text diff=python
+*.toml      text
+*.txt       text
 *.md        text diff=markdown
 *.json      text
 *.yml       text
@@ -40,39 +42,54 @@
 *.hlsl            text
 *.cginc           text
 
-# NAIF text kernels (PCK, LSK, FK) are text; binary kernels are binary.
+# NAIF text kernels (PCK, LSK, FK) are text.
 *.tpc       text
 *.tls       text
 *.tf        text
-*.bsp       binary
-*.bpc       binary
 
-# Binary assets
-*.png       binary
-*.jpg       binary
-*.jpeg      binary
-*.tga       binary
-*.tif       binary
-*.tiff      binary
-*.psd       binary
-*.exr       binary
-*.hdr       binary
-*.ktx       binary
-*.ktx2      binary
-*.fbx       binary
-*.blend     binary
-*.wav       binary
-*.mp3       binary
-*.ogg       binary
-*.mp4       binary
-*.ttf       binary
-*.otf       binary
-*.dll       binary
-*.so        binary
-*.dylib     binary
-*.bin       binary
-*.pdf       binary
-*.uspack    binary
+# Binary files are stored with Git LFS (see docs/adr/0005). Contributors need `git lfs install`.
+# Raw kernels, data packs and native plugin binaries are normally ignored (reproducible); the
+# rules below only matter if one is ever committed deliberately.
 
-# Git LFS is not configured (see docs/adr/0005). If large binary assets are added later,
-# install git-lfs and add tracking rules here in the same change.
+# Images and textures
+*.png       filter=lfs diff=lfs merge=lfs -text
+*.jpg       filter=lfs diff=lfs merge=lfs -text
+*.jpeg      filter=lfs diff=lfs merge=lfs -text
+*.tga       filter=lfs diff=lfs merge=lfs -text
+*.tif       filter=lfs diff=lfs merge=lfs -text
+*.tiff      filter=lfs diff=lfs merge=lfs -text
+*.psd       filter=lfs diff=lfs merge=lfs -text
+*.exr       filter=lfs diff=lfs merge=lfs -text
+*.hdr       filter=lfs diff=lfs merge=lfs -text
+*.ktx       filter=lfs diff=lfs merge=lfs -text
+*.ktx2      filter=lfs diff=lfs merge=lfs -text
+
+# Models
+*.fbx       filter=lfs diff=lfs merge=lfs -text
+*.blend     filter=lfs diff=lfs merge=lfs -text
+*.glb       filter=lfs diff=lfs merge=lfs -text
+
+# Audio and video
+*.wav       filter=lfs diff=lfs merge=lfs -text
+*.mp3       filter=lfs diff=lfs merge=lfs -text
+*.ogg       filter=lfs diff=lfs merge=lfs -text
+*.mp4       filter=lfs diff=lfs merge=lfs -text
+*.mov       filter=lfs diff=lfs merge=lfs -text
+
+# Fonts and documents
+*.ttf       filter=lfs diff=lfs merge=lfs -text
+*.otf       filter=lfs diff=lfs merge=lfs -text
+*.pdf       filter=lfs diff=lfs merge=lfs -text
+
+# Native binaries
+*.dll       filter=lfs diff=lfs merge=lfs -text
+*.so        filter=lfs diff=lfs merge=lfs -text
+*.dylib     filter=lfs diff=lfs merge=lfs -text
+*.a         filter=lfs diff=lfs merge=lfs -text
+*.lib       filter=lfs diff=lfs merge=lfs -text
+
+# Data (binary kernels and data packs)
+*.bsp       filter=lfs diff=lfs merge=lfs -text
+*.bpc       filter=lfs diff=lfs merge=lfs -text
+*.bin       filter=lfs diff=lfs merge=lfs -text
+*.uspack    filter=lfs diff=lfs merge=lfs -text

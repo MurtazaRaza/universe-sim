@@ -14,16 +14,13 @@ Desktop.ini
 *.suo
 *.swp
 
-# .NET build output (core/, tools/)
-bin/
-obj/
-*.nupkg
-TestResults/
-BenchmarkDotNet.Artifacts/
-coverage*.xml
-coverage*.json
+# C++ build output (CMake presets write to core/build/<preset>/)
+/core/build/
+CMakeUserPresets.json
+compile_commands.json
+.cache/
 
-# Python (tools/reference)
+# Python (tools/pipeline)
 __pycache__/
 *.pyc
 .venv/
