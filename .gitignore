@@ -27,6 +27,9 @@ __pycache__/
 .pytest_cache/
 
 # Data: raw downloads and generated packs are reproducible from data/sources.lock.json.
-# See docs/adr/0005-data-provenance-and-storage.md.
+# See docs/adr/0005-data-provenance-and-storage.md. The default pack is the exception: it is committed
+# through Git LFS (docs/adr/0006-default-pack-window-and-storage.md).
 /data/raw/
-/data/packs/
+/data/packs/*
+!/data/packs/solar-system-*.uspack
+*.part

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "S-JPL-DE440",
+      "title": "JPL planetary and lunar ephemeris DE440",
+      "provider": "NASA Jet Propulsion Laboratory, Solar System Dynamics group; distributed by NAIF",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/",
+      "citation": "Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H. (2021). The JPL Planetary and Lunar Ephemerides DE440 and DE441. The Astronomical Journal, 161:105. https://doi.org/10.3847/1538-3881/abd414",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "de440s.bsp",
+          "path": "naif/de440s.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/aa_checksums.txt"
+        }
+      ]
+    },
+    {
+      "id": "S-NAIF-PCK11",
+      "title": "NAIF generic planetary constants kernel pck00011.tpc",
+      "provider": "NAIF, NASA Jet Propulsion Laboratory",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "citation": "Archinal, B. A., et al. (2018). Report of the IAU Working Group on Cartographic Coordinates and Rotational Elements: 2015. Celestial Mechanics and Dynamical Astronomy, 130:22. https://doi.org/10.1007/s10569-017-9805-5",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "pck00011.tpc",
+          "path": "naif/pck00011.tpc",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc",
+          "publisher_checksums": null
+        }
+      ]
+    },
+    {
+      "id": "S-NAIF-GM440",
+      "title": "NAIF gravitational parameters kernel gm_de440.tpc",
+      "provider": "JPL Solar System Dynamics group (J. D. Giorgini); distributed by NAIF",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "citation": "gm_de440.tpc (NAIF, 2022-12-14): DE440 values for the Sun, planets, barycenters and Moon (Park et al. 2021, AJ 161:105); JPL satellite ephemeris release memos for other satellites; see the file header.",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "gm_de440.tpc",
+          "path": "naif/gm_de440.tpc",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc",
+          "publisher_checksums": null
+        }
+      ]
+    },
+    {
+      "id": "S-NAIF-LSK",
+      "title": "NAIF leap seconds kernel naif0012.tls",
+      "provider": "NAIF, NASA Jet Propulsion Laboratory",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
+      "citation": "naif0012.tls (NAIF): TAI - UTC from IERS Bulletin C; TDB - TT model parameters per Moyer, T. D. (1981), Celestial Mechanics 23, 33.",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "naif0012.tls",
+          "path": "naif/naif0012.tls",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls",
+          "publisher_checksums": null
+        }
+      ]
+    },
+    {
+      "id": "S-NAIF-IDS",
+      "title": "NAIF integer ID codes and body names (built into the SPICE Toolkit)",
+      "provider": "NAIF, NASA Jet Propulsion Laboratory",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/naif_ids.html",
+      "citation": "NAIF IDs Required Reading; the built-in body name table of CSPICE N0067 (read through SpiceyPy bodc2n).",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20).",
+      "files": []
+    },
+    {
+      "id": "S-JPL-HORIZONS",
+      "title": "JPL Horizons System (API)",
+      "provider": "NASA Jet Propulsion Laboratory, Solar System Dynamics group",
+      "tier": 1,
+      "url": "https://ssd.jpl.nasa.gov/api/horizons.api",
+      "citation": "Giorgini, J. D., et al. (1996). JPL's On-Line Solar System Data Service. Bulletin of the American Astronomical Society, 28(3), 1158. Used for reference vectors only.",
+      "license": "JPL Solar System Dynamics data service; responses are saved with their full request and API version (reference data only, not a pack input).",
+      "files": []
+    }
+  ]
+}

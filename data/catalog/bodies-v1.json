@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "description": "The v1 bodies (SPEC section 3.1) in display order. Kind and primary are the catalog hierarchy (SPEC section 7.5), mirroring the ephemeris structure: barycenters under the SSB, bodies under their system barycenter. Names come from the NAIF ID table and physical values from the kernels named in packs.json; nothing physical is entered here.",
+  "bodies": [
+    { "naif_id": 0, "kind": "barycenter", "primary": null },
+    { "naif_id": 10, "kind": "star", "primary": 0 },
+    { "naif_id": 1, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 199, "kind": "planet", "primary": 1 },
+    { "naif_id": 2, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 299, "kind": "planet", "primary": 2 },
+    { "naif_id": 3, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 399, "kind": "planet", "primary": 3 },
+    { "naif_id": 301, "kind": "moon", "primary": 3 },
+    { "naif_id": 4, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 499, "kind": "planet", "primary": 4 },
+    { "naif_id": 5, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 599, "kind": "planet", "primary": 5 },
+    { "naif_id": 6, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 699, "kind": "planet", "primary": 6 },
+    { "naif_id": 7, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 799, "kind": "planet", "primary": 7 },
+    { "naif_id": 8, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 899, "kind": "planet", "primary": 8 },
+    { "naif_id": 9, "kind": "barycenter", "primary": 0 },
+    { "naif_id": 999, "kind": "dwarf_planet", "primary": 9 }
+  ]
+}

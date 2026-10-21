@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "packs": [
+    {
+      "name": "solar-system",
+      "version": "1.0.0",
+      "description": "Solar System v1: Sun, planets, Moon, Pluto and the system barycenters. Ephemeris DE440 (de440s.bsp), radii and IAU rotation elements from pck00011.tpc, GM from gm_de440.tpc, leap seconds and the TDB - TT model from naif0012.tls.",
+      "bodies": "bodies-v1.json",
+      "names": "S-NAIF-IDS",
+      "ephemeris": [{ "source_id": "S-JPL-DE440", "file": "de440s.bsp" }],
+      "shape_and_rotation": { "source_id": "S-NAIF-PCK11", "file": "pck00011.tpc" },
+      "gm": { "source_id": "S-NAIF-GM440", "file": "gm_de440.tpc" },
+      "time": { "source_id": "S-NAIF-LSK", "file": "naif0012.tls" },
+      "window": null
+    }
+  ]
+}

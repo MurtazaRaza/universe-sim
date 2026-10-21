@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "source_id": "S-JPL-DE440",
+      "name": "de440s.bsp",
+      "path": "naif/de440s.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp",
+      "size": 32726016,
+      "sha256": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
+      "md5": "3917ee56769db332790c751e2168843d",
+      "publisher_md5": "3917ee56769db332790c751e2168843d",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/aa_checksums.txt",
+      "retrieved_utc": "2026-10-20T15:09:49Z"
+    },
+    {
+      "source_id": "S-NAIF-GM440",
+      "name": "gm_de440.tpc",
+      "path": "naif/gm_de440.tpc",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc",
+      "size": 12406,
+      "sha256": "924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140",
+      "md5": "a6bb37afab6815c9573a3ec208a8199a",
+      "publisher_md5": null,
+      "publisher_checksums": null,
+      "retrieved_utc": "2026-10-20T15:09:51Z"
+    },
+    {
+      "source_id": "S-NAIF-LSK",
+      "name": "naif0012.tls",
+      "path": "naif/naif0012.tls",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls",
+      "size": 5257,
+      "sha256": "678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b",
+      "md5": "25a2fff30b0dedb4d76c06727b1895b1",
+      "publisher_md5": null,
+      "publisher_checksums": null,
+      "retrieved_utc": "2026-10-20T15:09:52Z"
+    },
+    {
+      "source_id": "S-NAIF-PCK11",
+      "name": "pck00011.tpc",
+      "path": "naif/pck00011.tpc",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc",
+      "size": 131226,
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "md5": "3c0bdc01bb4101d6242cf96ece67a586",
+      "publisher_md5": null,
+      "publisher_checksums": null,
+      "retrieved_utc": "2026-10-20T15:09:54Z"
+    }
+  ]
+}

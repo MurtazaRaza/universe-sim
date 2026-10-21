@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runs the data pipeline in its virtual environment, from any directory:
+#     tools/pipeline/usim-pipeline <fetch|verify|build|info|reference> [options]
+# Set up the environment first (see CLAUDE.md):
+#     python3 -m venv tools/pipeline/.venv
+#     tools/pipeline/.venv/bin/pip install --require-hashes -r tools/pipeline/requirements.txt
+set -eu
+here="$(cd "$(dirname "$0")" && pwd)"
+if [ ! -x "$here/.venv/bin/python" ]; then
+    echo "error: $here/.venv is missing; create it with the commands at the top of this script" >&2
+    exit 1
+fi
+PYTHONPATH="$here" exec "$here/.venv/bin/python" -m usim_pipeline "$@"
