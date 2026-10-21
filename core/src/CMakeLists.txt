@@ -2,6 +2,8 @@
 
 add_library(usim_core STATIC
     catalog/catalog.cpp
+    data/data_pack.cpp
+    data/sha256.cpp
     frames/frames.cpp
     math/chebyshev.cpp
     math/quat.cpp
