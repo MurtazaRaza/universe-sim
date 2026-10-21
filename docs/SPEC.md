@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v0.1 |
+| Status | Draft v0.2 |
 | Last updated | 2026-10-20 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
@@ -127,11 +127,11 @@ In rough order (details in the [implementation plan](IMPLEMENTATION_PLAN.md)):
 
 | ID | Category | Requirement |
 |---|---|---|
-| NFR-01 | Portability | The core targets .NET Standard 2.1 and has zero third-party runtime dependencies and zero engine references ([ADR-0002](adr/0002-core-language-and-unity-integration.md)). |
+| NFR-01 | Portability | The core is written in C++20 using only the standard library: zero third-party runtime dependencies and zero engine references. Hosts in other languages use its stable C ABI ([ADR-0002](adr/0002-core-language-and-unity-integration.md)). |
 | NFR-02 | Precision | The core uses double precision throughout. Single precision is used only inside a host, after positions are re-centered on the view origin. |
-| NFR-03 | Performance | A full snapshot of all v1 bodies takes under 0.1 ms on a current desktop CPU (target, to be measured in Phase 3). Steady-state per-frame calls allocate no managed memory, to avoid GC spikes in Unity. |
-| NFR-04 | Determinism | The same inputs give identical outputs on the same platform and runtime. |
-| NFR-05 | Testability | Core tests run with `dotnet test` and do not require Unity. |
+| NFR-03 | Performance | A full snapshot of all v1 bodies takes under 0.1 ms on a current desktop CPU (target, to be measured in Phase 3). Steady-state per-frame calls make no heap allocations in the core, and the host bindings make no managed allocations (to avoid GC spikes in Unity). |
+| NFR-04 | Determinism | The same inputs give identical outputs on the same platform and compiler. Fast-math and floating-point contraction (FMA fusion) are disabled. |
+| NFR-05 | Testability | Core tests run with `ctest` and do not require Unity. |
 | NFR-06 | Accuracy | Validation thresholds are defined in [section 9](#9-accuracy-and-validation) and enforced by automated tests. |
 | NFR-07 | Data size | The default development data pack is at most 50 MB. Larger optional packs are allowed. |
 | NFR-08 | Platforms | Desktop first: macOS (Apple Silicon) and Windows. Other targets are an open question. |
@@ -215,21 +215,21 @@ Validation tests compare the core against independent references. Reference data
 Rules:
 
 - Never loosen a validation threshold without recording the measured cause in the plan or in an ADR.
-- Validation tests run in CI once CI exists (Phase 0 task).
+- Validation tests run locally before a numerical change is declared done, and in CI once CI exists (P0-11, deferred).
 
 ## 10. Data provenance
 
 Details of the registry, tiers and pipeline are in [DATA_SOURCES.md](DATA_SOURCES.md) and [ADR-0005](adr/0005-data-provenance-and-storage.md). In summary:
 
 - **Only Tier 1 sources** (the producing institution or peer-reviewed publications) may supply simulation inputs. Tier 2 sources (compilations such as the NASA fact sheets) are for cross-checks only. Unsourced material such as wikis, blogs or AI output is never used.
-- **No literal physical values in code**, except definitional constants (for example the au, the speed of light, the J2000 epoch, TT - TAI = 32.184 s). These live in one constants class, each with a citation.
+- **No literal physical values in code**, except definitional constants (for example the au, the speed of light, the J2000 epoch, TT - TAI = 32.184 s). These live in one place in the core (`usim/constants.hpp`), each with a citation.
 - **Derived values** are computed by the pipeline, which records the formula and the inputs.
 - **Manual transcription** (for sources with no machine-readable form) is allowed only in reviewed files under `data/catalog/manual/`. Each entry records the source URL, the access date and the exact table or section.
 
 ## 11. Rendering layer (Unity) requirements
 
 - Unity version **6000.5.1f1** with **URP 17.5**, the **Input System** package and **UI Toolkit** for UI.
-- The Unity project lives in `UniverseSim/` and consumes the core as a prebuilt assembly ([ADR-0002](adr/0002-core-language-and-unity-integration.md)).
+- The Unity project lives in `UniverseSim/` and consumes the core as a native plugin through its C ABI, using C# P/Invoke bindings ([ADR-0002](adr/0002-core-language-and-unity-integration.md)).
 - Unity-side code is limited to: hosting the core, mapping snapshots to GameObjects, camera and input, UI, materials, lighting and visual effects.
 - Precision handling: positions arrive re-centered on a double-precision view origin, so the camera stays near the Unity world origin. See [ARCHITECTURE.md](ARCHITECTURE.md#5-host-contract).
 - URP point lights cannot cover Solar System distances, so Sun lighting is computed per body from the Sun's direction (for example a custom lit shader or a per-body light setup).
@@ -255,13 +255,14 @@ These items are not scheduled in detail, but the design must not block them:
 | OQ-04 | Which ΔT model to use for historical dates before 1972 (UT display)? | Open, pick from a verified source |
 | OQ-05 | License for the project itself? | Open |
 | OQ-06 | Should observer views show apparent (light-time and aberration corrected) positions? | Open, after v1 |
-| OQ-07 | When Unity's CoreCLR runtime is available, should the core move to a modern .NET target? | Open, track Unity releases |
+| OQ-07 | Should the Unity Editor hot-reload the native plugin (load a uniquely named copy) so the Editor does not need a restart after each core rebuild? | Open, decide before Phase 5 |
 
 ## 14. Glossary
 
 | Term | Meaning |
 |---|---|
 | Barycenter | Center of mass of a system of bodies, for example the Earth-Moon barycenter (NAIF 3). |
+| C ABI | The plain-C function interface (`usim.h`) that the core exposes, so hosts in any language can call it. |
 | Chebyshev polynomial | The basis functions JPL ephemerides use to store positions over fixed time intervals. |
 | DAF | Double precision Array File, NAIF's binary container format for SPK and binary PCK files. |
 | Data pack | The versioned binary file built by the pipeline and loaded by the core. It holds ephemeris segments, catalog values and provenance. |

@@ -9,7 +9,7 @@ Write an ADR when a choice affects module boundaries, data formats, units or fra
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-engine-agnostic-core.md) | Engine-agnostic simulation core with thin rendering hosts | Accepted |
-| [0002](0002-core-language-and-unity-integration.md) | Core in C# targeting .NET Standard 2.1, consumed by Unity as a prebuilt DLL | Accepted |
+| [0002](0002-core-language-and-unity-integration.md) | Core in C++20 with a C ABI, consumed by Unity as a native plugin | Accepted |
 | [0003](0003-units-time-and-reference-frames.md) | Units, time scale and reference frames | Accepted |
 | [0004](0004-ephemeris-baseline-de440.md) | JPL DE440 as the baseline planetary ephemeris | Accepted |
 | [0005](0005-data-provenance-and-storage.md) | Data provenance, pipeline and storage of large data | Accepted |

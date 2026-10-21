@@ -14,9 +14,9 @@ Mixing units, time scales or frames is the most common source of silent errors i
 1. **Units:** km, s, km/s, rad and GM in km^3/s^2 throughout the core. Mass is never a primary value. It may be derived as GM / G and flagged as derived.
 2. **Time:** the internal time scale is TDB, stored as a two-part `Instant` relative to J2000.0 (JD 2451545.0 TDB). UTC, TAI and TT exist only at the edges (user input and display), and conversions use the leap second table from the data pack.
 3. **Frames:** the ICRF is the native inertial frame (it is what DE kernels use; SPICE calls it `J2000`). ECLIPJ2000 is the default frame for rendering and display. Body-fixed frames come from IAU rotation models. The default center is the Solar System Barycenter (NAIF 0).
-4. **Handedness:** the core is right-handed. Conversion to a host convention happens only in `Presentation.AxisConvention`. For Unity the mapping is (X, Y, Z) to (X, Z, Y), which puts ecliptic north at Unity up.
+4. **Handedness:** the core is right-handed. Conversion to a host convention happens only in `usim::presentation::AxisConvention`, applied by the core when it fills a snapshot. For Unity the mapping is (X, Y, Z) to (X, Z, Y), which puts ecliptic north at Unity up.
 5. **Precision:** double precision everywhere in the core. Positions are re-centered on a double-precision view origin before any host converts them to float.
-6. **Naming:** public members that carry a unit say so in their name or XML doc (`PositionKm`, `VelocityKmPerS`), and frame and time scale parameters are explicit, not implied.
+6. **Naming:** public members that carry a unit say so in their name or doc comment (`position_km`, `velocity_km_s`), and frame and time scale parameters are explicit, not implied.
 
 ## Consequences
 

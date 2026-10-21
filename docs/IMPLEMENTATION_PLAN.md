@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Last updated | 2026-10-20 |
-| Current phase | Phase 0: Repository foundation |
+| Current phase | Phase 1: Core foundations (not started). Phase 0 complete on 2026-10-20. |
 | Related | [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 ## How to use this plan
@@ -14,17 +14,18 @@
 - When you finish a task: check its box and add a dated note under it (one or two lines on what was done and any deviation). Update "Current phase" above when a phase completes.
 - When a task requires a decision that changes [SPEC.md](SPEC.md) or [ARCHITECTURE.md](ARCHITECTURE.md), write an ADR and update those documents in the same change.
 - Tasks marked **(user)** need the user's input or action before or during the work.
+- Tasks marked **(deferred)** are intentionally postponed. They do not block their phase. Each carries a note saying why and when to revisit it.
 - Requirement IDs (FR-*, NFR-*, VAL-*) refer to [SPEC.md](SPEC.md).
 
 ## Phase overview
 
 | Phase | Name | Outcome |
 |---|---|---|
-| 0 | Repository foundation | Repo, docs, solution skeleton, Unity can reference the core |
-| 1 | Core foundations | Math, time, frames, catalog model, axis conventions |
-| 2 | Data pipeline and data pack | Reproducible fetch and build from verified sources; reference vectors |
+| 0 | Repository foundation | Repo, docs, toolchain, C++ skeleton, Unity loads the native core |
+| 1 | Core foundations | Math, time, frames, catalog model, axis conventions, error model |
+| 2 | Data pipeline and data pack | Reproducible Python pipeline from verified sources; pack reader in C++; reference vectors |
 | 3 | Ephemeris engine | DE440 evaluation validated against CSPICE and Horizons |
-| 4 | Simulation API and headless host | Clock, orientation, snapshots, orbit paths, presentation math, CLI |
+| 4 | Simulation API, C ABI and headless host | Clock, orientation, snapshots, orbit paths, presentation math, C ABI, CLI |
 | 5 | Unity MVP | Interactive Solar System viewer (v1) |
 | 6 | Moons and visual fidelity | Major moons, full rotation models, sourced textures |
 | 7 | Small bodies | Dwarf planets, asteroids, comets |
@@ -37,67 +38,105 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
 
 ## Phase 0: Repository foundation
 
-**Goal:** a clean monorepo where the core builds and tests outside Unity, and Unity can reference it.
+**Goal:** a clean monorepo where the core builds and tests outside Unity, and Unity loads it as a native plugin.
 
-- [x] **P0-01** Initialize the git repository at the project root with `.gitignore` (root and `UniverseSim/`) and `.gitattributes` for Unity and .NET.
-  - 2026-10-20: Done. `main` branch. Git LFS not configured (see ADR-0005).
+- [x] **P0-01** Initialize the git repository at the project root with `.gitignore` (root and `UniverseSim/`) and `.gitattributes` for Unity and C++.
+  - 2026-10-20: Done. Branch `main`. Git LFS tracking rules added for binary assets (ADR-0005).
 - [x] **P0-02** Write the initial documents: SPEC, ARCHITECTURE, IMPLEMENTATION_PLAN, DATA_SOURCES, ADRs 0001 to 0005, CLAUDE.md, README.
-  - 2026-10-20: Done. Source URLs checked as reachable on this date.
-- [ ] **P0-03** **(user)** Install the .NET 10 SDK (current LTS). Only SDKs 6.0 and 7.0 were found on the dev machine, and both are out of support. Add `global.json` that pins the SDK feature band.
-- [ ] **P0-04** Create `core/UniverseSim.sln`, `core/Directory.Build.props` (nullable enabled, warnings as errors, deterministic, `LangVersion` 9.0 for the core) and `core/src/UniverseSim.Core` targeting `netstandard2.1` with no package references.
-- [ ] **P0-05** Create `core/tests/UniverseSim.Core.Tests` (NUnit, `net10.0`) with one smoke test.
-- [ ] **P0-06** Create `tools/UniverseSim.Cli` (`net10.0`) that prints the core assembly version.
-- [ ] **P0-07** Create `tools/scripts/build-core-for-unity.sh` (and a `.ps1` equivalent) that builds the core in Release and copies the DLL, PDB and XML docs to `UniverseSim/Assets/Plugins/UniverseSim.Core/`. Commit the generated `.dll.meta` (the DLL itself is ignored).
-- [ ] **P0-08** Create the Unity assembly `UniverseSim.Unity` (asmdef in `Assets/UniverseSim/Runtime/`) that references the core DLL. Add a trivial MonoBehaviour that logs the core version in the sample scene to prove the integration.
-- [ ] **P0-09** **(user)** Decide whether to remove the URP template's tutorial content (`Assets/Readme.asset`, `Assets/TutorialInfo/`) and the sample scene.
-- [ ] **P0-10** Add `.editorconfig` with C# style rules shared by the core, the tools and the Unity code.
-- [ ] **P0-11** **(user)** Choose a remote host (for example GitHub). Then add CI that runs `dotnet build` and `dotnet test` on push. Validation tests join CI in Phase 3.
-- [ ] **P0-12** Fill in the "Commands" section of `CLAUDE.md` and the "Getting started" section of `README.md` with the real commands.
+  - 2026-10-20: Done. Source URLs checked as reachable. Revised the same day when the project owner chose C++ for the core (ADR-0002 rewritten; ADR-0005 updated for the Python pipeline and Git LFS).
+- [x] **P0-03** Toolchain: Git LFS, CMake 3.25 or newer, Ninja, a C++20 compiler.
+  - 2026-10-20: Installed with Homebrew: git-lfs 3.8.0 (`git lfs install` run), CMake 4.4.4, Ninja 1.13.2. Compiler: Apple Clang 21 (Xcode).
+- [x] **P0-04** CMake project in `core/`: `usim_core` (static), `universesim` (shared, C ABI), shared compiler options (warnings as errors, `-ffp-contract=off`), presets `dev`, `release` and `unity-macos`.
+  - 2026-10-20: Done. Only `USIM_API` symbols are exported (hidden visibility by default).
+- [x] **P0-05** Unit tests with Catch2, pinned by version and SHA-256, discovered by `ctest`.
+  - 2026-10-20: Catch2 v3.16.0 (v3.16.1 was under two weeks old). 4 tests pass (version and C ABI).
+- [x] **P0-06** CLI host `usim` that prints the core version.
+  - 2026-10-20: `core/build/dev/apps/usim-cli/usim --version` prints `usim 0.1.0`.
+- [x] **P0-07** `tools/scripts/build-core-for-unity.sh`: builds the plugin and copies it into `UniverseSim/Assets/UniverseSim/Plugins/<platform>/`.
+  - 2026-10-20: macOS done. Universal binary (arm64 + x86_64), deployment target 12.0 to match the Unity 6000.5 player (`UnityPlayer.dylib` reports `minos 12.0`). The plugin lives under `Assets/UniverseSim/Plugins/` rather than `Assets/Plugins/`, so ignoring it leaves no orphan folder `.meta` files.
+- [x] **P0-08** Unity integration: asmdefs `UniverseSim.Unity`, `UniverseSim.Unity.Editor` and `UniverseSim.Unity.Tests.EditMode`; P/Invoke bindings (`NativeMethods`, `CoreLibrary`); `CoreStartupCheck`; `NativePluginImportSettings`.
+  - 2026-10-20: Verified headless with `-batchmode -runTests`: 3 of 3 EditMode tests pass (library loads, ABI matches, import settings correct). Found and fixed a first-import race: Unity imported the plugin before compiling the postprocessor, so an `[InitializeOnLoad]` pass now corrects settings after each domain reload.
+- [x] **P0-09** Remove the URP template's tutorial content and set up the main scene.
+  - 2026-10-20: The project owner gave blanket approval for changes inside the Unity project. Removed `Assets/Readme.asset` and `Assets/TutorialInfo/`, which referenced only each other. Moved `Assets/Scenes/SampleScene.unity` to `Assets/UniverseSim/Scenes/Main.unity` with `git mv` (GUID kept) and updated the build settings. Kept the volume profile (referenced by the render pipeline assets) and `InputSystem_Actions.inputactions` (the project-wide actions). Added `ProjectSetupTests`. 5 of 5 EditMode tests pass.
+- [x] **P0-10** `.editorconfig` and `.clang-format` at the repository root.
+  - 2026-10-20: Done. clang-format itself is not installed (optional: `brew install clang-format`).
+- [ ] **P0-11** **(deferred)** Choose a remote host, then add CI that builds and runs `ctest` (and later the validation tests).
+  - 2026-10-20: Deferred by the project owner; CI is not needed yet. Until then, run the commands in CLAUDE.md locally before declaring a task done.
+- [x] **P0-12** Fill in the commands in `CLAUDE.md` and `README.md`.
+  - 2026-10-20: Done.
+- [ ] **P0-13** **(deferred)** Windows plugin: a Windows x64 build of `universesim.dll`, a Windows branch in `NativePluginImportSettings`, and the build script extended to produce it.
+  - 2026-10-20: Deferred; development happens on macOS, and Windows is needed only to run the viewer on Windows. No Windows machine is required to do this work: the DLL can be cross-compiled on macOS (for example with mingw-w64 from Homebrew, or clang-cl with the Windows SDK), and its exports can be checked there. Only the final check, Unity on Windows loading the DLL, needs Windows. Revisit when a Windows build is wanted.
+- [x] **P0-14** Sanitizer preset (`asan`: AddressSanitizer and UndefinedBehaviorSanitizer) for local runs and later CI.
+  - 2026-10-20: Done. Tests pass under `ctest --preset asan`.
+- [x] **P0-15** Python 3.12 or newer for the Phase 2 pipeline.
+  - 2026-10-20: Already installed (pyenv 3.12.8, native arm64). Pinned for this repository with `.python-version` (`pyenv local 3.12.8`), so `python3` in the repo resolves to it. The global pyenv default (3.9.13) is unchanged.
 
-**Acceptance criteria**
-- `dotnet build` and `dotnet test` succeed from a clean clone.
-- Unity 6000.5.1f1 opens the project and compiles with the core DLL referenced. The sample MonoBehaviour logs the core version.
+**Acceptance criteria** (all met on macOS, 2026-10-20)
+- `cmake --preset dev && cmake --build --preset dev && ctest --preset dev` succeeds from a clean clone.
+- Unity 6000.5.1f1 loads the native core, and the EditMode tests pass.
 - The CLI prints the core version.
 
 ---
 
 ## Phase 1: Core foundations
 
-**Goal:** the building blocks every later phase depends on, fully unit tested.
+**Goal:** the building blocks every later phase depends on, fully unit tested. All code is in `core/include/usim/` and `core/src/`.
 
-- [ ] **P1-01** `Mathematics`: `Vector3d`, `Matrix3x3d`, `Quaterniond` (normalization, multiplication, conversion to and from matrices, slerp), angle helpers, and Chebyshev evaluation of a value and its derivative (Clenshaw recurrence).
-- [ ] **P1-02** `Constants`: definitional constants only, each with a citation comment and a test. Include the astronomical unit (149,597,870.700 km exactly, IAU 2012 Resolution B2), the speed of light (299,792.458 km/s, SI definition), J2000.0 (JD 2451545.0 TDB), TT - TAI = 32.184 s, seconds per day, and the ECLIPJ2000 obliquity as used by SPICE. Measured quantities (GM, radii and so on) must **not** go here; they come from data packs.
-- [ ] **P1-03** `Time`: `Instant` (two-part TDB), Julian date conversions, calendar conversion (Gregorian, Julian, and Horizons-style mixed mode), and ISO 8601 parsing and formatting with an explicit time scale suffix.
-- [ ] **P1-04** `Time`: time scale conversions TDB <-> TT <-> TAI <-> UTC. The leap second table is injected as data (loaded from the pack in Phase 2; test fixtures until then). Document the TDB-TT model used. Matching SPICE's model is recommended for parity with the validation oracle.
-- [ ] **P1-05** `Frames`: `FrameId`, the ICRF <-> ECLIPJ2000 rotation, composition of frame transforms, and a placeholder for body-fixed frames (completed in P4-03).
-- [ ] **P1-06** `Catalog`: `BodyId` (namespace + value), `BodyKind`, `Body`, `BodyCatalog` (tree with primary links), `Quantity` (value, unit, uncertainty, `SourceRef`, derived flag, explicit missing state) and `Source`.
-- [ ] **P1-07** `Presentation`: `AxisConvention` for Unity (left-handed, Y up) and Godot (right-handed, Y up), for vectors and quaternions. Verify the quaternion mapping against matrix conversion over random rotations (see ARCHITECTURE section 5.4).
-- [ ] **P1-08** XML documentation on every public member, stating units, frame and time scale where relevant. Enable the documentation file output.
+- [ ] **P1-01** `usim::math`: `Vec3`, `Mat3`, `Quat` (normalization, multiplication, conversion to and from matrices, slerp), angle helpers, and Chebyshev evaluation of a value and its derivative (Clenshaw recurrence).
+- [ ] **P1-02** `usim/constants.hpp`: definitional constants only, each with a citation comment and a test. Include:
+  - the astronomical unit (149,597,870.700 km exactly, IAU 2012 Resolution B2)
+  - the speed of light (299,792.458 km/s, SI definition)
+  - J2000.0 (JD 2451545.0 TDB)
+  - TT - TAI = 32.184 s
+  - seconds per day
+  - the ECLIPJ2000 obliquity as used by SPICE
+
+  Measured quantities (GM, radii and so on) must **not** go here; they come from data packs.
+- [ ] **P1-03** `usim::time`: `Instant` (two-part TDB), Julian date conversions, calendar conversion (Gregorian, Julian, and Horizons-style mixed mode), and ISO 8601 parsing and formatting with an explicit time scale suffix.
+- [ ] **P1-04** `usim::time`: conversions TDB <-> TT <-> TAI <-> UTC. The leap second table is injected as data (loaded from the pack in Phase 2; test fixtures until then). Document the TDB-TT model used. Matching SPICE's model is recommended for parity with the validation oracle.
+- [ ] **P1-05** `usim::frames`: `FrameId`, the ICRF <-> ECLIPJ2000 rotation, composition of frame transforms, and a placeholder for body-fixed frames (completed in P4-03).
+- [ ] **P1-06** `usim::catalog`: `BodyId` (namespace + value), `BodyKind`, `Body`, `BodyCatalog` (tree with primary links), `Quantity` (optional value, unit, uncertainty, `SourceRef`, derived flag) and `Source`.
+- [ ] **P1-07** `usim::presentation::AxisConvention` for Unity, Godot and Unreal, for vectors and quaternions. Test against matrix conversion over random rotations (formulas in ARCHITECTURE section 5.4).
+- [ ] **P1-08** Error model: a `Result<T>` type (value or error code plus message) and an error code enum that maps one-to-one to the C ABI status codes. No exceptions in the core's public API.
+- [ ] **P1-09** Doc comments (`///`) on every public declaration, stating units, frame and time scale where relevant.
 
 **Acceptance criteria**
-- Unit test coverage on these namespaces is meaningful (edge cases: calendar reform dates, leap second boundaries, negative Julian dates, quaternion sign ambiguity).
-- No public API without XML docs (enforced by the compiler warning CS1591 being treated as an error).
+- Unit tests cover the edge cases: calendar reform dates, leap second boundaries, negative Julian dates, the quaternion sign ambiguity.
+- The build is warning-free with warnings as errors, and the tests pass under the `asan` preset.
 
 ---
 
 ## Phase 2: Data pipeline and data pack
 
-**Goal:** a reproducible path from verified sources to a versioned data pack, plus independent reference data for validation.
+**Goal:** a reproducible path from verified sources to a versioned data pack, plus independent reference data for validation. Uses Python 3.12.8 (pinned in `.python-version`) with a virtual environment in `tools/pipeline/.venv`.
 
-- [ ] **P2-01** Create `tools/UniverseSim.DataPipeline` (`net10.0`) with the commands `fetch`, `verify`, `build` and `info` (see ARCHITECTURE section 4).
-- [ ] **P2-02** Write `data/sources.json` (the declared sources from DATA_SOURCES.md needed for v1: `de440s.bsp`, `pck00011.tpc`, `gm_de440.tpc`, `naif0012.tls`). Implement `fetch` with HTTPS download, size check, publisher MD5 check (from NAIF `aa_checksums.txt` where available) and SHA-256, writing `data/sources.lock.json`.
-- [ ] **P2-03** DAF reader and SPK segment readers for types 2 and 3, in the core (`Ephemeris` namespace). Follow the NAIF "DAF Required Reading" and "SPK Required Reading". Handle both endiannesses (the DAF file record declares the binary format).
-- [ ] **P2-04** Text kernel parser in the pipeline for `\begindata` blocks (PCK, LSK, GM files): numbers with `D` exponents, arrays, continuation lines, and `@` date tokens.
-- [ ] **P2-05** Catalog builder for v1 bodies: SSB, Sun, the planet system barycenters, the planets, the Moon and Pluto. It takes radii and rotation elements from `pck00011.tpc`, GM from `gm_de440.tpc` and names and IDs from NAIF. Every field gets a `SourceRef` (file plus keyword). Derived values (for example mean radius computed from triaxial radii) record their formula.
+- [ ] **P2-01** `tools/pipeline/`: a Python package (`pyproject.toml`, pinned `requirements.txt`, pytest) with the commands `fetch`, `verify`, `build`, `info` and `reference` (ARCHITECTURE section 4).
+- [ ] **P2-02** Write `data/sources.json` with the v1 sources from DATA_SOURCES.md: `de440s.bsp`, `pck00011.tpc`, `gm_de440.tpc` and `naif0012.tls`. Implement `fetch`:
+  - HTTPS download with a size check
+  - publisher MD5 check (from NAIF `aa_checksums.txt` where available)
+  - SHA-256
+  - writes `data/sources.lock.json`
+- [ ] **P2-03** Segment extraction for SPK types 2 and 3 through SpiceyPy (the DAF functions). Record the layout of the extracted records (init, interval length, coefficients) in the pack specification.
+- [ ] **P2-04** Constants from text kernels through the SpiceyPy kernel pool (`furnsh`, `gdpool`, `bodvrd`). Every value records its file and keyword.
+- [ ] **P2-05** Catalog builder for the v1 bodies: SSB, Sun, the planet system barycenters, the planets, the Moon and Pluto.
+  - Radii and rotation elements come from `pck00011.tpc`.
+  - GM comes from `gm_de440.tpc`.
+  - Names and IDs come from NAIF.
+  - Derived values (for example mean radius from the triaxial radii) record their formula.
 - [ ] **P2-06** Manual entry mechanism: `data/catalog/manual/*.json` with a schema requiring source id, URL, access date, table or section, and transcriber note. The pipeline rejects entries missing any of these. Use it only when no machine-readable Tier 1 source exists.
-- [ ] **P2-07** Data pack format v1: write `docs/formats/DATA_PACK.md`, implement the writer (pipeline) and the reader (core `Data` namespace). Support trimming ephemeris segments to a time window. Embed the source table and the lock file hash.
-- [ ] **P2-08** Reproducibility test: building twice from the same lock file yields identical bytes. Never embed wall-clock time in the content hash.
-- [ ] **P2-09** `tools/reference/` (Python, `requirements.txt` with pinned SpiceyPy): scripts that generate reference vectors from the same kernels (states, orientations, time conversions) and capture Horizons API vectors. Commit the outputs to `data/reference/` with provenance headers.
-- [ ] **P2-10** **(user)** Decide the default pack time window (for example 1900 to 2100, or the full de440s span) and how large data is distributed (OQ-02). Record the decision in an ADR.
+- [ ] **P2-07** Data pack format v1:
+  - Write `docs/formats/DATA_PACK.md`.
+  - Implement the writer in Python and the reader in C++ (`usim::data`).
+  - Support trimming ephemeris segments to a time window.
+  - Embed the source table and the lock file hash.
+- [ ] **P2-08** Reproducibility test: building twice from the same lock file yields identical bytes. No wall-clock time in the content hash.
+- [ ] **P2-09** Round-trip test: a small synthetic pack written by the pipeline is committed as a test fixture (`core/tests/fixtures/`), and the C++ reader tests load it.
+- [ ] **P2-10** `reference` command: reference vectors from CSPICE on the same kernels (states, orientations, time conversions) and Horizons API captures, committed to `data/reference/` with provenance headers.
+- [ ] **P2-11** **(user)** Decide the default pack time window (for example 1900 to 2100, or the full de440s span) and whether a prebuilt default pack is committed through Git LFS (OQ-02). Record the decision in an ADR.
 
 **Acceptance criteria**
 - From a clean clone: `fetch` then `build` produces a pack. All checksums verify. `info` lists bodies, coverage and sources.
-- The pack loads in the core and the catalog values match the source kernels exactly.
+- The C++ reader loads the pack, and the catalog values match the source kernels exactly.
 - Reference vector files exist for VAL-01 to VAL-04.
 
 ---
@@ -106,36 +145,46 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
 
 **Goal:** positions and velocities of v1 bodies from DE440, validated.
 
-- [ ] **P3-01** Chebyshev segment evaluation: type 2 (position, velocity from the derivative) and type 3 (position and velocity).
-- [ ] **P3-02** Record lookup by time within a segment (direct index from the fixed record interval) and segment selection across files and windows. Report coverage per body (FR-SIM-03).
-- [ ] **P3-03** `EphemerisChain`: resolve any target and center pair through the segment graph (common ancestor). Cache paths.
+- [ ] **P3-01** Chebyshev segment evaluation in C++: type 2 (position, velocity from the derivative) and type 3 (position and velocity).
+- [ ] **P3-02** Record lookup by time within a segment (direct index from the fixed record interval), and segment selection across windows. Report coverage per body (FR-SIM-03).
+- [ ] **P3-03** `EphemerisChain`: resolve any target and center pair through the segment graph (common ancestor). Precompute paths.
 - [ ] **P3-04** Output frames: ICRF natively, ECLIPJ2000 by rotation.
 - [ ] **P3-05** Out-of-coverage handling: return an explicit `OutOfCoverage` result, never extrapolate.
-- [ ] **P3-06** Performance: a benchmark project (BenchmarkDotNet) for a full v1 snapshot. Meet NFR-03 (under 0.1 ms, zero allocations).
-- [ ] **P3-07** Validation tests VAL-01 (against CSPICE) and VAL-02 (against Horizons). Measure the DE440 vs Horizons (DE441) differences, record them here, and set the final VAL-02 threshold.
-- [ ] **P3-08** Add validation tests to CI. The pack must be built in CI from the lock file, or cached.
+- [ ] **P3-06** Performance:
+  - Catch2 benchmarks for a full v1 snapshot.
+  - A test that counts heap allocations (replaced global `operator new`) to prove the snapshot path allocates nothing.
+  - Meet NFR-03.
+- [ ] **P3-07** Validation tests VAL-01 (against CSPICE) and VAL-02 (against Horizons), labeled `validation` in ctest. Measure the DE440 vs Horizons (DE441) differences, record them here, and set the final VAL-02 threshold.
+- [ ] **P3-08** Make the validation tests easy to run locally (one command that builds the pack if missing and runs `ctest -L validation`). Add them to CI once CI exists (P0-11).
 
 **Acceptance criteria**
 - VAL-01 and VAL-02 pass.
-- A state query from the CLI (for example Earth relative to the Sun at a given TDB instant) matches Horizons within the threshold.
+- `usim state` (P4-06) or a test harness shows Earth relative to the Sun at a given TDB instant matching Horizons within the threshold.
 
 ---
 
-## Phase 4: Simulation API and headless host
+## Phase 4: Simulation API, C ABI and headless host
 
-**Goal:** the complete engine-agnostic API a renderer needs, proven with the CLI.
+**Goal:** the complete engine-agnostic API a renderer needs, exposed through the C ABI and proven with the CLI.
 
-- [ ] **P4-01** `SimulationClock`: current instant, signed rate, pause, set time, and clamping to the coverage of the loaded pack, with events or flags when clamped.
-- [ ] **P4-02** `Simulation` facade: load a pack, expose the catalog, `GetState`, `GetOrientation`, and the zero-allocation `FillSnapshot` (ARCHITECTURE section 3.3).
-- [ ] **P4-03** Body orientation from IAU rotation models (pole right ascension and declination, prime meridian, including the periodic nutation and precession terms in `pck00011.tpc`). Validate with VAL-04.
+- [ ] **P4-01** `SimulationClock`: current instant, signed rate, pause, set time, and clamping to the pack's coverage, with flags when clamped.
+- [ ] **P4-02** `Simulation` facade: load a pack, expose the catalog, `state`, `orientation`, and the allocation-free `fill_snapshot` (ARCHITECTURE section 3.4).
+- [ ] **P4-03** Body orientation from IAU rotation models (pole right ascension and declination, prime meridian, including the periodic terms in `pck00011.tpc`). Validate with VAL-04.
 - [ ] **P4-04** `OrbitPathSampler`: adaptive sampling (denser near periapsis) of a body's path relative to its primary over one orbital period or a given window. Cache results and invalidate them on large time jumps.
-- [ ] **P4-05** `ViewOrigin` and scale modes (`TrueScale`, `EnlargedBodies`): positions re-centered on the view origin and scaled to render units, in double precision.
-- [ ] **P4-06** CLI commands `catalog`, `state`, `orientation`, `snapshot` and `orbit`, with JSON and CSV output.
-- [ ] **P4-07** Write `docs/API.md`: a short guide for host authors (the frame loop, the precision strategy, the axis conventions, error handling).
+- [ ] **P4-05** `ViewOrigin` and scale modes (`TrueScale`, `EnlargedBodies`): positions re-centered on the view origin, scaled to render units and mapped to the host axis convention, in double precision.
+- [ ] **P4-06** C ABI expansion (ARCHITECTURE section 3.5):
+  - simulation handle lifecycle, status codes, `usim_last_error_message`
+  - catalog queries, state, orientation, clock, snapshot, orbit paths
+  - struct size queries for binding validation
+  - C ABI tests in `core/tests/`
+  - increment `USIM_ABI_VERSION` as needed
+- [ ] **P4-07** CLI commands `catalog`, `state`, `orientation`, `snapshot` and `orbit`, with JSON and CSV output.
+- [ ] **P4-08** Write `docs/API.md`: a guide for host authors (the frame loop, the precision strategy, the axis conventions, error handling, thread safety, binding a new language).
 
 **Acceptance criteria**
 - The CLI produces a full snapshot and orbit paths for all v1 bodies.
 - VAL-04 passes.
+- The C ABI tests pass under the `asan` preset.
 - No engine is involved anywhere in Phases 1 to 4.
 
 ---
@@ -144,18 +193,20 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
 
 **Goal:** an interactive Solar System viewer driven entirely by the core.
 
-- [ ] **P5-01** `SimulationHost` MonoBehaviour: loads the pack from `StreamingAssets`, owns the `Simulation`, advances the clock and fills the snapshot each frame. Add the `copy-pack-to-unity` script.
-- [ ] **P5-02** `BodyView` prefab and spawning from the catalog: a sphere scaled by radius (triaxial where the data provides it) and oriented from the snapshot.
-- [ ] **P5-03** Floating origin: apply the snapshot positions relative to the double-precision view origin. Test for jitter at Earth surface zoom and at Pluto distance.
-- [ ] **P5-04** Depth strategy across scales (reversed-Z, dynamic clip planes or layered cameras). Document the choice in an ADR.
-- [ ] **P5-05** Camera rig with Input System actions: focus and orbit a body, logarithmic zoom, smooth focus transitions across scales, and free-fly.
-- [ ] **P5-06** Sun lighting at any scale: lit shader or per-body lighting driven by the Sun direction from the core. Correct phases for the Moon and planets.
-- [ ] **P5-07** Time controls UI (UI Toolkit): play and pause, signed rate presets, date and time entry with the time scale shown, a "now" button, and a coverage indicator.
-- [ ] **P5-08** Body info panel: values with units, uncertainty when available, and source citations. Display fallbacks are visibly marked.
-- [ ] **P5-09** Orbit lines from `OrbitPathSampler` (camera-relative) and screen-space labels, each with a toggle.
-- [ ] **P5-10** Scale mode toggle with a persistent on-screen indicator.
-- [ ] **P5-11** Visual assets: textures from verified sources (DATA_SOURCES.md, visual section), with `ATTRIBUTION.md`.
-- [ ] **P5-12** Unity tests: EditMode tests for snapshot-to-transform mapping, and a PlayMode smoke test that compares a body's position with CLI output for the same time.
+- [ ] **P5-01** C# bindings for the full C ABI (`Runtime/Native/`): blittable structs mirroring the C structs, size checks against the ABI's struct size queries at startup, and a `SafeHandle` for the simulation handle.
+- [ ] **P5-02** `SimulationHost` MonoBehaviour: loads the pack from `StreamingAssets`, owns the simulation handle, advances the clock and fills the snapshot each frame into a reused buffer (no per-frame managed allocations). Add the `copy-pack-to-unity` script.
+- [ ] **P5-03** `BodyView` prefab and spawning from the catalog: a sphere scaled by radius (triaxial where the data provides it) and oriented from the snapshot.
+- [ ] **P5-04** Floating origin through the view origin. Test for jitter at Earth surface zoom and at Pluto distance.
+- [ ] **P5-05** Depth strategy across scales (reversed-Z, dynamic clip planes or layered cameras). Document the choice in an ADR.
+- [ ] **P5-06** Camera rig with Input System actions: focus and orbit a body, logarithmic zoom, smooth focus transitions across scales, and free-fly.
+- [ ] **P5-07** Sun lighting at any scale: lit shader or per-body lighting driven by the Sun direction from the core. Correct phases for the Moon and planets.
+- [ ] **P5-08** Time controls UI (UI Toolkit): play and pause, signed rate presets, date and time entry with the time scale shown, a "now" button, and a coverage indicator.
+- [ ] **P5-09** Body info panel: values with units, uncertainty when available, and source citations. Display fallbacks are visibly marked.
+- [ ] **P5-10** Orbit lines from the core's orbit paths (camera-relative) and screen-space labels, each with a toggle.
+- [ ] **P5-11** Scale mode toggle with a persistent on-screen indicator.
+- [ ] **P5-12** Visual assets: textures from verified sources (DATA_SOURCES.md, visual section), with `ATTRIBUTION.md`.
+- [ ] **P5-13** Unity tests: EditMode tests for snapshot-to-transform mapping, and a PlayMode smoke test that compares a body's position with CLI output for the same time.
+- [ ] **P5-14** Decide OQ-07 (Editor hot reload of the native plugin). If yes, implement a development-only loader.
 
 **Acceptance criteria**
 - Opening the main scene shows the Solar System at the current date and time.
@@ -167,11 +218,11 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
 
 ## Phase 6: Moons and visual fidelity
 
-- [ ] **P6-01** Select satellite SPKs for the major moons (Phobos, Deimos, Galilean moons, major Saturnian moons, major Uranian moons, Triton, Charon) using NAIF `aa_summaries.txt`. Pin them in the lock file. Trim them to the pack window and keep the pack within its size budget.
-- [ ] **P6-02** Inspect the segment types of the selected kernels and implement any SPK types beyond 2 and 3 that they need.
+- [ ] **P6-01** Select satellite SPKs for the major moons using NAIF `aa_summaries.txt`, pin them in the lock file, and trim them to the pack window within the size budget. The moons: Phobos, Deimos, the Galilean moons, the major Saturnian moons, the major Uranian moons, Triton and Charon.
+- [ ] **P6-02** Inspect the segment types of the selected kernels. Implement any SPK types beyond 2 and 3 that they need, in both the pipeline extraction and the C++ evaluator.
 - [ ] **P6-03** Rotation models for the moons (IAU, including synchronous rotation where the report defines it).
 - [ ] **P6-04** Saturn's rings and other ring systems: dimensions from a Tier 1 source, rendered as visual-only geometry.
-- [ ] **P6-05** Optional: high-precision lunar orientation from `moon_pa_de440_200625.bpc` (binary PCK; needs DAF PCK type 2 support).
+- [ ] **P6-05** Optional: high-precision lunar orientation from `moon_pa_de440_200625.bpc` (binary PCK).
 - [ ] **P6-06** Optional: high-precision Earth orientation from `earth_latest_high_prec.bpc`.
 - [ ] **P6-07** Textures for the moons with attribution.
 
