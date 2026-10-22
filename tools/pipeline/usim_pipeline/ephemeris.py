@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import math
-
 from . import PipelineError
-from .kernels import NAIF_FRAME_J2000, SpkSegment
+from .kernels import NAIF_FRAME_J2000, SpkSegment, record_range
 from .pack.model import Frame, PackSegment, naif
 
 _FRAMES = {NAIF_FRAME_J2000: Frame.ICRF}
@@ -14,15 +12,7 @@ _FRAMES = {NAIF_FRAME_J2000: Frame.ICRF}
 def trim_records(segment: SpkSegment, window: tuple[float, float] | None) -> tuple[int, int] | None:
     """Indices [first, last] of the records overlapping `window` (TDB seconds past J2000), the whole segment
     for no window, or None if the segment does not reach into the window."""
-    count = segment.record_count
-    if window is None:
-        return (0, count - 1)
-    start, end = window
-    first = max(0, math.floor((start - segment.init_s) / segment.interval_s))
-    last = min(count - 1, math.ceil((end - segment.init_s) / segment.interval_s) - 1)
-    if first > last or start >= segment.end_s or end <= segment.start_s:
-        return None
-    return (first, last)
+    return record_range(segment.init_s, segment.interval_s, segment.record_count, segment.start_s, segment.end_s, window)
 
 
 def to_pack_segment(segment: SpkSegment, source_id: str, window: tuple[float, float] | None) -> PackSegment | None:

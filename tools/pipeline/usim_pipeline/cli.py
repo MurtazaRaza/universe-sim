@@ -13,7 +13,7 @@ from .repo import Repo
 def _cmd_fetch(repo: Repo, args: argparse.Namespace) -> int:
     from .fetch import fetch
 
-    fetch(repo, update=args.update)
+    fetch(repo, update=args.update, optional=args.optional)
     return 0
 
 
@@ -73,12 +73,17 @@ def main(argv: list[str] | None = None) -> int:
 
     fetch = commands.add_parser("fetch", help="download declared files and pin them in data/sources.lock.json")
     fetch.add_argument("--update", action="store_true", help="re-pin files whose lock entries no longer match")
+    fetch.add_argument(
+        "--optional", action="store_true", help="also download optional files (large; only optional packs need them)"
+    )
     fetch.set_defaults(run=_cmd_fetch)
 
     verify = commands.add_parser("verify", help="check data/raw against the lock file")
     verify.set_defaults(run=_cmd_verify)
 
-    build = commands.add_parser("build", help="build the packs defined in data/catalog/packs.json")
+    build = commands.add_parser(
+        "build", help="build the packs defined in data/catalog/packs.json (optional packs only when named)"
+    )
     build.add_argument("--pack", action="append", help="build only this pack (repeatable)")
     build.add_argument("--out", type=Path, default=None, help="output directory (default: data/packs)")
     build.set_defaults(run=_cmd_build)

@@ -18,6 +18,12 @@ from .manual import ManualEntry
 from .pack.model import BodyKind, Field, Frame, PackBody, PackQuantity, PackRotation, Unit, naif
 
 
+# How a selected body is positioned: by its own ephemeris segments, or at its primary with every state
+# flagged approximate (DATA_PACK.md, section APPX; ADR-0008).
+POSITION_EPHEMERIS = "ephemeris"
+POSITION_PRIMARY = "primary"
+
+
 @dataclass(frozen=True)
 class Selection:
     """One body of a selection file (data/catalog/bodies-*.json)."""
@@ -25,6 +31,7 @@ class Selection:
     naif_id: int
     kind: BodyKind
     primary: int | None
+    position: str = POSITION_EPHEMERIS
 
 
 def load_selection(path: Path) -> list[Selection]:
@@ -34,9 +41,14 @@ def load_selection(path: Path) -> list[Selection]:
     result: list[Selection] = []
     for index, entry in enumerate(document.get("bodies", [])):
         where = f"{path.name}: bodies[{index}]"
-        if not isinstance(entry, dict) or set(entry) != {"naif_id", "kind", "primary"}:
-            raise PipelineError(f"{where}: needs exactly naif_id, kind and primary")
+        if not isinstance(entry, dict) or not {"naif_id", "kind", "primary"} <= set(entry) <= {"naif_id", "kind", "primary", "position"}:
+            raise PipelineError(f"{where}: needs naif_id, kind and primary, and optionally position")
         naif_id, primary = entry["naif_id"], entry["primary"]
+        position = entry.get("position", POSITION_EPHEMERIS)
+        if position not in (POSITION_EPHEMERIS, POSITION_PRIMARY):
+            raise PipelineError(f"{where}: position must be {POSITION_EPHEMERIS!r} or {POSITION_PRIMARY!r}")
+        if position == POSITION_PRIMARY and primary is None:
+            raise PipelineError(f"{where}: position {POSITION_PRIMARY!r} needs a primary")
         if isinstance(naif_id, bool) or not isinstance(naif_id, int):
             raise PipelineError(f"{where}: naif_id must be an integer")
         if primary is not None and (isinstance(primary, bool) or not isinstance(primary, int)):
@@ -45,7 +57,7 @@ def load_selection(path: Path) -> list[Selection]:
             kind = BodyKind[str(entry["kind"]).upper()]
         except KeyError:
             raise PipelineError(f"{where}: unknown kind {entry['kind']!r}") from None
-        result.append(Selection(naif_id, kind, primary))
+        result.append(Selection(naif_id, kind, primary, position))
     ids = [s.naif_id for s in result]
     if len(set(ids)) != len(ids):
         raise PipelineError(f"{path}: a body is listed twice")

@@ -108,7 +108,8 @@ def _utc_now() -> str:
 @dataclass
 class FetchResult:
     """What fetch did per file: 'verified' (local copy matches the lock), 'downloaded' (matches the lock),
-    'pinned' (new lock entry) or 'repinned' (lock entry replaced by --update)."""
+    'pinned' (new lock entry), 'repinned' (lock entry replaced by --update) or 'skipped' (optional file
+    not downloaded)."""
 
     actions: list[tuple[str, str]]
     lock_changed: bool
@@ -122,6 +123,7 @@ def fetch(
     repo: Repo,
     *,
     update: bool = False,
+    optional: bool = False,
     opener: Opener = https_open,
     now: Callable[[], str] = _utc_now,
     log: Callable[[str], None] = print,
@@ -130,7 +132,12 @@ def fetch(
 
     With an existing lock entry the download must match it exactly (the lock is never changed silently);
     `update=True` re-pins files instead and drops lock entries no longer declared. New files are checked
-    against the publisher's MD5 list when the source declares one.
+    against the publisher's MD5 list when the source declares one; a local copy that already matches that
+    list is pinned without downloading it again.
+
+    Files declared optional (only optional packs need them) are downloaded with `optional=True`. Without it
+    they are skipped ('skipped' in the result) unless a local copy exists, which is checked as usual; their
+    lock entries are kept either way.
     """
     sources = load_sources(repo.sources_file)
     lock = load_lock(repo.lock_file)
@@ -151,6 +158,11 @@ def fetch(
         destination = repo.raw / file.path
         label = f"{source.id}/{file.name}"
         entry = lock.get(key)
+
+        if file.optional and not optional and not destination.exists():
+            actions.append((label, "skipped"))
+            log(f"skipped    {label} (optional, not downloaded; fetch --optional downloads it)")
+            continue
 
         if entry is not None and not update:
             if (entry.url, entry.path) != (file.url, file.path):
@@ -174,22 +186,29 @@ def fetch(
             log(f"downloaded {label} ({digests.size} bytes, matches the lock file)")
             continue
 
-        part, digests = _download(file.url, destination, opener)
         publisher_md5 = None
         if file.publisher_checksums is not None:
             if file.publisher_checksums not in checksum_lists:
                 checksum_lists[file.publisher_checksums] = _read_checksum_list(file.publisher_checksums, opener)
             publisher_md5 = checksum_lists[file.publisher_checksums].get(file.name)
             if publisher_md5 is None:
-                part.unlink(missing_ok=True)
                 raise PipelineError(f"{label}: not listed in {file.publisher_checksums}")
-            if publisher_md5 != digests.md5:
+        # A local copy that matches the publisher's MD5 (for example one downloaded ahead of time by
+        # tools/scripts/download-phase6-kernels.sh) is pinned as it is. Without a publisher list, a local
+        # copy is never trusted: the file is downloaded.
+        local = file_digests(destination) if publisher_md5 is not None and destination.exists() else None
+        adopted = local is not None and local.md5 == publisher_md5
+        if local is not None and adopted:
+            digests = local
+        else:
+            part, digests = _download(file.url, destination, opener)
+            if publisher_md5 is not None and publisher_md5 != digests.md5:
                 part.unlink(missing_ok=True)
                 raise PipelineError(
                     f"{label}: MD5 {digests.md5} does not match the publisher's {publisher_md5} "
                     f"({file.publisher_checksums})"
                 )
-        os.replace(part, destination)
+            os.replace(part, destination)
         new_entry = LockEntry(
             source_id=source.id,
             name=file.name,
@@ -211,6 +230,8 @@ def fetch(
         changed = changed or new_entry != entry
         actions.append((label, action))
         checked = " (publisher MD5 verified)" if publisher_md5 else " (no publisher checksum list)"
+        if adopted:
+            checked = " (local copy, publisher MD5 verified)"
         log(f"{action:<10} {label} ({digests.size} bytes, sha256 {digests.sha256}){checked}")
 
     if changed:
@@ -229,7 +250,8 @@ def _read_checksum_list(url: str, opener: Opener) -> dict[str, str]:
 
 
 def verify(repo: Repo, log: Callable[[str], None] = print) -> list[str]:
-    """Checks every declared file in data/raw against the lock file. Returns the problems found."""
+    """Checks every declared file in data/raw against the lock file. Returns the problems found. A missing
+    optional file is not a problem (only optional packs need it)."""
     sources = load_sources(repo.sources_file)
     lock = load_lock(repo.lock_file)
     problems: list[str] = []
@@ -242,6 +264,8 @@ def verify(repo: Repo, log: Callable[[str], None] = print) -> list[str]:
                 problems.append(f"{label}: not pinned in the lock file (run fetch)")
             elif (entry.url, entry.path) != (file.url, file.path):
                 problems.append(f"{label}: sources.json and the lock file disagree on URL or path")
+            elif not path.exists() and file.optional:
+                log(f"skipped    {label} (optional, not downloaded)")
             elif not path.exists():
                 problems.append(f"{label}: {path} is missing (run fetch)")
             elif not _matches(entry, file_digests(path)):
@@ -265,6 +289,8 @@ def locked_file(repo: Repo, sources: tuple[Source, ...], source_id: str, name: s
     if entry is None:
         raise PipelineError(f"{source_id}/{name} is not pinned in the lock file (run fetch)")
     path = repo.raw / entry.path
+    if not path.exists() and declared.optional:
+        raise PipelineError(f"{path} is missing: it is optional, run fetch --optional to download it")
     if not path.exists() or not _matches(entry, file_digests(path)):
         raise PipelineError(f"{path} is missing or does not match the lock file (run fetch)")
     return path, entry

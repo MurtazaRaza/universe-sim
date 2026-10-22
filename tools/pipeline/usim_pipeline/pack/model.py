@@ -17,6 +17,9 @@ from .. import PipelineError
 
 class IdNamespace(IntEnum):
     NAIF = 1
+    GAIA_DR3 = 2
+    HIP = 3
+    HR = 4  # Bright Star Catalogue (Harvard Revised) number
 
 
 class BodyKind(IntEnum):
@@ -151,6 +154,57 @@ class PackTime:
     leap_seconds: tuple[tuple[int, int, int, int], ...]  # (year, month, day, TAI - UTC in s)
 
 
+@dataclass(frozen=True)
+class PackApproximation:
+    """A body without its own ephemeris, placed at its primary with every state flagged approximate
+    (DATA_PACK.md, section APPX; ADR-0008)."""
+
+    body: BodyRef
+    proxy: BodyRef  # the body's primary
+    reason: str
+
+
+@dataclass(frozen=True)
+class PackStar:
+    """One star of the star catalog (DATA_PACK.md, section STAR, format 1.2)."""
+
+    id: BodyRef  # (namespace, catalog number)
+    ra_rad: float  # right ascension at the catalog epoch, ICRF, [0, 2 pi)
+    dec_rad: float  # declination at the catalog epoch, ICRF
+    pm_ra_cosdec_rad_per_s: float | None  # proper motion in RA times cos(dec); None with pm_dec None too
+    pm_dec_rad_per_s: float | None
+    v_mag: float
+    b_v: float | None  # B-V color index, magnitudes
+    designation: str = ""
+
+
+@dataclass(frozen=True)
+class PackStarCatalog:
+    """The star catalog of a pack: one source, one epoch, and how its columns became the values."""
+
+    source_id: str
+    epoch_tdb_s: float
+    locator: str
+    derivation: str
+    stars: tuple[PackStar, ...]
+
+
+@dataclass(frozen=True)
+class PackRing:
+    """A ring region, or a gap within one, in a body's equatorial plane (DATA_PACK.md, section RING, 1.2)."""
+
+    body: BodyRef
+    name: str
+    gap: bool
+    inner_km: float
+    outer_km: float
+    radii_source_id: str
+    radii_locator: str  # with the derivation when the radii were computed from a center and a width
+    optical_depth: tuple[float, float] | None = None  # (smallest, largest) normal optical depth
+    optical_depth_source_id: str | None = None
+    optical_depth_locator: str = ""
+
+
 @dataclass(frozen=True, eq=False)
 class PackSegment:
     """Chebyshev records of one SPK type 2 or 3 segment (DATA_PACK.md, sections EPHS and EPHD)."""
@@ -202,6 +256,9 @@ class PackContent:
     rotations: list[PackRotation] = field(default_factory=list)
     time: PackTime | None = None
     segments: list[PackSegment] = field(default_factory=list)
+    approximations: list[PackApproximation] = field(default_factory=list)
+    star_catalog: PackStarCatalog | None = None
+    rings: list[PackRing] = field(default_factory=list)
 
 
 def check_content(content: PackContent) -> None:
@@ -280,3 +337,65 @@ def check_content(content: PackContent) -> None:
             raise PipelineError(f"pack: {what}: coverage extends past the last record")
         if not numpy.isfinite(segment.records).all():
             raise PipelineError(f"pack: {what}: non-finite coefficient")
+    primaries = {b.id: b.primary for b in content.bodies}
+    targets = {s.target for s in content.segments}
+    approximated: set[BodyRef] = set()
+    for a in content.approximations:
+        what = f"approximate position of {a.body}"
+        if a.body not in known_bodies:
+            raise PipelineError(f"pack: {what}: body is not in the pack")
+        if a.body in approximated:
+            raise PipelineError(f"pack: {what} appears twice")
+        approximated.add(a.body)
+        if primaries[a.body] is None or a.proxy != primaries[a.body]:
+            raise PipelineError(f"pack: {what}: the proxy {a.proxy} is not the body's primary")
+        if a.body in targets:
+            raise PipelineError(f"pack: {what}: the body has its own ephemeris segment")
+    _check_stars(content.star_catalog, check_source)
+    rotating = {r.body for r in content.rotations}
+    for ring in content.rings:
+        what = f"ring {ring.name!r} of {ring.body}"
+        if ring.body not in known_bodies:
+            raise PipelineError(f"pack: {what}: body is not in the pack")
+        if ring.body not in rotating:
+            raise PipelineError(f"pack: {what}: the body has no rotation model to define the ring plane")
+        if not ring.name:
+            raise PipelineError(f"pack: {what}: no name")
+        if not (math.isfinite(ring.inner_km) and math.isfinite(ring.outer_km) and 0 < ring.inner_km < ring.outer_km):
+            raise PipelineError(f"pack: {what}: radii must satisfy 0 < inner < outer")
+        check_source(ring.radii_source_id, what)
+        if ring.optical_depth is not None:
+            low, high = ring.optical_depth
+            if ring.gap:
+                raise PipelineError(f"pack: {what}: a gap has no optical depth")
+            if not (math.isfinite(low) and math.isfinite(high) and 0 <= low <= high):
+                raise PipelineError(f"pack: {what}: optical depth must satisfy 0 <= smallest <= largest")
+            if ring.optical_depth_source_id is None:
+                raise PipelineError(f"pack: {what}: optical depth without a source")
+            check_source(ring.optical_depth_source_id, what)
+        elif ring.optical_depth_source_id is not None or ring.optical_depth_locator:
+            raise PipelineError(f"pack: {what}: optical depth source without a value")
+
+
+def _check_stars(catalog: PackStarCatalog | None, check_source) -> None:
+    if catalog is None:
+        return
+    check_source(catalog.source_id, "star catalog")
+    if not math.isfinite(catalog.epoch_tdb_s):
+        raise PipelineError("pack: star catalog epoch is not finite")
+    if not catalog.stars:
+        raise PipelineError("pack: star catalog without stars")
+    ids = [s.id for s in catalog.stars]
+    if len(set(ids)) != len(ids):
+        raise PipelineError("pack: star catalog lists a star twice")
+    for s in catalog.stars:
+        what = f"star {s.id}"
+        if s.id[0] not in (int(v) for v in IdNamespace):
+            raise PipelineError(f"pack: {what}: unknown id namespace")
+        if not (0.0 <= s.ra_rad < 2 * math.pi and -math.pi / 2 <= s.dec_rad <= math.pi / 2):
+            raise PipelineError(f"pack: {what}: direction out of range")
+        if (s.pm_ra_cosdec_rad_per_s is None) != (s.pm_dec_rad_per_s is None):
+            raise PipelineError(f"pack: {what}: proper motion needs both components")
+        values = [s.v_mag] + [v for v in (s.b_v, s.pm_ra_cosdec_rad_per_s, s.pm_dec_rad_per_s) if v is not None]
+        if not all(math.isfinite(v) for v in values):
+            raise PipelineError(f"pack: {what}: non-finite value")

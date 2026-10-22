@@ -104,6 +104,38 @@ def test_fetch_without_publisher_list_pins_by_sha256(repo, server):
     assert server.requests == [URL]
 
 
+def test_local_copy_matching_the_publisher_md5_is_pinned_without_downloading(repo, server):
+    declare(repo)
+    serve(server)
+    (repo.raw / "test").mkdir(parents=True)
+    (repo.raw / "test" / "data.bin").write_bytes(DATA)
+    result = run(repo, server)
+    assert result.actions == [("S-TEST-A/data.bin", "pinned")]
+    assert server.requests == [LIST]  # the checksum list only
+    entry = load_lock(repo.lock_file)[("S-TEST-A", "data.bin")]
+    assert (entry.sha256, entry.publisher_md5) == (hashlib.sha256(DATA).hexdigest(), md5(DATA))
+    assert verify(repo, log=quiet) == []
+
+
+def test_local_copy_not_matching_the_publisher_md5_is_downloaded_again(repo, server):
+    declare(repo)
+    serve(server)
+    (repo.raw / "test").mkdir(parents=True)
+    (repo.raw / "test" / "data.bin").write_bytes(DATA[:100])  # an interrupted copy
+    assert run(repo, server).actions == [("S-TEST-A/data.bin", "pinned")]
+    assert URL in server.requests
+    assert (repo.raw / "test" / "data.bin").read_bytes() == DATA
+
+
+def test_local_copy_without_publisher_list_is_not_trusted(repo, server):
+    declare(repo, checksums=None)
+    server.files[URL] = DATA
+    (repo.raw / "test").mkdir(parents=True)
+    (repo.raw / "test" / "data.bin").write_bytes(DATA)
+    run(repo, server)
+    assert server.requests == [URL]
+
+
 def test_publisher_md5_mismatch_fails_and_leaves_nothing(repo, server):
     declare(repo)
     serve(server, listed="0" * 32)

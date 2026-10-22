@@ -67,7 +67,31 @@ def describe(path: Path, log: Callable[[str], None] = print) -> PackContent:
             f"{format_tdb(s.start_s)} to {format_tdb(s.end_s)}, {size} bytes"
         )
     log(f"  coefficient data: {total} bytes")
-    uncovered = [b.name for b in content.bodies if all(b.id not in (s.target, s.center) for s in content.segments)]
+    approximated = {a.body for a in content.approximations}
+    uncovered = [
+        b.name
+        for b in content.bodies
+        if b.id not in approximated and all(b.id not in (s.target, s.center) for s in content.segments)
+    ]
     if uncovered:
         log(f"  bodies without ephemeris: {', '.join(uncovered)}")
+    if content.approximations:
+        log(f"\napproximate positions ({len(content.approximations)}), every state flagged approximate")
+        for a in content.approximations:
+            log(f"  {names.get(a.body, _id(a.body))} at {names.get(a.proxy, _id(a.proxy))}: {a.reason}")
+    stars = content.star_catalog
+    if stars is not None:
+        brightest = sorted(stars.stars, key=lambda s: s.v_mag)[:3]
+        log(
+            f"\nstars ({len(stars.stars)}, {stars.source_id}): V {min(s.v_mag for s in stars.stars)!r} to "
+            f"{max(s.v_mag for s in stars.stars)!r}, {sum(1 for s in stars.stars if s.b_v is not None)} with B-V; "
+            f"brightest {', '.join(s.designation or str(s.id[1]) for s in brightest)}"
+        )
+        log(f"  {stars.locator}")
+    if content.rings:
+        log(f"\nrings ({len(content.rings)})")
+        for r in content.rings:
+            depth = f", optical depth {r.optical_depth[0]!r} to {r.optical_depth[1]!r} [{r.optical_depth_source_id}]" if r.optical_depth else ""
+            kind = "gap" if r.gap else "ring"
+            log(f"  {names.get(r.body, _id(r.body))} {r.name} ({kind}): {r.inner_km!r} to {r.outer_km!r} km [{r.radii_source_id}]{depth}")
     return content

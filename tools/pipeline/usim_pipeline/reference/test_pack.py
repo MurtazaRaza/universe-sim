@@ -3,7 +3,9 @@ pipeline's pack writer, and test_pack_expected.hpp, its expected contents for th
 
 All values are made up for the test and are not physical data. The content exercises every section and the
 optional parts of each record: uncertainties, derived values, nutation terms with quadratic phase angles,
-SPK types 2 and 3, coverage that ends inside the last record, a body without ephemeris and a non-ASCII name.
+SPK types 2 and 3, coverage that ends inside the last record, a body placed at its primary (format 1.1), a
+non-ASCII name, and (format 1.2) stars with and without color and proper motion, and rings with and without
+optical depth, including a gap.
 """
 
 from __future__ import annotations
@@ -22,11 +24,15 @@ from ..pack.model import (
     Frame,
     PackBody,
     PackContent,
+    PackApproximation,
     PackFile,
     PackQuantity,
+    PackRing,
     PackRotation,
     PackSegment,
     PackSource,
+    PackStar,
+    PackStarCatalog,
     PackTime,
     Unit,
     naif,
@@ -105,7 +111,22 @@ def synthetic_content() -> PackContent:
             PackSegment(naif(1002), naif(1001), Frame.ICRF, 2, -86400.0, 86400.0, -86400.0, 172800.0,
                         _records(1, 5, -86400.0, 172800.0, 0.5), "S-TEST-A", "synthetic-a.bin segment 1"),
         ],  # fmt: skip
-    )
+        approximations=[PackApproximation(naif(1003), naif(1000), "Synthetic: no segment; placed at its primary")],
+        star_catalog=PackStarCatalog(
+            "S-TEST-B", 86400.0, "synthetic-b.txt STARS", "Synthetic: made up for the test",
+            (
+                PackStar((3, 11), 0.0, 0.0, None, None, 4.0, None, ""),
+                PackStar((4, 2), 1.0, -0.5, 1.0e-12, -2.0e-12, 1.5, 0.25, "Syn A"),
+                PackStar((4, 7), 6.0, 1.25, None, None, -0.5, 1.75, "Syn B"),
+            ),
+        ),
+        rings=[
+            PackRing(naif(1000), "Star Ring", False, 5.0, 6.0, "S-TEST-A", "synthetic-a.bin RING1"),
+            PackRing(naif(1001), "Test Ring", False, 10.0, 20.0, "S-TEST-B", "synthetic-b.txt RING2",
+                     (0.25, 0.5), "S-TEST-A", "synthetic-a.bin DEPTH2"),
+            PackRing(naif(1001), "Test Gap", True, 12.0, 13.0, "S-TEST-B", "synthetic-b.txt GAP"),
+        ],
+    )  # fmt: skip
 
 
 def _cpp_string(text: str) -> str:
@@ -321,6 +342,72 @@ def expected_header(content: PackContent, data: bytes) -> str:
         "};",
         "inline constexpr SegmentRow k_segments[] = {",
         *segment_rows,
+        "};",
+        "",
+        "struct ApproximationRow {",
+        "    std::int64_t naif_id;",
+        "    std::int64_t proxy_naif_id;",
+        "    const char* reason;",
+        "};",
+        "inline constexpr ApproximationRow k_approximations[] = {",
+        *(f"    {{{a.body[1]}, {a.proxy[1]}, {_cpp_string(a.reason)}}}," for a in content.approximations),
+        "};",
+        "",
+    ]
+    catalog = content.star_catalog
+    assert catalog is not None
+    out += [
+        f"inline constexpr const char* k_star_source_id = {_cpp_string(catalog.source_id)};",
+        f"inline constexpr const char* k_star_locator = {_cpp_string(catalog.locator)};",
+        f"inline constexpr const char* k_star_derivation = {_cpp_string(catalog.derivation)};",
+        f"inline constexpr double k_star_epoch_tdb_s = {cpp_double(catalog.epoch_tdb_s)};",
+        "",
+        "struct StarRow {",
+        "    std::int32_t id_namespace;",
+        "    std::int64_t id;",
+        "    const char* designation;",
+        "    double ra_rad;",
+        "    double dec_rad;",
+        "    bool has_proper_motion;",
+        "    double pm_ra_cos_dec_rad_per_s;",
+        "    double pm_dec_rad_per_s;",
+        "    double v_magnitude;",
+        "    bool has_color;",
+        "    double b_minus_v;",
+        "};",
+        "inline constexpr StarRow k_stars[] = {",
+        *(
+            f"    {{{s.id[0]}, {s.id[1]}, {_cpp_string(s.designation)}, {cpp_double(s.ra_rad)}, {cpp_double(s.dec_rad)}, "
+            f"{str(s.pm_ra_cosdec_rad_per_s is not None).lower()}, {cpp_double(s.pm_ra_cosdec_rad_per_s or 0.0)}, "
+            f"{cpp_double(s.pm_dec_rad_per_s or 0.0)}, {cpp_double(s.v_mag)}, {str(s.b_v is not None).lower()}, "
+            f"{cpp_double(s.b_v or 0.0)}}},"
+            for s in catalog.stars
+        ),
+        "};",
+        "",
+        "struct RingRow {",
+        "    std::int64_t naif_id;",
+        "    const char* name;",
+        "    bool gap;",
+        "    double inner_km;",
+        "    double outer_km;",
+        "    const char* radii_source_id;",
+        "    const char* radii_locator;",
+        "    bool has_optical_depth;",
+        "    double optical_depth_smallest;",
+        "    double optical_depth_largest;",
+        "    const char* optical_depth_source_id;",
+        "    const char* optical_depth_locator;",
+        "};",
+        "inline constexpr RingRow k_rings[] = {",
+        *(
+            f"    {{{r.body[1]}, {_cpp_string(r.name)}, {str(r.gap).lower()}, {cpp_double(r.inner_km)}, "
+            f"{cpp_double(r.outer_km)}, {_cpp_string(r.radii_source_id)}, {_cpp_string(r.radii_locator)}, "
+            f"{str(r.optical_depth is not None).lower()}, {cpp_double((r.optical_depth or (0.0, 0.0))[0])}, "
+            f"{cpp_double((r.optical_depth or (0.0, 0.0))[1])}, {_cpp_string(r.optical_depth_source_id or '')}, "
+            f"{_cpp_string(r.optical_depth_locator)}}},"
+            for r in content.rings
+        ),
         "};",
         "",
         "} // namespace usim::test::pack",

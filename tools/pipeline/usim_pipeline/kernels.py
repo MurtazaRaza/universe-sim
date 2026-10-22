@@ -14,9 +14,10 @@ SPK segments are read with the DAF routines and copied bit for bit.
 from __future__ import annotations
 
 import datetime
+import math
 import re
 import struct
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -278,11 +279,11 @@ class SpkSegment:
     data_type: int
     start_s: float  # coverage from the segment summary
     end_s: float
-    init_s: float  # start of the first record
+    init_s: float  # start of the first record held
     interval_s: float  # length of every record
     record_size: int  # doubles per record
-    records: numpy.ndarray  # float64, shape (record_count, record_size)
-    first_address: int  # DAF address (1-based, in doubles) of the first record
+    records: numpy.ndarray  # float64, shape (record_count, record_size): all records, or those in a window
+    first_address: int  # DAF address (1-based, in doubles) of the first record held
 
     @property
     def record_count(self) -> int:
@@ -299,18 +300,45 @@ def _exact_int(value: float, what: str) -> int:
     return int(value)
 
 
-def read_spk_segments(path: Path) -> list[SpkSegment]:
-    """All segments of an SPK file, in file order. Fails on data types other than 2 and 3."""
+def record_range(
+    init_s: float, interval_s: float, count: int, start_s: float, end_s: float, window: tuple[float, float] | None
+) -> tuple[int, int] | None:
+    """Indices [first, last] of the records of a segment that overlap `window` (TDB seconds past J2000): all
+    of them for no window, None if the segment's coverage [start_s, end_s] does not reach into the window."""
+    if window is None:
+        return (0, count - 1)
+    start, end = window
+    first = max(0, math.floor((start - init_s) / interval_s))
+    last = min(count - 1, math.ceil((end - init_s) / interval_s) - 1)
+    if first > last or start >= end_s or end <= start_s:
+        return None
+    return (first, last)
+
+
+def read_spk_segments(
+    path: Path, keep: Callable[[int, int], bool] | None = None, window: tuple[float, float] | None = None
+) -> list[SpkSegment]:
+    """The segments of an SPK file, in file order. Fails on data types other than 2 and 3.
+
+    `keep(target, center)` selects segments (all by default). With a `window` (TDB seconds past J2000) only
+    the records overlapping it are read: a segment is returned with those records, its coverage clipped to
+    them, and a segment that does not reach into the window is left out. This keeps memory use to what the
+    pack needs (the satellite kernels are over 1 GB).
+    """
     handle = spiceypy.dafopr(str(path))
     segments: list[SpkSegment] = []
+    index = -1
     try:
         spiceypy.dafbfs(handle)
         while spiceypy.daffna():
+            index += 1
             summary = spiceypy.dafgs(5)  # ND = 2 doubles + NI = 6 integers packed into 3 doubles
             dc, ic = spiceypy.dafus(summary, 2, 6)
             name = spiceypy.dafgn().strip()
             target, center, frame, data_type, begin, end = (int(v) for v in ic)
-            where = f"{path.name} segment {len(segments)} ({target} wrt {center})"
+            if keep is not None and not keep(target, center):
+                continue
+            where = f"{path.name} segment {index} ({target} wrt {center})"
             if data_type not in SPK_COMPONENTS:
                 raise PipelineError(f"{where}: SPK type {data_type} is not supported (only 2 and 3)")
             init, interval, rsize, count = (float(v) for v in spiceypy.dafgda(handle, end - 3, end))
@@ -323,24 +351,31 @@ def read_spk_segments(path: Path) -> list[SpkSegment]:
                 raise PipelineError(f"{where}: segment length does not match {record_count} records of {record_size}")
             if not interval > 0:
                 raise PipelineError(f"{where}: record interval {interval} is not positive")
-            data = spiceypy.dafgda(handle, begin, begin + record_size * record_count - 1)
-            records = numpy.array(data, dtype=numpy.float64).reshape(record_count, record_size)
+            start_s, end_s = float(dc[0]), float(dc[1])
+            kept = record_range(init, interval, record_count, start_s, end_s, window)
+            if kept is None:
+                continue
+            first, last = kept
+            address = begin + first * record_size
+            data = spiceypy.dafgda(handle, address, begin + (last + 1) * record_size - 1)
+            records = numpy.array(data, dtype=numpy.float64).reshape(last - first + 1, record_size)
+            kept_init = init + first * interval
             segments.append(
                 SpkSegment(
                     file_name=path.name,
-                    index=len(segments),
+                    index=index,
                     name=name,
                     target=target,
                     center=center,
                     frame=frame,
                     data_type=data_type,
-                    start_s=float(dc[0]),
-                    end_s=float(dc[1]),
-                    init_s=init,
+                    start_s=max(start_s, kept_init),
+                    end_s=min(end_s, init + (last + 1) * interval),
+                    init_s=kept_init,
                     interval_s=interval,
                     record_size=record_size,
                     records=records,
-                    first_address=begin,
+                    first_address=address,
                 )
             )
     finally:

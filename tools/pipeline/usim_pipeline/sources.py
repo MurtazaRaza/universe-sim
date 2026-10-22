@@ -32,6 +32,7 @@ class SourceFile:
     path: str  # relative to data/raw, POSIX separators
     url: str
     publisher_checksums: str | None  # URL of the publisher's MD5 list (NAIF aa_checksums.txt), if any
+    optional: bool = False  # large file only optional packs need: fetch skips it unless asked (fetch --optional)
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,12 @@ def parse_sources(document: Any, where: str = "sources.json") -> tuple[Source, .
             path = _require(item, "path", str, fat)
             file_url = _require(item, "url", str, fat)
             checksums = _optional_str(item, "publisher_checksums", fat)
+            optional = item.get("optional", False)
+            if not isinstance(optional, bool):
+                raise PipelineError(f"{fat}: field 'optional' must be true or false")
+            unknown = set(item) - {"name", "path", "url", "publisher_checksums", "optional"}
+            if unknown:
+                raise PipelineError(f"{fat}: unknown fields {sorted(unknown)}")
             _check_raw_path(path, fat)
             _check_https(file_url, fat)
             if checksums is not None:
@@ -137,7 +144,7 @@ def parse_sources(document: Any, where: str = "sources.json") -> tuple[Source, .
             if path in seen_paths:
                 raise PipelineError(f"{fat}: path {path!r} is declared twice")
             seen_paths.add(path)
-            files.append(SourceFile(name, path, file_url, checksums))
+            files.append(SourceFile(name, path, file_url, checksums, optional))
         sources.append(
             Source(
                 id=source_id,

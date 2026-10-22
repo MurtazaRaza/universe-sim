@@ -11,7 +11,7 @@ import pytest
 
 from usim_pipeline import PipelineError
 from usim_pipeline.pack.binary import HEADER, SECTION, canonical, read_header, read_pack, write_pack
-from usim_pipeline.pack.model import Field, PackQuantity, Unit, naif
+from usim_pipeline.pack.model import Field, PackApproximation, PackQuantity, Unit, naif
 from usim_pipeline.reference.test_pack import synthetic_content
 
 
@@ -19,9 +19,10 @@ def test_round_trip_preserves_everything():
     content = synthetic_content()
     header, back = read_pack(write_pack(content))
     assert back == canonical(content)
-    assert header.format_major == 1 and header.format_minor == 0
+    assert header.format_major == 1 and header.format_minor == 2
     assert header.lock_sha256 == content.lock_sha256
     assert back.bodies[4].name == "Test Körper"
+    assert back.approximations == [PackApproximation(naif(1003), naif(1000), "Synthetic: no segment; placed at its primary")]
     assert back.segments[1].records.tobytes() == content.segments[1].records.tobytes()
 
 
@@ -86,6 +87,11 @@ def test_reader_rejects_damaged_packs(corrupt, message):
         (lambda c: c.segments.append(dataclasses.replace(c.segments[0], target=naif(4242))), "not in the pack"),
         (lambda c: c.rotations.append(dataclasses.replace(c.rotations[1], body=naif(1002), phase_degree=4)), "phase angle"),
         (lambda c: c.rotations.append(dataclasses.replace(c.rotations[0], body=naif(1002), pm=())), "1 to 3"),
+        (lambda c: c.approximations.append(PackApproximation(naif(1002), naif(1001), "x")), "own ephemeris segment"),
+        (lambda c: c.approximations.append(PackApproximation(naif(1003), naif(1000), "x")), "twice"),
+        (lambda c: c.approximations.append(PackApproximation(naif(1001), naif(0), "x")), "not the body's primary"),
+        (lambda c: c.approximations.append(PackApproximation(naif(0), naif(0), "x")), "not the body's primary"),
+        (lambda c: c.approximations.append(PackApproximation(naif(4242), naif(0), "x")), "not in the pack"),
     ],
 )
 def test_writer_rejects_content_a_reader_would_refuse(change, message):
@@ -93,3 +99,28 @@ def test_writer_rejects_content_a_reader_would_refuse(change, message):
     change(content)
     with pytest.raises(PipelineError, match=message):
         write_pack(content)
+
+
+def test_a_reader_skips_unknown_sections_and_appx_is_optional():
+    # Rename APPX to an id the reader does not know: the pack still reads, as a format 1.0 pack would,
+    # without approximate positions.
+    data = write_pack(synthetic_content())
+    header = read_header(data)
+    index = list(header.sections).index("APPX")
+    renamed = _rehash(_patch(data, HEADER.size + index * SECTION.size, b"ZZZZ"))
+    _, back = read_pack(renamed)
+    assert back.approximations == []
+    assert len(back.segments) == 3
+
+
+def test_star_and_ring_sections_are_optional():
+    data = write_pack(synthetic_content())
+    header = read_header(data)
+    for name in ("STAR", "RING"):
+        index = list(header.sections).index(name)
+        data = _patch(data, HEADER.size + index * SECTION.size, b"ZZZ" + name[0].encode())
+    _, back = read_pack(_rehash(data))
+    assert back.star_catalog is None and back.rings == []
+    # A pack without stars and rings has no STAR or RING section at all.
+    plain = dataclasses.replace(synthetic_content(), star_catalog=None, rings=[])
+    assert {"STAR", "RING"}.isdisjoint(read_header(write_pack(plain)).sections)

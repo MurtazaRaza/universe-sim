@@ -15,6 +15,7 @@ import numpy
 from .. import PipelineError
 from .model import (
     BodyKind,
+    PackApproximation,
     Field,
     Frame,
     PackBody,
@@ -22,8 +23,11 @@ from .model import (
     PackFile,
     PackQuantity,
     PackRotation,
+    PackRing,
     PackSegment,
     PackSource,
+    PackStar,
+    PackStarCatalog,
     PackTime,
     Unit,
     check_content,
@@ -31,7 +35,7 @@ from .model import (
 
 MAGIC = b"USIMPACK"
 FORMAT_MAJOR = 1
-FORMAT_MINOR = 0
+FORMAT_MINOR = 2
 ENDIAN_MARKER = 0x01020304
 SECTION_VERSION = 1
 ALIGNMENT = 8
@@ -49,15 +53,29 @@ ROTATION = struct.Struct("<IiIIqIIIIIIIIIIIIIIII")  # 88
 TIME = struct.Struct("<IIdddddII")  # 56
 LEAP = struct.Struct("<iiii")  # 16
 SEGMENT = struct.Struct("<iiqqiiddddIIQIIII")  # 96
+APPROXIMATION = struct.Struct("<iiqqII")  # 32
+STAR_HEADER = struct.Struct("<IIdIIII")  # 32
+STAR = struct.Struct("<iIqddddddII")  # 72
+RING = struct.Struct("<IIddddIIIIIIII")  # 72
 
-# Sections in the order they are written. Every one is required in format 1.0.
-SECTION_ORDER = (b"META", b"SRCS", b"FILE", b"BODY", b"QNTY", b"ROTN", b"TIME", b"EPHS", b"STRS", b"EPHD")
+# Sections in the order they are written. The format 1.0 sections are required; APPX (1.1) is optional and
+# always written; STAR and RING (1.2) are optional and written only when the pack has stars or rings.
+SECTION_ORDER = (
+    b"META", b"SRCS", b"FILE", b"BODY", b"QNTY", b"ROTN", b"TIME", b"EPHS", b"APPX", b"STAR", b"RING", b"STRS", b"EPHD",
+)  # fmt: skip
+OPTIONAL_SECTIONS = (b"APPX", b"STAR", b"RING")
+REQUIRED_SECTIONS = tuple(s for s in SECTION_ORDER if s not in OPTIONAL_SECTIONS)
 
 QUANTITY_HAS_UNCERTAINTY = 1
 FILE_PUBLISHER_VERIFIED = 1
+STAR_HAS_COLOR = 1
+STAR_HAS_PROPER_MOTION = 2
+RING_GAP = 1
+RING_HAS_OPTICAL_DEPTH = 2
 
 assert HEADER.size == 128 and SECTION.size == 32 and SOURCE.size == 56 and FILE.size == 88
 assert BODY.size == 40 and QUANTITY.size == 56 and ROTATION.size == 88 and TIME.size == 56 and SEGMENT.size == 96
+assert APPROXIMATION.size == 32 and STAR_HEADER.size == 32 and STAR.size == 72 and RING.size == 72
 
 
 class _Strings:
@@ -91,7 +109,15 @@ def canonical(content: PackContent) -> PackContent:
     reader returns. Two contents with equal canonical forms give identical packs."""
     body_index = {b.id: i for i, b in enumerate(content.bodies)}
     quantities = sorted(content.quantities, key=lambda q: (body_index[q.body], int(q.field)))
-    return dataclasses.replace(content, quantities=quantities, metadata=dict(sorted(content.metadata.items())))
+    approximations = sorted(content.approximations, key=lambda a: body_index[a.body])
+    catalog = content.star_catalog
+    if catalog is not None:
+        catalog = dataclasses.replace(catalog, stars=tuple(sorted(catalog.stars, key=lambda s: s.id)))
+    rings = sorted(content.rings, key=lambda r: (body_index[r.body], r.inner_km))
+    return dataclasses.replace(
+        content, quantities=quantities, approximations=approximations, metadata=dict(sorted(content.metadata.items())),
+        star_catalog=catalog, rings=rings,
+    )  # fmt: skip
 
 
 def write_pack(content: PackContent) -> bytes:
@@ -181,12 +207,47 @@ def write_pack(content: PackContent) -> bytes:
         first += s.records.size
     sections[b"EPHS"] = bytes(ephs)
     sections[b"EPHD"] = b"".join(data_parts)
+
+    approximations = sorted(content.approximations, key=lambda a: body_index[a.body])
+    appx = bytearray(COUNTS.pack(len(approximations), 0))
+    for a in approximations:
+        appx += APPROXIMATION.pack(a.body[0], a.proxy[0], a.body[1], a.proxy[1], *strings.ref(a.reason))
+    sections[b"APPX"] = bytes(appx)
+
+    catalog = content.star_catalog
+    if catalog is not None:
+        star = bytearray(
+            STAR_HEADER.pack(len(catalog.stars), source_index[catalog.source_id], catalog.epoch_tdb_s,
+                             *strings.ref(catalog.locator), *strings.ref(catalog.derivation))
+        )  # fmt: skip
+        for s in sorted(catalog.stars, key=lambda s: s.id):
+            flags = (STAR_HAS_COLOR if s.b_v is not None else 0) | (
+                STAR_HAS_PROPER_MOTION if s.pm_ra_cosdec_rad_per_s is not None else 0
+            )
+            star += STAR.pack(
+                s.id[0], flags, s.id[1], s.ra_rad, s.dec_rad, s.pm_ra_cosdec_rad_per_s or 0.0,
+                s.pm_dec_rad_per_s or 0.0, s.v_mag, s.b_v or 0.0, *strings.ref(s.designation),
+            )  # fmt: skip
+        sections[b"STAR"] = bytes(star)
+
+    if content.rings:
+        ring_data = bytearray(COUNTS.pack(len(content.rings), 0))
+        for r in sorted(content.rings, key=lambda r: (body_index[r.body], r.inner_km)):
+            flags = (RING_GAP if r.gap else 0) | (RING_HAS_OPTICAL_DEPTH if r.optical_depth is not None else 0)
+            low, high = r.optical_depth or (0.0, 0.0)
+            depth_source = source_index[r.optical_depth_source_id] if r.optical_depth_source_id is not None else 0
+            ring_data += RING.pack(
+                body_index[r.body], flags, r.inner_km, r.outer_km, low, high, source_index[r.radii_source_id],
+                depth_source, *strings.ref(r.name), *strings.ref(r.radii_locator), *strings.ref(r.optical_depth_locator),
+            )  # fmt: skip
+        sections[b"RING"] = bytes(ring_data)
     sections[b"STRS"] = strings.data()
 
-    offset = HEADER.size + SECTION.size * len(SECTION_ORDER)
+    written = [s for s in SECTION_ORDER if s in sections]
+    offset = HEADER.size + SECTION.size * len(written)
     table = bytearray()
     body = bytearray()
-    for section_id in SECTION_ORDER:
+    for section_id in written:
         payload = sections[section_id]
         table += SECTION.pack(section_id, SECTION_VERSION, offset, len(payload), 0)
         padded = _pad(payload)
@@ -194,7 +255,7 @@ def write_pack(content: PackContent) -> bytes:
         offset += len(padded)
     after_header = bytes(table) + bytes(body)
     header = HEADER.pack(
-        MAGIC, FORMAT_MAJOR, FORMAT_MINOR, ENDIAN_MARKER, HEADER.size, len(SECTION_ORDER),
+        MAGIC, FORMAT_MAJOR, FORMAT_MINOR, ENDIAN_MARKER, HEADER.size, len(written),
         HEADER.size + len(after_header), hashlib.sha256(after_header).digest(), bytes.fromhex(content.lock_sha256),
         bytes(32),
     )  # fmt: skip
@@ -263,7 +324,7 @@ def read_header(data: bytes) -> PackHeader:
     spans.sort()
     if any(a[1] > b[0] for a, b in zip(spans, spans[1:])):
         raise PipelineError("pack: sections overlap")
-    missing = [s.decode() for s in SECTION_ORDER if s.decode() not in sections]
+    missing = [s.decode() for s in REQUIRED_SECTIONS if s.decode() not in sections]
     if missing:
         raise PipelineError(f"pack: missing sections {missing}")
     return PackHeader(major, minor, size, content_hash.hex(), lock_hash.hex(), sections)
@@ -401,9 +462,49 @@ def read_pack(data: bytes) -> tuple[PackHeader, PackContent]:
             )
         )  # fmt: skip
 
+    approximations = []
+    if "APPX" in header.sections:
+        apx = view("APPX")
+        count, _ = apx.unpack(COUNTS, 0)
+        for r in apx.records(APPROXIMATION, COUNTS.size, count):
+            approximations.append(PackApproximation((r[0], r[2]), (r[1], r[3]), text(r[4], r[5])))
+
+    star_catalog = None
+    if "STAR" in header.sections:
+        sta = view("STAR")
+        h = sta.unpack(STAR_HEADER, 0)
+        stars = []
+        for r in sta.records(STAR, STAR_HEADER.size, h[0]):
+            moving = bool(r[1] & STAR_HAS_PROPER_MOTION)
+            stars.append(
+                PackStar(
+                    id=(r[0], r[2]), ra_rad=r[3], dec_rad=r[4], pm_ra_cosdec_rad_per_s=r[5] if moving else None,
+                    pm_dec_rad_per_s=r[6] if moving else None, v_mag=r[7], b_v=r[8] if r[1] & STAR_HAS_COLOR else None,
+                    designation=text(r[9], r[10]),
+                )
+            )  # fmt: skip
+        star_catalog = PackStarCatalog(source_id(h[1]), h[2], text(h[3], h[4]), text(h[5], h[6]), tuple(stars))
+
+    rings = []
+    if "RING" in header.sections:
+        rng = view("RING")
+        count, _ = rng.unpack(COUNTS, 0)
+        for r in rng.records(RING, COUNTS.size, count):
+            has_depth = bool(r[1] & RING_HAS_OPTICAL_DEPTH)
+            rings.append(
+                PackRing(
+                    body=body_ref(r[0]), name=text(r[8], r[9]), gap=bool(r[1] & RING_GAP), inner_km=r[2], outer_km=r[3],
+                    radii_source_id=source_id(r[6]), radii_locator=text(r[10], r[11]),
+                    optical_depth=(r[4], r[5]) if has_depth else None,
+                    optical_depth_source_id=source_id(r[7]) if has_depth else None,
+                    optical_depth_locator=text(r[12], r[13]),
+                )
+            )  # fmt: skip
+
     content = PackContent(
         metadata=metadata, lock_sha256=header.lock_sha256, sources=sources, files=files, bodies=bodies,
-        quantities=quantities, rotations=rotations, time=time, segments=segments,
+        quantities=quantities, rotations=rotations, time=time, segments=segments, approximations=approximations,
+        star_catalog=star_catalog, rings=rings,
     )  # fmt: skip
     check_content(content)
     for q in quantities:
