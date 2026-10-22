@@ -19,6 +19,59 @@
       ]
     },
     {
+      "id": "S-NAIF-SAT",
+      "title": "JPL planetary satellite ephemerides (SPK)",
+      "provider": "NASA Jet Propulsion Laboratory, Solar System Dynamics group; distributed by NAIF",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/",
+      "citation": "JPL satellite ephemeris solutions MAR099, JUP365, SAT441, URA184, NEP097 and PLU060, as merged by NAIF into the kernels listed (solution, planetary ephemeris and fit in each kernel's comments). URA184: Jacobson, R. A., Park, R. S. (2025). The Orbits of Uranus, Its Satellites and Rings, the Gravity Field of the Uranian System, and the Orientation of the Poles of Uranus and Its Satellites. The Astronomical Journal, 169(2), 65.",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "mar099.bsp",
+          "path": "naif/mar099.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+          "optional": true
+        },
+        {
+          "name": "jup365.bsp",
+          "path": "naif/jup365.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/jup365.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+          "optional": true
+        },
+        {
+          "name": "sat441.bsp",
+          "path": "naif/sat441.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/sat441.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+          "optional": true
+        },
+        {
+          "name": "ura184_part-3.bsp",
+          "path": "naif/ura184_part-3.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/ura184_part-3.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+          "optional": true
+        },
+        {
+          "name": "nep097.bsp",
+          "path": "naif/nep097.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/nep097.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+          "optional": true
+        },
+        {
+          "name": "plu060.bsp",
+          "path": "naif/plu060.bsp",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/plu060.bsp",
+          "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+          "optional": true
+        }
+      ]
+    },
+    {
       "id": "S-NAIF-PCK11",
       "title": "NAIF generic planetary constants kernel pck00011.tpc",
       "provider": "NAIF, NASA Jet Propulsion Laboratory",
@@ -87,6 +140,49 @@
       "url": "https://ssd.jpl.nasa.gov/api/horizons.api",
       "citation": "Giorgini, J. D., et al. (1996). JPL's On-Line Solar System Data Service. Bulletin of the American Astronomical Society, 28(3), 1158. Used for reference vectors only.",
       "license": "JPL Solar System Dynamics data service; responses are saved with their full request and API version (reference data only, not a pack input).",
+      "files": []
+    },
+    {
+      "id": "S-CDS-BSC5",
+      "title": "The Bright Star Catalogue, 5th Revised Ed. (Preliminary Version), CDS catalog V/50",
+      "provider": "Yale University Observatory and NASA Astronomical Data Center (Hoffleit and Warren); distributed by CDS, Strasbourg",
+      "tier": 1,
+      "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/",
+      "citation": "Hoffleit, D., Warren Jr., W. H. (1991). The Bright Star Catalogue, 5th Revised Ed. (Preliminary Version). Astronomical Data Center, NSSDC/ADC. Bibcode 1991bsc..book.....H. Retrieved through the VizieR catalogue service of CDS, Strasbourg (DOI 10.26093/cds/vizier), catalog V/50.",
+      "license": "CDS VizieR rules of usage (https://cds.unistra.fr/vizier-org/licences_vizier.html, read 2026-10-22): data are free of use in a scientific context with the original authors and publication cited; an acknowledgement of VizieR is appreciated; commercial use depends on the data origin. The V/50 ReadMe states no copyright.",
+      "files": [
+        {
+          "name": "ReadMe",
+          "path": "cds/V50/ReadMe",
+          "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/ReadMe",
+          "publisher_checksums": null
+        },
+        {
+          "name": "catalog.gz",
+          "path": "cds/V50/catalog.gz",
+          "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz",
+          "publisher_checksums": null
+        }
+      ]
+    },
+    {
+      "id": "S-IAU-WGPSN",
+      "title": "Gazetteer of Planetary Nomenclature: ring and ring gap nomenclature",
+      "provider": "International Astronomical Union Working Group for Planetary System Nomenclature (WGPSN); hosted by the USGS Astrogeology Science Center",
+      "tier": 1,
+      "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+      "citation": "Gazetteer of Planetary Nomenclature, International Astronomical Union (IAU) Working Group for Planetary System Nomenclature (WGPSN), page 'Rings and Ring Gaps' (https://planetarynames.wr.usgs.gov/Page/Rings, read 2026-10-22). Values enter through data/catalog/rings.json.",
+      "license": "USGS Astrogeology web content (a U.S. Government work); cite the Gazetteer of Planetary Nomenclature, IAU WGPSN.",
+      "files": []
+    },
+    {
+      "id": "S-PDS-RMS",
+      "title": "Vital statistics for Saturn's rings (PDS Ring-Moon Systems Node)",
+      "provider": "NASA Planetary Data System, Ring-Moon Systems Node (SETI Institute)",
+      "tier": 2,
+      "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
+      "citation": "PDS Ring-Moon Systems Node, 'Vital Statistics for Saturn's Rings and Inner Satellites', table 'Rings of Saturn' (https://pds-rings.seti.org/saturn/saturn_tables.html, read 2026-10-22); a compilation whose rows cite the published sources (for example Colwell et al. 2009, French et al. 2017, Murray and Dermott 1999). Used for ring optical depths only, labeled Tier 2. Values enter through data/catalog/rings.json.",
+      "license": "NASA Planetary Data System public web content; cite the PDS Ring-Moon Systems Node and the references of each row.",
       "files": []
     }
   ]

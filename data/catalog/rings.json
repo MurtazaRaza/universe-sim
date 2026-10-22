@@ -1,0 +1,279 @@
+{
+  "schema_version": 1,
+  "description": "Planetary rings (P6-04), transcribed from registered sources (SPEC section 10): radii from the IAU WGPSN Gazetteer of Planetary Nomenclature (Tier 1), optical depths from the PDS Ring-Moon Systems Node table (Tier 2, no Tier 1 source available to the pipeline). Each value is kept as the text on the page; the pipeline parses it. Saturn's main rings and the gaps the Gazetteer gives with a single width; left out: the Huygens Gap (width given as a range, 285-440 km), the Roche Division and the F, G and E rings (outside the main rings, no optical depth used).",
+  "rings": [
+    {
+      "naif_id": 699,
+      "name": "D Ring",
+      "gap": false,
+      "radii": {
+        "text": "67,000 - 74,490",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row D, columns Distance (km) from planet's center"
+      },
+      "optical_depth": {
+        "text": "10^-5 to 10^-3",
+        "source_id": "S-PDS-RMS",
+        "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row D Ring, column Optical Depth"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "C Ring",
+      "gap": false,
+      "radii": {
+        "text": "74,490 - 91,980",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row C, columns Distance (km) from planet's center"
+      },
+      "optical_depth": {
+        "text": "0.05 to 0.35",
+        "source_id": "S-PDS-RMS",
+        "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row C Ring, column Optical Depth"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "B Ring",
+      "gap": false,
+      "radii": {
+        "text": "91,980 - 117,500",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row B, columns Distance (km) from planet's center"
+      },
+      "optical_depth": {
+        "text": "0.4 to 5",
+        "source_id": "S-PDS-RMS",
+        "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row B Ring, column Optical Depth"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Cassini Division",
+      "gap": false,
+      "radii": {
+        "text": "117,500 - 122,050",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Cassini Division, columns Distance (km) from planet's center"
+      },
+      "optical_depth": {
+        "text": "0 to 0.2",
+        "source_id": "S-PDS-RMS",
+        "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Cassini Division, column Optical Depth"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "A Ring",
+      "gap": false,
+      "radii": {
+        "text": "122,050 - 136,770",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row A, columns Distance (km) from planet's center"
+      },
+      "optical_depth": {
+        "text": "0.4 to 1",
+        "source_id": "S-PDS-RMS",
+        "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row A Ring, column Optical Depth"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Colombo Gap",
+      "gap": true,
+      "radii": {
+        "text": "77,800",
+        "width_text": "100",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Colombo Gap, columns Distance (km) from planet's center and Radial Width (km)"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Maxwell Gap",
+      "gap": true,
+      "radii": {
+        "text": "87,500",
+        "width_text": "270",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Maxwell Gap, columns Distance (km) from planet's center and Radial Width (km)"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Bond Gap",
+      "gap": true,
+      "radii": {
+        "text": "88,690-88,720",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Bond Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Dawes Gap",
+      "gap": true,
+      "radii": {
+        "text": "90,200-90,220",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Dawes Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Herschel Gap",
+      "gap": true,
+      "radii": {
+        "text": "118,183-118,285",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Herschel Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Russell Gap",
+      "gap": true,
+      "radii": {
+        "text": "118,597-118,630",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Russell Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Jeffreys Gap",
+      "gap": true,
+      "radii": {
+        "text": "118,931-118,969",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Jeffreys Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Kuiper Gap",
+      "gap": true,
+      "radii": {
+        "text": "119,403-119,406",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Kuiper Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Laplace Gap",
+      "gap": true,
+      "radii": {
+        "text": "119,848-120,086",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Laplace Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Bessel Gap",
+      "gap": true,
+      "radii": {
+        "text": "120,236-120,246",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Bessel Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Barnard Gap",
+      "gap": true,
+      "radii": {
+        "text": "120,305-120,318",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Barnard Gap, columns Distance (km) from planet's center"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Encke Gap",
+      "gap": true,
+      "radii": {
+        "text": "133,570",
+        "width_text": "325",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Encke Gap, columns Distance (km) from planet's center and Radial Width (km)"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    },
+    {
+      "naif_id": 699,
+      "name": "Keeler Gap",
+      "gap": true,
+      "radii": {
+        "text": "136,505",
+        "width_text": "35",
+        "source_id": "S-IAU-WGPSN",
+        "url": "https://planetarynames.wr.usgs.gov/Page/Rings",
+        "accessed": "2026-10-22",
+        "table": "Rings of Saturn, row Keeler Gap, columns Distance (km) from planet's center and Radial Width (km)"
+      },
+      "transcriber_note": "Extracted on 2026-10-22 by a script from the table rows of the saved pages (cell text as shown on the page; superscripts written as ^) and checked against the pages by eye."
+    }
+  ]
+}

@@ -2,6 +2,30 @@
   "schema_version": 1,
   "files": [
     {
+      "source_id": "S-CDS-BSC5",
+      "name": "ReadMe",
+      "path": "cds/V50/ReadMe",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/ReadMe",
+      "size": 11571,
+      "sha256": "44fd9c73e2eecad0beb47bdfa3f01c60fd43f93d6964198e31fcd48732de5b33",
+      "md5": "8d665f11fe6ce59e65ce2a74b15b2a38",
+      "publisher_md5": null,
+      "publisher_checksums": null,
+      "retrieved_utc": "2026-10-21T20:10:10Z"
+    },
+    {
+      "source_id": "S-CDS-BSC5",
+      "name": "catalog.gz",
+      "path": "cds/V50/catalog.gz",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz",
+      "size": 573921,
+      "sha256": "3dc44b1e90be8fbe5bcc7656032560f51275f985c7e3f783c9028e1838ec7bed",
+      "md5": "2f0662e53aa4e563acb8b2705f45c1a3",
+      "publisher_md5": null,
+      "publisher_checksums": null,
+      "retrieved_utc": "2026-10-21T20:10:11Z"
+    },
+    {
       "source_id": "S-JPL-DE440",
       "name": "de440s.bsp",
       "path": "naif/de440s.bsp",
@@ -48,6 +72,78 @@
       "publisher_md5": null,
       "publisher_checksums": null,
       "retrieved_utc": "2026-10-20T15:09:54Z"
+    },
+    {
+      "source_id": "S-NAIF-SAT",
+      "name": "jup365.bsp",
+      "path": "naif/jup365.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/jup365.bsp",
+      "size": 1136581632,
+      "sha256": "dbf016c01ba4d022154838000cf3f06962cf958ddc503a366f7fe8f81495c5cb",
+      "md5": "9dcee11a333945310db8b76eb695fc9c",
+      "publisher_md5": "9dcee11a333945310db8b76eb695fc9c",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+      "retrieved_utc": "2026-10-21T14:16:54Z"
+    },
+    {
+      "source_id": "S-NAIF-SAT",
+      "name": "mar099.bsp",
+      "path": "naif/mar099.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099.bsp",
+      "size": 1227574272,
+      "sha256": "9991e57b196bae1a096acc6e2afc6718102ee420d684695de0f0333064c046bc",
+      "md5": "46f5740f86ec78b978ab96a82f0e42b7",
+      "publisher_md5": "46f5740f86ec78b978ab96a82f0e42b7",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+      "retrieved_utc": "2026-10-21T14:16:56Z"
+    },
+    {
+      "source_id": "S-NAIF-SAT",
+      "name": "nep097.bsp",
+      "path": "naif/nep097.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/nep097.bsp",
+      "size": 105262080,
+      "sha256": "5c1132fdc48c54e5d2e4eb663e1ed1a876911eae9433c203f29a5a1b5e1fa9b1",
+      "md5": "937e05462aac5e34cb5cfddae6c99199",
+      "publisher_md5": "937e05462aac5e34cb5cfddae6c99199",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+      "retrieved_utc": "2026-10-21T14:16:56Z"
+    },
+    {
+      "source_id": "S-NAIF-SAT",
+      "name": "plu060.bsp",
+      "path": "naif/plu060.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/plu060.bsp",
+      "size": 135207936,
+      "sha256": "dfbb102491a26ed41ae08ca3f8963f22f0219df1d8f265ab87b9ad825a826fc6",
+      "md5": "9e8d40339d583273feb94bbf8c95cae4",
+      "publisher_md5": "9e8d40339d583273feb94bbf8c95cae4",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+      "retrieved_utc": "2026-10-21T14:16:57Z"
+    },
+    {
+      "source_id": "S-NAIF-SAT",
+      "name": "sat441.bsp",
+      "path": "naif/sat441.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/sat441.bsp",
+      "size": 661592064,
+      "sha256": "d7e444a9ba7a52b8f448ff0747030789524d2f0c1212e4e2bd7f5fc3c96444d5",
+      "md5": "0d081d7e58504450cf2aa0b151a36b41",
+      "publisher_md5": "0d081d7e58504450cf2aa0b151a36b41",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+      "retrieved_utc": "2026-10-21T14:16:58Z"
+    },
+    {
+      "source_id": "S-NAIF-SAT",
+      "name": "ura184_part-3.bsp",
+      "path": "naif/ura184_part-3.bsp",
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/ura184_part-3.bsp",
+      "size": 386885632,
+      "sha256": "273cd4ccc470d1098562cd4e94fa48fc2b4c6b1c2896308e473c949b87937c53",
+      "md5": "cf24471fb9037543cdbe168bc0fd4c2e",
+      "publisher_md5": "cf24471fb9037543cdbe168bc0fd4c2e",
+      "publisher_checksums": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/aa_checksums.txt",
+      "retrieved_utc": "2026-10-21T14:16:59Z"
     }
   ]
 }
