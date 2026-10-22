@@ -2,13 +2,22 @@
 
 add_library(usim_core STATIC
     catalog/catalog.cpp
+    catalog/sky.cpp
     data/data_pack.cpp
     data/sha256.cpp
+    ephemeris/chebyshev_segment.cpp
+    ephemeris/coverage.cpp
+    ephemeris/ephemeris_chain.cpp
     frames/frames.cpp
+    frames/iau_rotation.cpp
     math/chebyshev.cpp
     math/quat.cpp
     presentation/axis_convention.cpp
+    presentation/view.cpp
     result.cpp
+    sim/orbit_path.cpp
+    sim/simulation.cpp
+    sim/simulation_clock.cpp
     time/calendar.cpp
     time/iso8601.cpp
     time/time_scales.cpp
