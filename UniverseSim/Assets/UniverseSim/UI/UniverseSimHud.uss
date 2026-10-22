@@ -1,0 +1,201 @@
+.root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: rgb(225, 230, 240);
+    font-size: 14px;
+}
+
+.labels {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.body-label {
+    position: absolute;
+    font-size: 12px;
+    color: rgb(200, 210, 230);
+    -unity-text-outline-width: 0;
+    padding-left: 6px;
+    translate: 0 -50%;
+}
+
+.body-label.selected {
+    color: rgb(255, 230, 150);
+}
+
+.bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    padding: 8px 12px;
+    background-color: rgba(10, 14, 24, 0.75);
+}
+
+.top-bar {
+    top: 0;
+    flex-direction: row;
+}
+
+.bottom-bar {
+    bottom: 0;
+}
+
+.spacer {
+    flex-grow: 1;
+}
+
+.row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.time-primary {
+    font-size: 20px;
+    -unity-font-style: bold;
+}
+
+.time-secondary,
+.coverage,
+.subtitle {
+    color: rgb(150, 160, 180);
+}
+
+.status {
+    align-items: flex-end;
+}
+
+.scale-indicator {
+    -unity-font-style: bold;
+    color: rgb(150, 220, 160);
+}
+
+.scale-indicator.enlarged {
+    color: rgb(255, 190, 110);
+}
+
+.warning {
+    color: rgb(255, 180, 90);
+    white-space: normal;
+}
+
+.credit {
+    font-size: 11px;
+    margin-right: 6px;
+}
+
+.rate {
+    margin-left: 12px;
+    -unity-font-style: bold;
+}
+
+.date-entry {
+    width: 300px;
+}
+
+.focus {
+    width: 260px;
+}
+
+.panel {
+    position: absolute;
+    right: 12px;
+    top: 84px;
+    width: 380px;
+    max-height: 60%;
+    padding: 10px;
+    background-color: rgba(10, 14, 24, 0.82);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(50, 60, 80);
+    border-right-color: rgb(50, 60, 80);
+    border-top-color: rgb(50, 60, 80);
+    border-bottom-color: rgb(50, 60, 80);
+}
+
+.title {
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+
+.values {
+    margin-top: 6px;
+    flex-shrink: 1;
+}
+
+.value-name {
+    color: rgb(150, 160, 180);
+    margin-top: 4px;
+}
+
+.value {
+    white-space: normal;
+}
+
+.value-source {
+    font-size: 11px;
+    color: rgb(120, 130, 150);
+    white-space: normal;
+}
+
+/* Controls on the dark HUD (overrides of the default runtime theme). */
+.unity-button {
+    background-color: rgb(38, 50, 72);
+    color: rgb(225, 230, 240);
+    border-left-color: rgb(70, 85, 110);
+    border-right-color: rgb(70, 85, 110);
+    border-top-color: rgb(70, 85, 110);
+    border-bottom-color: rgb(70, 85, 110);
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.unity-button:hover {
+    background-color: rgb(55, 72, 104);
+}
+
+.unity-button:active {
+    background-color: rgb(75, 95, 135);
+}
+
+.unity-base-field__label {
+    min-width: 0;
+    padding-right: 6px;
+    color: rgb(180, 190, 210);
+}
+
+.unity-base-text-field__input,
+.unity-base-popup-field__input,
+.unity-toggle__checkmark {
+    background-color: rgb(20, 26, 40);
+    color: rgb(225, 230, 240);
+    border-left-color: rgb(70, 85, 110);
+    border-right-color: rgb(70, 85, 110);
+    border-top-color: rgb(70, 85, 110);
+    border-bottom-color: rgb(70, 85, 110);
+}
+
+.unity-toggle {
+    margin-left: 16px;
+}
+
+.unity-toggle__checkmark {
+    -unity-background-image-tint-color: rgb(150, 220, 160);
+}
+
+.unity-base-popup-field__text {
+    color: rgb(225, 230, 240);
+}
+
+.unity-scroller {
+    opacity: 0.6;
+}

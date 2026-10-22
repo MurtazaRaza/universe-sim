@@ -1,7 +1,9 @@
 {
     "name": "UniverseSim.Unity",
     "rootNamespace": "UniverseSim.Unity",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

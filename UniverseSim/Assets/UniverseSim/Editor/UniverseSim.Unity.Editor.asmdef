@@ -1,7 +1,10 @@
 {
     "name": "UniverseSim.Unity.Editor",
     "rootNamespace": "UniverseSim.Unity.Editor",
-    "references": [],
+    "references": [
+        "UniverseSim.Unity",
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [
         "Editor"
     ],

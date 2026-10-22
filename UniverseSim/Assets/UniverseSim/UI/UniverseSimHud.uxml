@@ -1,0 +1,55 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="UniverseSimHud.uss" />
+    <ui:VisualElement name="root" class="root" picking-mode="Ignore">
+        <ui:VisualElement name="labels" class="labels" picking-mode="Ignore" />
+
+        <ui:VisualElement name="top-bar" class="bar top-bar" picking-mode="Ignore">
+            <ui:VisualElement class="clock" picking-mode="Ignore">
+                <ui:Label name="time-primary" class="time-primary" text="-" picking-mode="Ignore" />
+                <ui:Label name="time-secondary" class="time-secondary" text="-" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="spacer" picking-mode="Ignore" />
+            <ui:VisualElement class="status" picking-mode="Ignore">
+                <ui:Label name="scale-indicator" class="scale-indicator" text="True scale" picking-mode="Ignore" />
+                <ui:Label name="coverage" class="coverage" text="-" picking-mode="Ignore" />
+                <ui:Label name="load-error" class="warning" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="info-panel" class="panel info-panel">
+            <ui:Label name="info-title" class="title" text="-" />
+            <ui:Label name="info-kind" class="subtitle" />
+            <ui:Label name="info-warning" class="warning" />
+            <ui:ScrollView name="info-values" class="values" />
+            <ui:VisualElement class="row">
+                <ui:Button name="info-focus" text="Focus" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="bottom-bar" class="bar bottom-bar">
+            <ui:VisualElement class="row time-controls">
+                <ui:Button name="slower" text="Slower" />
+                <ui:Button name="reverse" text="Reverse" />
+                <ui:Button name="play-pause" text="Pause" />
+                <ui:Button name="faster" text="Faster" />
+                <ui:Label name="rate" class="rate" text="-" />
+            </ui:VisualElement>
+            <ui:VisualElement class="row">
+                <ui:TextField name="date-entry" class="date-entry" />
+                <ui:Button name="go" text="Go" />
+                <ui:Button name="now" text="Now" />
+                <ui:Label name="date-error" class="warning" />
+            </ui:VisualElement>
+            <ui:VisualElement class="row">
+                <ui:DropdownField name="focus" label="Focus" class="focus" />
+                <ui:Toggle name="toggle-orbits" label="Orbits" value="true" />
+                <ui:Toggle name="toggle-labels" label="Labels" value="true" />
+                <ui:Toggle name="toggle-stars" label="Stars" value="true" />
+                <ui:Toggle name="toggle-enlarged" label="Enlarge bodies x100" />
+                <ui:Toggle name="toggle-fly" label="Free fly (F)" />
+                <ui:VisualElement class="spacer" picking-mode="Ignore" />
+                <ui:Label name="star-credit" class="coverage credit" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

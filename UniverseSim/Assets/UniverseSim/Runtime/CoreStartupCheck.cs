@@ -16,7 +16,15 @@ namespace UniverseSim.Unity
             {
                 if (CoreLibrary.IsCompatible)
                 {
-                    Debug.Log($"UniverseSim core {CoreLibrary.Version} loaded (ABI {CoreLibrary.AbiVersion}).");
+                    var mismatches = CoreLibrary.StructSizeMismatches();
+                    if (mismatches.Count == 0)
+                    {
+                        Debug.Log($"UniverseSim core {CoreLibrary.Version} loaded (ABI {CoreLibrary.AbiVersion}).");
+                    }
+                    else
+                    {
+                        Debug.LogError("UniverseSim core struct layouts differ from the binding: " + string.Join("; ", mismatches));
+                    }
                 }
                 else
                 {
