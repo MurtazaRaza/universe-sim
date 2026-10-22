@@ -13,6 +13,7 @@ A universe simulation built on real, verified data. It starts with the Solar Sys
 3. [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md): phases and tasks. Find the current phase and the next unchecked task.
 4. [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md): the registry of allowed data sources and their tiers.
 5. [docs/adr/](docs/adr/): why the key decisions were made (ADR-0002 covers C++ and the Unity integration).
+6. [docs/API.md](docs/API.md): how hosts use the core (frame loop, precision, time, bindings).
 
 ## Non-negotiable rules
 
@@ -79,7 +80,8 @@ A universe simulation built on real, verified data. It starts with the Solar Sys
 - Unity **6000.5.1f1**, **URP 17.5**, **Input System**, **UI Toolkit** for UI. Assets use Force Text serialization with visible `.meta` files.
 - The Unity project is the `UniverseSim/` folder. Project-owned content goes under `UniverseSim/Assets/UniverseSim/`.
 - Always commit `.meta` files together with their assets. Never edit `Library/`, `Temp/`, `Logs/` or `UserSettings/`.
-- The native core is copied to `Assets/UniverseSim/Plugins/<platform>/` by `tools/scripts/build-core-for-unity.sh`. It is ignored by git, and its import settings are enforced by `Editor/NativePluginImportSettings.cs`.
+- The native core is copied to `Assets/UniverseSim/Plugins/<platform>/` by `tools/scripts/build-core-for-unity.sh`. It is ignored by git, and its import settings are enforced by `Editor/NativePluginImportSettings.cs`. The plugin targets macOS 12, so run that script after core changes even when the other presets pass.
+- The main scene is built by `Editor/MainSceneBuilder.cs`; change the builder rather than editing `Main.unity` by hand.
 - The Editor keeps a native plugin loaded after first use. **Restart the Editor after rebuilding the core.**
 - Visual assets need an entry in `UniverseSim/Assets/UniverseSim/ATTRIBUTION.md`.
 
@@ -94,8 +96,9 @@ cd core && cmake --preset dev && cmake --build --preset dev && ctest --preset de
 # Same under AddressSanitizer + UBSan
 cd core && cmake --preset asan && cmake --build --preset asan && ctest --preset asan
 
-# CLI host
+# CLI host (queries against the default pack; see --help)
 core/build/dev/apps/usim-cli/usim --version
+core/build/dev/apps/usim-cli/usim state earth --center sun --time "2026-10-21T12:00:00 UTC"
 
 # Build the native plugin and copy it into Unity (macOS: universal arm64 + x86_64)
 tools/scripts/build-core-for-unity.sh
@@ -104,8 +107,24 @@ tools/scripts/build-core-for-unity.sh
 /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics \
   -projectPath UniverseSim -runTests -testPlatform EditMode -testResults /tmp/editmode.xml
 
+# Unity PlayMode tests (they render: no -nographics). USIM_SCREENSHOT_DIR=<dir> also saves screenshots.
+/Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode \
+  -projectPath UniverseSim -runTests -testPlatform PlayMode -testResults /tmp/playmode.xml
+
+# Rebuild the main scene from its assets (after changing the builder, materials or references)
+/Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics -quit \
+  -projectPath UniverseSim -executeMethod UniverseSim.Unity.Editor.MainSceneBuilder.Build
+
+# Copy the packs into StreamingAssets for player builds (the Editor also reads data/packs; the moons pack
+# is preferred when present; --default-only skips it)
+tools/scripts/copy-pack-to-unity.sh
+
 # Validation tests only (the default pack against data/reference/; they also run with the full ctest)
 cd core && ctest --preset dev -L validation
+tools/scripts/run-validation.sh            # the same, getting the pack first (LFS checkout or pull, else build)
+
+# Benchmarks (release builds only; NFR-03)
+cd core && cmake --preset release && cmake --build --preset release && ctest --preset release -L benchmark
 
 # Data pipeline: one-time setup of its virtual environment (packages pinned by hash)
 python3 -m venv tools/pipeline/.venv
@@ -117,6 +136,13 @@ tools/pipeline/usim-pipeline verify
 tools/pipeline/usim-pipeline build          # data/packs/solar-system-<version>.uspack, byte-reproducible
 tools/pipeline/usim-pipeline info
 
+# Optional moons pack (ADR-0010): satellite kernels (3.4 GB, optional sources), then the pack (304 MB, not committed)
+tools/pipeline/usim-pipeline fetch --optional
+tools/pipeline/usim-pipeline build --pack solar-system-moons
+
+# Phase 6 kernels into data/raw/naif/ with progress and resume (an alternative to fetch --optional)
+tools/scripts/download-phase6-kernels.sh --dry-run    # sizes and what is already here; --group to limit
+
 # Regenerate reference data: unit-fixtures, test-pack, spice (all three: offline), horizons (network)
 tools/pipeline/usim-pipeline reference offline
 
@@ -127,7 +153,7 @@ tools/pipeline/.venv/bin/python -m pytest tools/pipeline
 Python: the repository pins 3.12.8 in `.python-version` (pyenv), so `python3` at the repo root is 3.12.8. On this machine that interpreter prints harmless "blake2" import errors (Homebrew `libb2` is missing); SHA-256 and MD5 work.
 
 Data rules for agents:
-- The default pack in `data/packs/` is committed through Git LFS (ADR-0006). After a change that alters pack bytes (pipeline, sources, catalog selection), rebuild it, run the tests, and bump `version` in `data/catalog/packs.json` if the content changed; remove the old pack file in the same change.
+- The default pack in `data/packs/` is committed through Git LFS (ADR-0006). The optional moons pack (`solar-system-moons-*.uspack`) is never committed (ADR-0010); pack lookups must match the default pack as `solar-system-<digit>...`, not `solar-system-*`. After a change that alters pack bytes (pipeline, sources, catalog selection), rebuild it, run the tests, and bump `version` in `data/catalog/packs.json` if the content changed; remove the old pack file in the same change.
 - After changing the pack writer, regenerate the round-trip fixture (`reference test-pack`). Never edit generated files in `core/tests/fixtures/` or `data/reference/` by hand.
 - Kernel values are the correctly rounded text of the kernel, cross-checked against CSPICE (ADR-0007). Do not switch to raw `gdpool` values.
 

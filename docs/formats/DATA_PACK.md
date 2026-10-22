@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | Format 1.0, implemented |
-| Last updated | 2026-10-21 |
+| Status | Format 1.2, implemented |
+| Last updated | 2026-10-22 |
 | Writer | `tools/pipeline/usim_pipeline/pack/binary.py` (Python) |
 | Readers | `core/src/data/data_pack.cpp` (C++, `usim::data::DataPack`); `binary.py` (Python, for `usim-pipeline info`) |
-| Related | [ARCHITECTURE.md section 3.7](../ARCHITECTURE.md#37-data-pack-format-v1), [ADR-0005](../adr/0005-data-provenance-and-storage.md), [ADR-0006](../adr/0006-default-pack-window-and-storage.md), [ADR-0007](../adr/0007-text-kernel-values.md) |
+| Related | [ARCHITECTURE.md section 3.7](../ARCHITECTURE.md#37-data-pack-format-v1), [ADR-0005](../adr/0005-data-provenance-and-storage.md), [ADR-0006](../adr/0006-default-pack-window-and-storage.md), [ADR-0007](../adr/0007-text-kernel-values.md), [ADR-0008](../adr/0008-planet-positions-at-system-barycenters.md) |
 
 A data pack (`.uspack`) is the only data the core reads at runtime. The pipeline writes it from verified sources; the core reads it without parsing any other format. Two independent implementations follow this document, and the round-trip fixture (`core/tests/fixtures/test_pack_v1.uspack`) keeps them consistent. Change this document first, then both implementations.
 
@@ -22,7 +22,7 @@ A data pack (`.uspack`) is the only data the core reads at runtime. The pipeline
 
 | Code | Values |
 |---|---|
-| Id namespace (`usim::catalog::IdNamespace`) | 1 naif, 2 gaia-dr3, 3 hip. 0 means "none" where a field allows it. |
+| Id namespace (`usim::catalog::IdNamespace`) | 1 naif, 2 gaia-dr3, 3 hip, 4 hr (Bright Star Catalogue, Harvard Revised number). 0 means "none" where a field allows it. |
 | Body kind (`usim::catalog::BodyKind`) | 0 barycenter, 1 star, 2 planet, 3 dwarf planet, 4 moon, 5 asteroid, 6 comet, 7 spacecraft, 8 star system, 9 galaxy |
 | Unit (`usim::catalog::Unit`) | 0 none, 1 km, 2 s, 3 km/s, 4 rad, 5 rad/s, 6 km^3/s^2 |
 | Field | 1 gm (unit 6), 2 mean_radius (1), 3 radius_a (1), 4 radius_b (1), 5 radius_c (1) |
@@ -42,7 +42,7 @@ offset 128    section table: section_count entries of 32 bytes
 |---|---|---|---|
 | 0 | u8[8] | magic | `USIMPACK` |
 | 8 | u16 | format_major | 1 |
-| 10 | u16 | format_minor | 0 |
+| 10 | u16 | format_minor | 2 |
 | 12 | u32 | endian_marker | 0x01020304 (bytes 04 03 02 01) |
 | 16 | u32 | header_size | 128 |
 | 20 | u32 | section_count | |
@@ -71,7 +71,7 @@ Sections must lie inside the file and must not overlap. Ids are unique.
 
 ## 3. Sections
 
-All ten sections are required in format 1.0. The writer stores them in the order META, SRCS, FILE, BODY, QNTY, ROTN, TIME, EPHS, STRS, EPHD; readers use the table and do not depend on the order. Most sections start with an 8-byte count header (`u32 count, u32 second`), followed by `count` fixed-size records.
+The ten sections of format 1.0 are required. Format 1.1 adds APPX, and format 1.2 adds STAR and RING; all three are optional: a pack without APPX has no approximate positions, without STAR no star catalog, without RING no rings. The writer stores the sections in the order META, SRCS, FILE, BODY, QNTY, ROTN, TIME, EPHS, APPX, STAR, RING, STRS, EPHD (it omits STAR and RING when they are empty); readers use the table and do not depend on the order. Most sections start with an 8-byte count header (`u32 count, u32 second`), followed by `count` fixed-size records.
 
 ### META: metadata
 
@@ -231,6 +231,67 @@ The records are copied bit for bit from the SPK file. When the pack is trimmed t
 
 The f64 values of all segments' records, concatenated. Its size is a multiple of 8.
 
+### APPX: approximate positions (format 1.1)
+
+Header `u32 count, u32 reserved`, then records of 32 bytes, in catalog order. Each declares a body that has no ephemeris segment of its own and is placed at its primary instead, with every state flagged approximate (SPEC FR-SIM-03 and FR-SIM-04; ADR-0008).
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | i32 | body namespace |
+| 4 | i32 | proxy namespace |
+| 8 | i64 | body id value |
+| 16 | i64 | proxy id value: the body's primary |
+| 24 | str | reason, for display and provenance |
+
+Constraints: the body is in the catalog and is not the target of any segment; the proxy is the body's primary; a body appears at most once. A format 1.0 reader skips this section, so such a body has no position there rather than a wrong one.
+
+### STAR: star catalog (format 1.2)
+
+The stars of the sky background (SPEC FR-REN-09): directions, proper motions, brightness and color index from one star catalog. Header of 32 bytes, then `count` records of 72 bytes, sorted by (id namespace, id value).
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | count |
+| 4 | u32 | source index |
+| 8 | f64 | epoch of the positions, TDB s past J2000 |
+| 16 | str | locator: file and columns |
+| 24 | str | derivation: how the catalog's columns became the values below |
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | i32 | id namespace (4, hr, for the Bright Star Catalogue) |
+| 4 | u32 | flags: bit 0 set if the B-V color index is present; bit 1 set if the proper motion is present |
+| 8 | i64 | id value (the catalog number) |
+| 16 | f64 | right ascension at the epoch, rad, in [0, 2 pi), ICRF |
+| 24 | f64 | declination at the epoch, rad, in [-pi/2, pi/2] |
+| 32 | f64 | proper motion in right ascension times cos(declination), rad/s (0 when absent) |
+| 40 | f64 | proper motion in declination, rad/s (0 when absent) |
+| 48 | f64 | V magnitude |
+| 56 | f64 | B-V color index, magnitudes (0 when absent) |
+| 64 | str | designation as written in the catalog (for example `Alp CMa`), possibly empty |
+
+Ids are unique. The core moves a star linearly in the tangent plane at its epoch by its proper motion; parallax and radial velocity are not modeled, so the directions are geocentric and heliocentric alike (a sky background, not astrometry).
+
+### RING: planetary rings (format 1.2)
+
+Header `u32 count, u32 reserved`, then records of 72 bytes, sorted by (body index, inner radius). Each describes one ring region, or a gap within one, in the equatorial plane of its body (the XY plane of the body's IAU frame), as visual-only geometry (P6-04).
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | body index |
+| 4 | u32 | flags: bit 0 set for a gap (an empty region within a ring); bit 1 set if the optical depth is present |
+| 8 | f64 | inner radius, km |
+| 16 | f64 | outer radius, km |
+| 24 | f64 | smallest normal optical depth of the region (0 when absent) |
+| 32 | f64 | largest normal optical depth of the region (0 when absent) |
+| 40 | u32 | source index of the radii |
+| 44 | u32 | source index of the optical depth (0 when absent) |
+| 48 | str | name (for example `C Ring`) |
+| 56 | str | locator of the radii, with the derivation when they were computed from a center and a width |
+| 64 | str | locator of the optical depth (empty when absent) |
+
+Constraints: 0 < inner radius < outer radius; 0 <= smallest <= largest optical depth; the body has a rotation model (ROTN), which defines the ring plane; a gap has no optical depth.
+
 ## 4. Validation
 
 A reader rejects (`data_format` unless noted):
@@ -244,6 +305,7 @@ A reader rejects (`data_format` unless noted):
 - a rotation record that breaks the ROTN constraints;
 - TT - TAI other than 32.184 s, or an invalid leap second table;
 - a segment that breaks the EPHS constraints, or a non-finite value;
+- an approximate position that breaks the APPX constraints, a star that breaks the STAR constraints, or a ring that breaks the RING constraints;
 - a catalog that `BodyCatalog::create` rejects (duplicates, missing primaries, cycles, unregistered sources).
 
 The pipeline's writer applies the same checks before writing (`check_content`).
@@ -255,4 +317,4 @@ The pipeline's writer applies the same checks before writing (`check_content`).
 
 ## 6. Size
 
-The default pack (`solar-system-1.0.0.uspack`, de440s.bsp untrimmed) is 32,681,168 bytes; the ephemeris records are almost all of it. Trimming to a window shrinks it roughly in proportion to the window's length.
+The default pack (`solar-system-1.2.0.uspack`, de440s.bsp untrimmed, with the star catalog) is about 33.4 MB; the ephemeris records are almost all of it (the 9,096 stars take about 0.7 MB). Trimming to a window shrinks it roughly in proportion to the window's length. The optional moons pack (`solar-system-moons-1.0.0.uspack`, 2000 to 2100) is about 304 MB, almost all of it the satellite records.

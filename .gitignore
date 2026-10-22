@@ -31,5 +31,5 @@ __pycache__/
 # through Git LFS (docs/adr/0006-default-pack-window-and-storage.md).
 /data/raw/
 /data/packs/*
-!/data/packs/solar-system-*.uspack
+!/data/packs/solar-system-[0-9]*.uspack
 *.part

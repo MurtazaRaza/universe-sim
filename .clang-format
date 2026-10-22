@@ -3,6 +3,7 @@ BasedOnStyle: LLVM
 Language: Cpp
 Standard: c++20
 IndentWidth: 4
+AccessModifierOffset: -4
 ColumnLimit: 110
 PointerAlignment: Left
 ReferenceAlignment: Left
@@ -16,8 +17,9 @@ FixNamespaceComments: true
 IndentPPDirectives: AfterHash
 IncludeBlocks: Regroup
 IncludeCategories:
-  # The file's own header and other usim headers first, then third-party, then the standard library.
-  - Regex: '^"usim/'
+  # Project headers in quotes first (usim/, and test helpers such as fixtures/ and validation/), then
+  # third-party, then the standard library.
+  - Regex: '^"'
     Priority: 1
   - Regex: '^<catch2/'
     Priority: 2

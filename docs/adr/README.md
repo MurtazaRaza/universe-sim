@@ -15,6 +15,10 @@ Write an ADR when a choice affects module boundaries, data formats, units or fra
 | [0005](0005-data-provenance-and-storage.md) | Data provenance, pipeline and storage of large data | Accepted |
 | [0006](0006-default-pack-window-and-storage.md) | Default pack window and storage | Accepted |
 | [0007](0007-text-kernel-values.md) | Reading values from text kernels | Accepted |
+| [0008](0008-planet-positions-at-system-barycenters.md) | Mars to Pluto placed at their system barycenters in v1 | Accepted; decision 4 superseded by ADR-0010 |
+| [0009](0009-depth-and-precision-across-scales.md) | Depth and precision across scales | Accepted |
+| [0010](0010-moons-in-an-optional-pack.md) | The major moons in an optional pack, 2000 to 2100 | Accepted |
+| [0011](0011-sky-background-and-rings.md) | Star catalog for the sky background, and planetary rings | Accepted |
 
 ## Template
 

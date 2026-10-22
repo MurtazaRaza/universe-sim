@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Active |
-| Last updated | 2026-10-21 |
+| Last updated | 2026-10-22 |
 | Related | [SPEC.md section 10](SPEC.md#10-data-provenance), [ADR-0005](adr/0005-data-provenance-and-storage.md) |
 
 This is the human-readable registry of the sources the simulation may use. The machine-readable counterparts are `data/sources.json` (declared sources and files) and `data/sources.lock.json` (exact files, sizes, checksums and retrieval dates), maintained by `tools/pipeline/usim-pipeline fetch`. Keep the three consistent: a source is added here and to `sources.json` in the same change.
@@ -43,7 +43,7 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | Citation | Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H. (2021). The JPL Planetary and Lunar Ephemerides DE440 and DE441. *The Astronomical Journal*, 161:105. https://doi.org/10.3847/1538-3881/abd414 |
 | Pinned | `de440s.bsp`: 32,726,016 bytes, SHA-256 c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2, publisher MD5 verified, retrieved 2026-10-20 |
 | Terms | NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged. The same terms apply to every NAIF kernel below. The data pack holds re-encoded extracts with their attribution. |
-| Contents | 14 segments of SPK type 2, all 1849-12-26 to 2150-01-22 TDB: barycenters 1 to 9 and the Sun relative to the SSB, Earth and Moon relative to the Earth-Moon barycenter, Mercury and Venus relative to their barycenters. No segments for the centers of Mars to Pluto (SPEC OQ-08). |
+| Contents | 14 segments of SPK type 2, all 1849-12-26 to 2150-01-22 TDB: barycenters 1 to 9 and the Sun relative to the SSB, Earth and Moon relative to the Earth-Moon barycenter, Mercury and Venus relative to their barycenters. No segments for the centers of Mars to Pluto; v1 places those planets at their system barycenters, flagged approximate ([ADR-0008](adr/0008-planet-positions-at-system-barycenters.md)). |
 | Used by | The default data pack (ephemeris); VAL-01 reference states. |
 | Notes | The v1 baseline; see [ADR-0004](adr/0004-ephemeris-baseline-de440.md). |
 
@@ -73,7 +73,11 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | Provides | Moons of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto. |
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/ |
 | Docs | `AAREADME_Satellite_SPKs`, `aa_summaries.txt` (bodies and coverage per file), `aa_checksums.txt` |
-| Notes | File names encode the solution (for example `jup365.bsp`, `sat441.bsp`, `plu060.bsp`, `mar099s.bsp`). Many files exceed 100 MB. Select per body by coverage in Phase 6 and trim the segments into the pack. Version numbers do not increase with date, so read the summaries. |
+| Files | `mar099.bsp` (Mars; MAR099 with DE440), `jup365.bsp` (Jupiter; JUP365, DE440), `sat441.bsp` (Saturn; SAT441, DE440), `ura184_part-3.bsp` (Uranus; URA184, DE442), `nep097.bsp` (Neptune; NEP097, DE441 fit), `plu060.bsp` (Pluto; PLU060, DE440): one file per system holding the planet center and the major moons relative to the system barycenter, all covering at least 1800 to 2199. Every segment is SPK type 2 in J2000. Declared **optional** in `data/sources.json`: `fetch --optional` downloads them (3.4 GB); `fetch` alone only checks local copies. |
+| Citation | The solution names above, as merged by NAIF (each kernel's comments give the solution, the planetary ephemeris and the fit). URA184: Jacobson, R. A., Park, R. S. (2025). The Orbits of Uranus, Its Satellites and Rings, the Gravity Field of the Uranian System, and the Orientation of the Poles of Uranus and Its Satellites. *The Astronomical Journal*, 169(2), 65. |
+| Pinned | `mar099.bsp` 1,227,574,272 bytes, SHA-256 9991e57b196bae1a096acc6e2afc6718102ee420d684695de0f0333064c046bc; `jup365.bsp` 1,136,581,632 bytes, SHA-256 dbf016c01ba4d022154838000cf3f06962cf958ddc503a366f7fe8f81495c5cb; `sat441.bsp` 661,592,064 bytes, SHA-256 d7e444a9ba7a52b8f448ff0747030789524d2f0c1212e4e2bd7f5fc3c96444d5; `ura184_part-3.bsp` 386,885,632 bytes, SHA-256 273cd4ccc470d1098562cd4e94fa48fc2b4c6b1c2896308e473c949b87937c53; `nep097.bsp` 105,262,080 bytes, SHA-256 5c1132fdc48c54e5d2e4eb663e1ed1a876911eae9433c203f29a5a1b5e1fa9b1; `plu060.bsp` 135,207,936 bytes, SHA-256 dfbb102491a26ed41ae08ca3f8963f22f0219df1d8f265ab87b9ad825a826fc6; publisher MD5 verified for all six, retrieved 2026-10-21 (downloaded with `tools/scripts/download-phase6-kernels.sh`, pinned by `fetch` from the local copies). |
+| Used by | The optional moons pack `solar-system-moons` (P6-01, [ADR-0010](adr/0010-moons-in-an-optional-pack.md)): only the segments relative to each system barycenter, 2000 to 2100. VAL-01 moons-pack reference states. |
+| Notes | File names encode the solution. Version numbers do not increase with date, so read `aa_summaries.txt`. The Uranus alternative `ura111xl-701` to `705` with `-799` (URA111, DE441, about 6.7 GB) was not used: URA184 is the newer solution and differs from URA111 by up to 1299 km (Titania) over 2000 to 2100 (ADR-0010). Center offsets and trimmed sizes over the de440s window: [ADR-0008](adr/0008-planet-positions-at-system-barycenters.md). |
 
 ### S-JPL-HORIZONS: JPL Horizons System (Tier 1, reference data)
 
@@ -136,7 +140,7 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 
 | | |
 |---|---|
-| File | `moon_pa_de440_200625.bpc` (binary PCK, 12 MB) |
+| File | `moon_pa_de440_200625.bpc` (binary PCK, 12 MB). Downloaded into `data/raw/naif/` on 2026-10-21 (size checked against the server); not yet registered in `sources.json` (P6-05). |
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ |
 
 ### S-NAIF-EARTHPCK: high-precision Earth orientation (Tier 1, Phase 6 optional)
@@ -173,6 +177,26 @@ Notes: these are HTML tables. Values from them enter only through the manual ent
 | URL | https://www.iausofa.org/ |
 | Notes | Used as an algorithm reference and validation oracle. SOFA has its own license terms; read them before porting code. |
 
+### S-IAU-WGPSN: Gazetteer of Planetary Nomenclature, rings and ring gaps (Tier 1)
+
+| | |
+|---|---|
+| Provides | Names and distances from the planet's center (km) of the rings, divisions and gaps of Jupiter, Saturn, Uranus and Neptune. |
+| URL | https://planetarynames.wr.usgs.gov/Page/Rings (IAU Working Group for Planetary System Nomenclature, hosted by the USGS Astrogeology Science Center) |
+| Form | An HTML table; values enter through `data/catalog/rings.json` (transcribed 2026-10-22, each value as the text on the page, parsed by the pipeline). |
+| Used by | Ring radii in the default and moons packs (P6-04, [ADR-0011](adr/0011-sky-background-and-rings.md)): Saturn's D, C, B and A rings, the Cassini Division and 13 gaps. |
+| Notes | Distances are rounded (to 10 km for the main boundaries). A gap given as a center and a radial width becomes center plus and minus half the width. |
+
+### S-PDS-RMS: PDS Ring-Moon Systems Node, Saturn's rings (Tier 2)
+
+| | |
+|---|---|
+| Provides | Inner and outer boundaries, normal optical depth ranges and types of Saturn's rings, with a reference per row. |
+| URL | https://pds-rings.seti.org/saturn/saturn_tables.html (table "Rings of Saturn", read 2026-10-22) |
+| Underlying sources | The table's footnotes, for example Colwell, J. E., et al. (2009), in *Saturn from Cassini-Huygens*, Springer, 375-408; French, R. G., et al. (2017), *Icarus* 290, 14-45; Murray, C. D., Dermott, S. F. (1999), *Solar System Dynamics*. |
+| Used by | Ring optical depths in the packs, used only to draw ring opacity, labeled Tier 2 in the pack and the viewer. No Tier 1 source of these values is available to the pipeline. |
+| Form | An HTML table; values enter through `data/catalog/rings.json`. |
+
 ## 5. Solar System: small bodies
 
 ### S-JPL-SBDB: JPL Small-Body Database (Tier 1, Phase 7)
@@ -198,7 +222,21 @@ Notes: these are HTML tables. Values from them enter only through the manual ent
 | URL | https://nssdc.gsfc.nasa.gov/planetary/factsheet/ |
 | Use | Sanity checks and descriptive text. Not a simulation input. |
 
-## 7. Beyond the Solar System (Phase 9, not yet pinned)
+## 7. Sky background
+
+### S-CDS-BSC5: The Bright Star Catalogue, 5th revised edition (Tier 1)
+
+| | |
+|---|---|
+| Provides | 9110 entries (9096 stars, to about V 6.5): J2000 positions (FK5), proper motions, V magnitudes, B-V and other colors, spectral types, designations. |
+| URL | https://cdsarc.cds.unistra.fr/ftp/V/50/ (CDS catalog V/50) |
+| Citation | Hoffleit, D., Warren Jr., W. H. (1991). *The Bright Star Catalogue*, 5th Revised Ed. (Preliminary Version). Astronomical Data Center, NSSDC/ADC. Retrieved through VizieR, CDS, Strasbourg (DOI 10.26093/cds/vizier). |
+| Checksums | No publisher checksum list. Pinned: `ReadMe` 11,571 bytes, SHA-256 44fd9c73e2eecad0beb47bdfa3f01c60fd43f93d6964198e31fcd48732de5b33; `catalog.gz` 573,921 bytes, SHA-256 3dc44b1e90be8fbe5bcc7656032560f51275f985c7e3f783c9028e1838ec7bed; retrieved 2026-10-21. |
+| Terms | CDS VizieR rules of usage (https://cds.unistra.fr/vizier-org/licences_vizier.html, read 2026-10-22): free of use in a scientific context with the authors and publication cited; an acknowledgement of VizieR is appreciated; commercial use depends on the data origin. The ReadMe states no copyright. |
+| Used by | The star catalog of the default and moons packs (section STAR, [ADR-0011](adr/0011-sky-background-and-rings.md)). |
+| Notes | The pipeline reads the columns at the byte ranges of the ReadMe's "Byte-by-byte Description of file: catalog" and checks that the pinned ReadMe still describes them there. FK5 equinox J2000 coordinates are used as ICRF directions without a frame tie correction. pmRA is the projected motion, pmRA cos(Dec), per the ReadMe. |
+
+## 8. Beyond the Solar System (Phase 9, not yet pinned)
 
 | ID | Source | URL | Notes |
 |---|---|---|---|
@@ -207,7 +245,7 @@ Notes: these are HTML tables. Values from them enter only through the manual ent
 | S-CDS-SIMBAD | SIMBAD astronomical database | https://simbad.cds.unistra.fr/simbad/ | Cross-identifications and names. |
 | S-NASA-EXO | NASA Exoplanet Archive | https://exoplanetarchive.ipac.caltech.edu/ | Planetary Systems tables with uncertainties. |
 
-## 8. Visual assets (rendering only)
+## 9. Visual assets (rendering only)
 
 Textures and models are not simulation data, but their provenance and licenses are still tracked, in `UniverseSim/Assets/UniverseSim/ATTRIBUTION.md`.
 

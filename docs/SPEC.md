@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v0.4 |
-| Last updated | 2026-10-21 |
+| Status | Draft v0.5 |
+| Last updated | 2026-10-22 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 This document defines **what** the project is and the requirements it must meet. How the system is structured is in [ARCHITECTURE.md](ARCHITECTURE.md). The order of work is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Decisions and their rationale are recorded as ADRs in [adr/](adr/).
@@ -36,7 +36,7 @@ Three properties define the project:
 
 ### 3.1 Version 1: Solar System MVP
 
-- Sun, the eight planets, the Moon, and Pluto, plus the system barycenters, positioned from the JPL DE440 planetary ephemeris (see [ADR-0004](adr/0004-ephemeris-baseline-de440.md)). Note: `de440s.bsp` gives the centers of the Sun, Mercury, Venus, Earth and the Moon, but only the system barycenters of Mars to Pluto; how v1 positions those planet centers is OQ-08.
+- Sun, the eight planets, the Moon, and Pluto, plus the system barycenters, positioned from the JPL DE440 planetary ephemeris (see [ADR-0004](adr/0004-ephemeris-baseline-de440.md)). Note: `de440s.bsp` gives the centers of the Sun, Mercury, Venus, Earth and the Moon, but only the system barycenters of Mars to Pluto. In v1 those six planets are placed at their system barycenters, flagged approximate; the planet centers arrive with the moons in Phase 6 ([ADR-0008](adr/0008-planet-positions-at-system-barycenters.md)).
 - Default time coverage of 1849-12-26 to 2150-01-22 (the span of `de440s.bsp`). The full DE440 span (1549-12-31 to 2650-01-25) is optional.
 - Physical properties (radii, GM, rotation models) from IAU and JPL sources.
 - Body orientation from the IAU WGCCRE 2015 rotation models.
@@ -116,6 +116,8 @@ In rough order (details in the [implementation plan](IMPLEMENTATION_PLAN.md)):
 | FR-REN-06 | Orbit lines and labels, each with a toggle. |
 | FR-REN-07 | Lighting that comes from the Sun's actual direction at every scale (planet and moon phases must be correct). |
 | FR-REN-08 | The renderer never computes or modifies physical state. It reads snapshots from the core and sends user commands (time changes, focus) back to it. |
+| FR-REN-09 | A sky background of real stars from a registered star catalog: directions from the core (in the display frame and the host's axes, with proper motion applied for the current time), brightness from the V magnitude and color from the B-V color index. The mapping from magnitude and color index to pixels is a display choice. Added 2026-10-22. |
+| FR-REN-10 | Planetary rings as visual-only geometry in the planet's equatorial plane, with radii and optical depths from registered sources. Added 2026-10-22 (P6-04). |
 
 ### 5.4 Headless host
 
@@ -129,11 +131,11 @@ In rough order (details in the [implementation plan](IMPLEMENTATION_PLAN.md)):
 |---|---|---|
 | NFR-01 | Portability | The core is written in C++20 using only the standard library: zero third-party runtime dependencies and zero engine references. Hosts in other languages use its stable C ABI ([ADR-0002](adr/0002-core-language-and-unity-integration.md)). |
 | NFR-02 | Precision | The core uses double precision throughout. Single precision is used only inside a host, after positions are re-centered on the view origin. |
-| NFR-03 | Performance | A full snapshot of all v1 bodies takes under 0.1 ms on a current desktop CPU (target, to be measured in Phase 3). Steady-state per-frame calls make no heap allocations in the core, and the host bindings make no managed allocations (to avoid GC spikes in Unity). |
+| NFR-03 | Performance | A full snapshot of all v1 bodies takes under 0.1 ms on a current desktop CPU. Measured 2026-10-21 (P3-06): about 3 µs for the ephemeris states of the 15 bodies the default pack covers (release build, Apple Silicon). Steady-state per-frame calls make no heap allocations in the core, and the host bindings make no managed allocations (to avoid GC spikes in Unity). |
 | NFR-04 | Determinism | The same inputs give identical outputs on the same platform and compiler. Fast-math and floating-point contraction (FMA fusion) are disabled. |
 | NFR-05 | Testability | Core tests run with `ctest` and do not require Unity. |
 | NFR-06 | Accuracy | Validation thresholds are defined in [section 9](#9-accuracy-and-validation) and enforced by automated tests. |
-| NFR-07 | Data size | The default development data pack is at most 50 MB. Larger optional packs are allowed. |
+| NFR-07 | Data size | The default development data pack is at most 50 MB. Larger optional packs are allowed. The moons pack (304 MB, 2000 to 2100) is such an optional pack, built locally and not committed ([ADR-0010](adr/0010-moons-in-an-optional-pack.md)). |
 | NFR-08 | Platforms | Desktop first: macOS (Apple Silicon) and Windows. Other targets are an open question. |
 | NFR-09 | Documentation | Every public core API member has a `///` doc comment that states units, frame and time scale wherever they apply. The C ABI header and the C# bindings document their members the same way. |
 | NFR-10 | Licensing | Every redistributed dataset and asset has its license or terms recorded in the source registry or an attribution file. |
@@ -176,7 +178,7 @@ Display units (au, light-years, degrees, calendar dates) are applied only in pre
 
 - A body identifier is a pair (`namespace`, `value`).
 - Solar System bodies use the `naif` namespace with NAIF integer IDs (0 = SSB, 10 = Sun, 399 = Earth, 301 = Moon, 3 = Earth-Moon barycenter, 2000001 = Ceres, ...).
-- Later namespaces include `gaia-dr3` (Gaia source_id) and `hip` (Hipparcos). Cross-identifications are stored as data.
+- Later namespaces include `gaia-dr3` (Gaia source_id), `hip` (Hipparcos) and `hr` (Bright Star Catalogue number, used by the sky background since 2026-10-22). Cross-identifications are stored as data.
 
 ### 7.5 Classification and hierarchy
 
@@ -201,17 +203,17 @@ Validation tests compare the core against independent references. Reference data
 
 | ID | Check | Reference | Threshold |
 |---|---|---|---|
-| VAL-01 | SPK evaluation: position and velocity of every v1 body, sampled across coverage | CSPICE (through SpiceyPy) reading the same kernel | position ≤ 1 m, velocity ≤ 1 mm/s |
-| VAL-02 | End-to-end planetary states, 1900 to 2100 | JPL Horizons API (which uses DE441 for planets) | ≤ 1 km, provisional (*) |
+| VAL-01 | SPK evaluation: position and velocity of every v1 body, sampled across coverage; the moons and planet centers of the moons pack likewise | CSPICE (through SpiceyPy) reading the same kernels | position ≤ 1 m, velocity ≤ 1 mm/s (moons pack measured 2026-10-22: 2.0e-6 km) |
+| VAL-02 | End-to-end planetary states, 1900 to 2100 | JPL Horizons API (which uses DE441 for planets) | position ≤ 1 m; the Moon ≤ 20 m (*) |
 | VAL-03 | Time scale conversions (UTC, TAI, TT, TDB) | SPICE `str2et`/`unitim`, or SOFA | ≤ 0.1 ms, provisional (**) |
-| VAL-04 | Body orientation matrices | CSPICE `pxform` with the same PCK | ≤ 1 µrad |
+| VAL-04 | Body orientation matrices and their rates, the moons of the moons pack included | CSPICE `sxform` with the same PCK | ≤ 1 µrad; rates within 1e-6 of their size (measured 2026-10-21: 2.6e-10 rad and 2.6e-10; moons 2026-10-22: 1.3e-10 rad) |
 | VAL-05 | Keplerian small-body positions | Horizons small-body ephemerides | Measured and reported; no hard threshold (approximate model) |
 | VAL-06 | N-body sandbox drift over 1, 10 and 100 years | DE440 | Measured and reported; thresholds set in Phase 8 |
 | VAL-07 | Energy and angular momentum conservation in the sandbox | Analytic invariants | Set in Phase 8 |
 
-(*) Horizons uses DE441 while the core uses DE440. The two ephemerides come from the same fit and are expected to agree closely in the modern era. Phase 3 measures the actual differences and sets a final threshold with the measurement recorded.
+(*) Horizons uses DE441 while the core uses DE440. Measured 2026-10-21 (P3-07) over the 14 captured bodies, 1900 to 2100: the Sun, the planets and the system barycenters agree within 2 mm (the output rounding of Horizons), the Earth within 0.13 m and the Moon within 10.3 m. The Moon's difference is the lunar orbit difference between DE440 and DE441, and the Earth's follows from it through the Earth-Moon barycenter. The thresholds keep a margin over these measurements while still catching systematic mistakes such as reading TT as TDB, which moves the Earth by tens of meters.
 
-(**) SPICE and SOFA use different TDB-TT models, so small sub-millisecond differences are expected. Timing errors matter only when a user-entered UTC time is mapped to TDB. At Earth's orbital speed of about 30 km/s, 0.1 ms corresponds to about 3 m, well below the VAL-02 threshold. Measured 2026-10-21 against CSPICE with the same leap seconds kernel (the default pack's time data): at most 4.9e-7 s over 1972 to 2150, which is the resolution of CSPICE's one-double TDB seconds near 2150, not a model difference. The threshold stays provisional until a comparison with SOFA.
+(**) SPICE and SOFA use different TDB-TT models, so small sub-millisecond differences are expected. Timing errors matter only when a user-entered UTC time is mapped to TDB. At Earth's orbital speed of about 30 km/s, 0.1 ms corresponds to about 3 m. VAL-02 queries in TDB, so it does not include them. Measured 2026-10-21 against CSPICE with the same leap seconds kernel (the default pack's time data): at most 4.9e-7 s over 1972 to 2150, which is the resolution of CSPICE's one-double TDB seconds near 2150, not a model difference. The threshold stays provisional until a comparison with SOFA.
 
 Rules:
 
@@ -256,8 +258,8 @@ These items are not scheduled in detail, but the design must not block them:
 | OQ-04 | Which ΔT model to use for historical dates before 1972 (UT display)? | Open, pick from a verified source |
 | OQ-05 | License for the project itself? | Open |
 | OQ-06 | Should observer views show apparent (light-time and aberration corrected) positions? | Open, after v1 |
-| OQ-07 | Should the Unity Editor hot-reload the native plugin (load a uniquely named copy) so the Editor does not need a restart after each core rebuild? | Open, decide before Phase 5 |
-| OQ-08 | `de440s.bsp` has no segments for the centers of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto (only their system barycenters). Should v1 add the planet-center segments from the JPL satellite ephemerides (S-NAIF-SAT, trimmed into the pack), or show those planets at their system barycenter, flagged as approximate? | Open, decide before P3-03 |
+| OQ-07 | Should the Unity Editor hot-reload the native plugin (load a uniquely named copy) so the Editor does not need a restart after each core rebuild? | Decided 2026-10-21: no; the Editor is restarted after a core rebuild (P5-14) |
+| OQ-08 | `de440s.bsp` has no segments for the centers of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto (only their system barycenters). Should v1 add the planet-center segments from the JPL satellite ephemerides (S-NAIF-SAT, trimmed into the pack), or show those planets at their system barycenter, flagged as approximate? | Decided 2026-10-21: system barycenters, flagged approximate, until Phase 6 ([ADR-0008](adr/0008-planet-positions-at-system-barycenters.md)) |
 
 ## 14. Glossary
 
