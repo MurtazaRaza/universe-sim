@@ -3,6 +3,8 @@
 #include "usim/catalog/body_id.hpp"
 #include "usim/catalog/quantity.hpp"
 #include "usim/frames/frame_id.hpp"
+#include "usim/frames/frame_transform.hpp"
+#include "usim/time/time_point.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -10,7 +12,7 @@
 namespace usim::frames {
 
 /// IAU rotation elements of one body, as published in a SPICE text PCK (pck00011.tpc) and carried by the
-/// data pack in the PCK's own units. Evaluating them is P4-03; this is the data only.
+/// data pack in the PCK's own units. iau_angles() and iau_transform() evaluate them.
 ///
 /// The model (PCK Required Reading; Archinal et al. 2018), with T in Julian centuries (36525 days) of TDB
 /// since J2000 and d in days of TDB since J2000, all angles in degrees:
@@ -44,5 +46,25 @@ struct IauRotationElements {
         return nut_prec_angles_deg.size() / static_cast<std::size_t>(phase_degree + 1);
     }
 };
+
+/// The pole and prime meridian of a body at one instant, with their rates, from its IAU elements.
+struct IauAngles {
+    double pole_ra_rad = 0.0;              ///< alpha_0: right ascension of the north pole, rad.
+    double pole_dec_rad = 0.0;             ///< delta_0: declination of the north pole, rad.
+    double prime_meridian_rad = 0.0;       ///< W: prime meridian angle, rad (not reduced to one turn).
+    double pole_ra_rate_rad_s = 0.0;       ///< d alpha_0 / dt, rad per TDB second.
+    double pole_dec_rate_rad_s = 0.0;      ///< d delta_0 / dt, rad per TDB second.
+    double prime_meridian_rate_rad_s = 0.0; ///< dW / dt, rad per TDB second.
+};
+
+/// Evaluates the model in the IauRotationElements documentation at `t` (TDB), with the rates as its
+/// analytic time derivatives.
+[[nodiscard]] IauAngles iau_angles(const IauRotationElements& elements, time::Instant t) noexcept;
+
+/// The transform from the ICRF to the body's IAU body-fixed frame at `t` (TDB), with its rotation rate:
+/// R = [W]_3 [pi/2 - delta_0]_1 [pi/2 + alpha_0]_3 with [x]_i the frame rotation by x about axis i (PCK
+/// Required Reading). Equals SPICE sxform("J2000", "IAU_<body>", t). Elements given relative to
+/// ECLIPJ2000 are composed with the ICRF to ECLIPJ2000 rotation.
+[[nodiscard]] FrameTransform iau_transform(const IauRotationElements& elements, time::Instant t) noexcept;
 
 } // namespace usim::frames

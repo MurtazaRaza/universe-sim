@@ -76,11 +76,13 @@ TEST_CASE("frame system transforms between inertial frames", "[frames]") {
     CHECK(test::max_abs_difference(e.velocity_km_s, usim::frames::icrf_to_eclipj2000() * s.velocity_km_s) < 1e-13);
 }
 
-TEST_CASE("body-fixed frames are not available before P4-03", "[frames]") {
+TEST_CASE("body-fixed frames without rotation elements are not found", "[frames]") {
     const FrameSystem frames;
     const auto r = frames.transform(FrameId::icrf(), FrameId::body_fixed(BodyId::naif(399)), Instant());
     REQUIRE_FALSE(r.has_value());
-    CHECK(r.error().code == ErrorCode::unsupported);
+    CHECK(r.error().code == ErrorCode::not_found);
+    CHECK(r.error().message.find("naif:399") != std::string::npos);
+    CHECK_FALSE(frames.try_transform(FrameId::body_fixed(BodyId::naif(399)), FrameId::icrf(), Instant()).has_value());
     CHECK(to_string(FrameId::body_fixed(BodyId::naif(399))) == "body-fixed(naif:399)");
     CHECK(to_string(FrameId::eclipj2000()) == "ECLIPJ2000");
     CHECK_FALSE(FrameId::body_fixed(BodyId::naif(399)).is_inertial());

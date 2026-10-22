@@ -14,9 +14,10 @@ enum class IdNamespace : std::int32_t {
     naif = 1,      ///< NAIF integer IDs (0 SSB, 10 Sun, 399 Earth, 301 Moon, 2000001 Ceres, ...).
     gaia_dr3 = 2,  ///< Gaia DR3 source_id (Phase 9).
     hipparcos = 3, ///< Hipparcos catalog number (Phase 9).
+    hr = 4,        ///< Bright Star Catalogue (Harvard Revised) number: the stars of the sky background.
 };
 
-/// Short lowercase name of the namespace: "naif", "gaia-dr3", "hip" or "invalid".
+/// Short lowercase name of the namespace: "naif", "gaia-dr3", "hip", "hr" or "invalid".
 [[nodiscard]] std::string_view to_string(IdNamespace id_namespace) noexcept;
 
 /// Identifies a body: a namespace and a value within it (SPEC section 7.4).

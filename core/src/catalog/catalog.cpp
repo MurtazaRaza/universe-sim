@@ -20,6 +20,8 @@ std::string_view to_string(IdNamespace id_namespace) noexcept {
         return "gaia-dr3";
     case IdNamespace::hipparcos:
         return "hip";
+    case IdNamespace::hr:
+        return "hr";
     }
     return "invalid";
 }
