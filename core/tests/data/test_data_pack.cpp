@@ -15,6 +15,7 @@
 #include <iterator>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace expected = usim::test::pack;
@@ -62,6 +63,20 @@ void write_u16(std::vector<std::byte>& bytes, std::size_t at, std::uint16_t valu
 void rehash(std::vector<std::byte>& bytes) {
     const auto digest = usim::data::sha256(std::span(bytes).subspan(128));
     std::memcpy(bytes.data() + 32, digest.data(), digest.size());
+}
+
+// Byte position of the section table entry with `id` (DATA_PACK.md section 2.2).
+std::size_t section_entry(const std::vector<std::byte>& bytes, std::string_view id) {
+    std::uint32_t count = 0;
+    std::memcpy(&count, bytes.data() + 20, 4);
+    for (std::size_t i = 0; i < count; ++i) {
+        const std::size_t at = 128 + i * 32;
+        if (std::string_view(reinterpret_cast<const char*>(bytes.data()) + at, 4) == id) {
+            return at;
+        }
+    }
+    FAIL("no section " << id);
+    return 0;
 }
 
 ErrorCode parse_error_code(const std::vector<std::byte>& bytes) {
@@ -236,6 +251,65 @@ TEST_CASE("Data pack ephemeris segments round-trip bit for bit", "[data][pack]")
     CHECK(p.ephemeris_segments()[2].degree() == 0);
 }
 
+TEST_CASE("Data pack approximate positions round-trip", "[data][pack]") {
+    const auto approximations = pack().position_approximations();
+    REQUIRE(approximations.size() == std::size(expected::k_approximations));
+    for (std::size_t i = 0; i < approximations.size(); ++i) {
+        const auto& e = expected::k_approximations[i];
+        CHECK(approximations[i].body == BodyId::naif(e.naif_id));
+        CHECK(approximations[i].proxy == BodyId::naif(e.proxy_naif_id));
+        CHECK(approximations[i].reason == e.reason);
+    }
+}
+
+TEST_CASE("Data pack star catalog round-trips (format 1.2)", "[data][pack]") {
+    const auto& catalog = pack().star_catalog();
+    CHECK(catalog.source.source_id == expected::k_star_source_id);
+    CHECK(catalog.source.locator == expected::k_star_locator);
+    CHECK(catalog.derivation == expected::k_star_derivation);
+    CHECK(catalog.epoch_tdb_s == expected::k_star_epoch_tdb_s);
+    REQUIRE(catalog.stars.size() == std::size(expected::k_stars));
+    for (std::size_t i = 0; i < catalog.stars.size(); ++i) {
+        const auto& s = catalog.stars[i];
+        const auto& e = expected::k_stars[i];
+        CHECK(s.id == BodyId{static_cast<usim::catalog::IdNamespace>(e.id_namespace), e.id});
+        CHECK(s.designation == e.designation);
+        CHECK(s.ra_rad == e.ra_rad);
+        CHECK(s.dec_rad == e.dec_rad);
+        CHECK(s.proper_motion.has_value() == e.has_proper_motion);
+        if (s.proper_motion) {
+            CHECK(s.proper_motion->ra_cos_dec_rad_per_s == e.pm_ra_cos_dec_rad_per_s);
+            CHECK(s.proper_motion->dec_rad_per_s == e.pm_dec_rad_per_s);
+        }
+        CHECK(s.v_magnitude == e.v_magnitude);
+        CHECK(s.b_minus_v.has_value() == e.has_color);
+        CHECK(s.b_minus_v.value_or(0.0) == e.b_minus_v);
+    }
+}
+
+TEST_CASE("Data pack rings round-trip (format 1.2)", "[data][pack]") {
+    const auto rings = pack().rings();
+    REQUIRE(rings.size() == std::size(expected::k_rings));
+    for (std::size_t i = 0; i < rings.size(); ++i) {
+        const auto& r = rings[i];
+        const auto& e = expected::k_rings[i];
+        CHECK(r.body == BodyId::naif(e.naif_id));
+        CHECK(r.name == e.name);
+        CHECK(r.gap == e.gap);
+        CHECK(r.inner_radius_km == e.inner_km);
+        CHECK(r.outer_radius_km == e.outer_km);
+        CHECK(r.radii_source.source_id == e.radii_source_id);
+        CHECK(r.radii_source.locator == e.radii_locator);
+        REQUIRE(r.optical_depth.has_value() == e.has_optical_depth);
+        if (r.optical_depth) {
+            CHECK(r.optical_depth->smallest == e.optical_depth_smallest);
+            CHECK(r.optical_depth->largest == e.optical_depth_largest);
+            CHECK(r.optical_depth->source.source_id == e.optical_depth_source_id);
+            CHECK(r.optical_depth->source.locator == e.optical_depth_locator);
+        }
+    }
+}
+
 TEST_CASE("Parsing from memory gives the same pack as loading the file", "[data][pack]") {
     const auto bytes = fixture_bytes();
     REQUIRE(bytes.size() == expected::k_file_size);
@@ -298,6 +372,58 @@ TEST_CASE("The reader rejects damaged and incompatible packs", "[data][pack]") {
         const auto result = DataPack::parse(bytes);
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error().message.find("TT - TAI") != std::string::npos);
+    }
+    SECTION("a pack without APPX (format 1.0) has no approximate positions") {
+        auto bytes = good;
+        std::memcpy(bytes.data() + section_entry(bytes, "APPX"), "ZZZZ", 4); // an unknown section is skipped
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE(result.has_value());
+        CHECK(result.value().position_approximations().empty());
+    }
+    SECTION("a pack without STAR and RING (format 1.1) has no stars and no rings") {
+        auto bytes = good;
+        std::memcpy(bytes.data() + section_entry(bytes, "STAR"), "ZZZ1", 4); // unknown sections are skipped
+        std::memcpy(bytes.data() + section_entry(bytes, "RING"), "ZZZ2", 4);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE(result.has_value());
+        CHECK(result.value().star_catalog().stars.empty());
+        CHECK(result.value().rings().empty());
+    }
+    SECTION("a ring needs inner < outer") {
+        auto bytes = good;
+        std::uint64_t ring = 0;
+        std::memcpy(&ring, bytes.data() + section_entry(bytes, "RING") + 8, 8);
+        const double outer = 1.0; // record 0 spans 5 to 6 km
+        std::memcpy(bytes.data() + ring + 8 + 16, &outer, 8);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().code == ErrorCode::data_format);
+    }
+    SECTION("a star direction must be in range") {
+        auto bytes = good;
+        std::uint64_t star = 0;
+        std::memcpy(&star, bytes.data() + section_entry(bytes, "STAR") + 8, 8);
+        const double dec = 2.0; // beyond pi / 2
+        std::memcpy(bytes.data() + star + 32 + 24, &dec, 8);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().code == ErrorCode::data_format);
+    }
+    SECTION("an approximation must use the body's primary") {
+        auto bytes = good;
+        std::uint64_t appx = 0;
+        std::memcpy(&appx, bytes.data() + section_entry(bytes, "APPX") + 8, 8);
+        const std::int64_t root = 0;
+        std::memcpy(bytes.data() + appx + 8 + 16, &root, 8); // record 0, proxy id value
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().code == ErrorCode::data_format);
+        CHECK(result.error().message.find("primary") != std::string::npos);
     }
     SECTION("a missing file is an I/O error") {
         const auto result = DataPack::load_file(std::filesystem::path(USIM_TEST_FIXTURES_DIR) / "no-such-pack.uspack");

@@ -10,8 +10,8 @@
 namespace usim::test::pack {
 
 inline constexpr const char* k_file_name = "test_pack_v1.uspack";
-inline constexpr std::uint64_t k_file_size = 3592;
-inline constexpr const char* k_content_sha256 = "52e9dc1d8258a8394ce9075b77108050f19e2f16690b402935162f223bfb78e3";
+inline constexpr std::uint64_t k_file_size = 4416;
+inline constexpr const char* k_content_sha256 = "db5a1099e88c90ee561b2136d78b9bac0eebcacc1d4ac684b1264543d6f50078";
 inline constexpr const char* k_lock_sha256 = "d916b278e664651247fc46d544faa2998e0c91344b3a397ac5f2ec811d467c78";
 
 struct MetaRow {
@@ -179,6 +179,59 @@ inline constexpr SegmentRow k_segments[] = {
     {1000, 0, 2, -864000.0, 432000.0, -864000.0, 432000.0, 11, 3, std::span<const double>{k_segment0_records}, "S-TEST-A", "synthetic-a.bin segment 0"},
     {1001, 1000, 3, 3600.0, 150000.0, 0.0, 86400.0, 14, 2, std::span<const double>{k_segment1_records}, "S-TEST-B", "synthetic-b.txt segment 0"},
     {1002, 1001, 2, -86400.0, 86400.0, -86400.0, 172800.0, 5, 1, std::span<const double>{k_segment2_records}, "S-TEST-A", "synthetic-a.bin segment 1"},
+};
+
+struct ApproximationRow {
+    std::int64_t naif_id;
+    std::int64_t proxy_naif_id;
+    const char* reason;
+};
+inline constexpr ApproximationRow k_approximations[] = {
+    {1003, 1000, "Synthetic: no segment; placed at its primary"},
+};
+
+inline constexpr const char* k_star_source_id = "S-TEST-B";
+inline constexpr const char* k_star_locator = "synthetic-b.txt STARS";
+inline constexpr const char* k_star_derivation = "Synthetic: made up for the test";
+inline constexpr double k_star_epoch_tdb_s = 86400.0;
+
+struct StarRow {
+    std::int32_t id_namespace;
+    std::int64_t id;
+    const char* designation;
+    double ra_rad;
+    double dec_rad;
+    bool has_proper_motion;
+    double pm_ra_cos_dec_rad_per_s;
+    double pm_dec_rad_per_s;
+    double v_magnitude;
+    bool has_color;
+    double b_minus_v;
+};
+inline constexpr StarRow k_stars[] = {
+    {3, 11, "", 0.0, 0.0, false, 0.0, 0.0, 4.0, false, 0.0},
+    {4, 2, "Syn A", 1.0, -0.5, true, 1e-12, -2e-12, 1.5, true, 0.25},
+    {4, 7, "Syn B", 6.0, 1.25, false, 0.0, 0.0, -0.5, true, 1.75},
+};
+
+struct RingRow {
+    std::int64_t naif_id;
+    const char* name;
+    bool gap;
+    double inner_km;
+    double outer_km;
+    const char* radii_source_id;
+    const char* radii_locator;
+    bool has_optical_depth;
+    double optical_depth_smallest;
+    double optical_depth_largest;
+    const char* optical_depth_source_id;
+    const char* optical_depth_locator;
+};
+inline constexpr RingRow k_rings[] = {
+    {1000, "Star Ring", false, 5.0, 6.0, "S-TEST-A", "synthetic-a.bin RING1", false, 0.0, 0.0, "", ""},
+    {1001, "Test Ring", false, 10.0, 20.0, "S-TEST-B", "synthetic-b.txt RING2", true, 0.25, 0.5, "S-TEST-A", "synthetic-a.bin DEPTH2"},
+    {1001, "Test Gap", true, 12.0, 13.0, "S-TEST-B", "synthetic-b.txt GAP", false, 0.0, 0.0, "", ""},
 };
 
 } // namespace usim::test::pack

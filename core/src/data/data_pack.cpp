@@ -38,14 +38,26 @@ constexpr std::size_t k_rotation_size = 88;
 constexpr std::size_t k_time_size = 56;
 constexpr std::size_t k_leap_size = 16;
 constexpr std::size_t k_segment_size = 96;
+constexpr std::size_t k_approximation_size = 32;
+constexpr std::size_t k_star_header_size = 32;
+constexpr std::size_t k_star_size = 72;
+constexpr std::size_t k_ring_size = 72;
 
 constexpr std::uint32_t k_max_phase_degree = 16; // DATA_PACK.md, ROTN
 constexpr std::uint32_t k_quantity_has_uncertainty = 1;
 constexpr std::uint32_t k_file_publisher_verified = 1;
+constexpr std::uint32_t k_star_has_color = 1;
+constexpr std::uint32_t k_star_has_proper_motion = 2;
+constexpr std::uint32_t k_ring_gap = 1;
+constexpr std::uint32_t k_ring_has_optical_depth = 2;
+constexpr double k_pi = 3.141592653589793; // the double nearest pi
 
 // The sections of format 1.0, all required.
 constexpr std::array<std::string_view, 10> k_required_sections = {"META", "SRCS", "FILE", "BODY", "QNTY",
                                                                   "ROTN", "TIME", "EPHS", "STRS", "EPHD"};
+
+// Sections added by later minor versions, optional (1.1: APPX; 1.2: STAR, RING).
+constexpr std::array<std::string_view, 3> k_optional_sections = {"APPX", "STAR", "RING"};
 
 Error format_error(std::string message) {
     return make_error(ErrorCode::data_format, "data pack: " + std::move(message));
@@ -148,7 +160,7 @@ bool is_valid_utf8(std::string_view text) noexcept {
 
 Result<catalog::BodyId> body_id(std::int32_t id_namespace, std::int64_t value, std::string_view what) {
     if (id_namespace < static_cast<std::int32_t>(catalog::IdNamespace::naif) ||
-        id_namespace > static_cast<std::int32_t>(catalog::IdNamespace::hipparcos)) {
+        id_namespace > static_cast<std::int32_t>(catalog::IdNamespace::hr)) {
         return format_error(std::string(what) + ": unknown id namespace " + std::to_string(id_namespace));
     }
     return catalog::BodyId{static_cast<catalog::IdNamespace>(id_namespace), value};
@@ -206,6 +218,11 @@ public:
     Result<std::vector<frames::IauRotationElements>> rotations(const std::vector<catalog::Body>& bodies);
     Result<void> time_data(std::vector<time::LeapSecondEntry>& leaps, time::TdbModel& model, catalog::SourceRef& source);
     Result<std::vector<EphemerisSegment>> segments(const catalog::BodyCatalog& bodies);
+    Result<std::vector<PositionApproximation>> approximations(const catalog::BodyCatalog& bodies,
+                                                              const std::vector<EphemerisSegment>& segments);
+    Result<catalog::StarCatalog> stars();
+    Result<std::vector<catalog::Ring>> rings(const catalog::BodyCatalog& bodies,
+                                             const std::vector<frames::IauRotationElements>& rotations);
 
 private:
     struct SectionEntry {
@@ -220,7 +237,11 @@ private:
                 return View(file_.bytes().subspan(static_cast<std::size_t>(s.offset), static_cast<std::size_t>(s.size)), id);
             }
         }
-        return View(); // unreachable: sections() checked that every required section exists
+        return View(); // only for an absent optional section; sections() checked the required ones
+    }
+
+    [[nodiscard]] bool has_section(std::string_view id) const {
+        return std::any_of(sections_.begin(), sections_.end(), [&](const SectionEntry& s) { return s.id == id; });
     }
 
     // A (count, second) pair at the start of a section, and a check that `count` records of `record_size`
@@ -319,7 +340,8 @@ Result<void> Parser::sections() {
         if (std::any_of(sections_.begin(), sections_.end(), [&](const SectionEntry& s) { return s.id == id; })) {
             return format_error("section " + std::string(id) + " appears twice");
         }
-        const bool known = std::find(k_required_sections.begin(), k_required_sections.end(), id) != k_required_sections.end();
+        const bool known = std::find(k_required_sections.begin(), k_required_sections.end(), id) != k_required_sections.end() ||
+                           std::find(k_optional_sections.begin(), k_optional_sections.end(), id) != k_optional_sections.end();
         if (known && version != k_section_version) {
             return make_error(ErrorCode::incompatible_version, "data pack: section " + std::string(id) +
                                                                    " has version " + std::to_string(version));
@@ -692,15 +714,186 @@ Result<std::vector<EphemerisSegment>> Parser::segments(const catalog::BodyCatalo
     return segments;
 }
 
+Result<std::vector<PositionApproximation>> Parser::approximations(const catalog::BodyCatalog& bodies,
+                                                                  const std::vector<EphemerisSegment>& segments) {
+    std::vector<PositionApproximation> result;
+    if (!has_section("APPX")) {
+        return result; // a format 1.0 pack
+    }
+    const View view = section("APPX");
+    const Result<std::uint32_t> count = record_count(view, k_approximation_size);
+    if (!count) {
+        return count.error();
+    }
+    for (std::uint32_t i = 0; i < count.value(); ++i) {
+        const std::size_t at = k_counts_size + std::size_t{i} * k_approximation_size;
+        const Result<catalog::BodyId> body = body_id(view.i32(at), view.i64(at + 8), "approximated body");
+        const Result<catalog::BodyId> proxy = body_id(view.i32(at + 4), view.i64(at + 16), "approximation proxy");
+        if (!body || !proxy) {
+            return !body ? body.error() : proxy.error();
+        }
+        const std::string what = "approximate position of " + catalog::to_string(body.value());
+        const catalog::Body* entry = bodies.find(body.value());
+        if (entry == nullptr) {
+            return format_error(what + ": the body is not in the catalog");
+        }
+        if (!entry->primary || *entry->primary != proxy.value()) {
+            return format_error(what + ": the proxy is not the body's primary");
+        }
+        if (std::any_of(segments.begin(), segments.end(), [&](const EphemerisSegment& s) { return s.target == body.value(); })) {
+            return format_error(what + ": the body has its own ephemeris segment");
+        }
+        if (std::any_of(result.begin(), result.end(), [&](const PositionApproximation& a) { return a.body == body.value(); })) {
+            return format_error(what + " appears twice");
+        }
+        Result<std::string> reason = text(view, at + 24);
+        if (!reason) {
+            return reason.error();
+        }
+        result.push_back({body.value(), proxy.value(), std::move(reason).value()});
+    }
+    return result;
+}
+
+Result<catalog::StarCatalog> Parser::stars() {
+    catalog::StarCatalog result;
+    if (!has_section("STAR")) {
+        return result; // no star catalog
+    }
+    const View view = section("STAR");
+    if (!view.has(0, k_star_header_size)) {
+        return format_error("section STAR is truncated");
+    }
+    const std::uint32_t count = view.u32(0);
+    if (!view.has(k_star_header_size, std::size_t{count} * k_star_size)) {
+        return format_error("section STAR is truncated");
+    }
+    Result<std::string> source = source_id(view.u32(4));
+    Result<std::string> locator = text(view, 16);
+    Result<std::string> derivation = text(view, 24);
+    if (!source || !locator || !derivation) {
+        return !source ? source.error() : (!locator ? locator.error() : derivation.error());
+    }
+    result.epoch_tdb_s = view.f64(8);
+    if (!std::isfinite(result.epoch_tdb_s) || count == 0) {
+        return format_error("star catalog: invalid epoch or no stars");
+    }
+    result.source = catalog::SourceRef{std::move(source).value(), std::move(locator).value()};
+    result.derivation = std::move(derivation).value();
+    result.stars.reserve(count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const std::size_t at = k_star_header_size + std::size_t{i} * k_star_size;
+        const Result<catalog::BodyId> id = body_id(view.i32(at), view.i64(at + 8), "star");
+        Result<std::string> designation = text(view, at + 64);
+        if (!id || !designation) {
+            return !id ? id.error() : designation.error();
+        }
+        const std::uint32_t flags = view.u32(at + 4);
+        catalog::Star star;
+        star.id = id.value();
+        star.designation = std::move(designation).value();
+        star.ra_rad = view.f64(at + 16);
+        star.dec_rad = view.f64(at + 24);
+        star.v_magnitude = view.f64(at + 48);
+        const std::array<double, 5> values = {star.ra_rad, star.dec_rad, view.f64(at + 32), view.f64(at + 40),
+                                              view.f64(at + 56)};
+        const std::string what = "star " + catalog::to_string(star.id);
+        if (!all_finite(values) || !std::isfinite(star.v_magnitude) || !(star.ra_rad >= 0.0) ||
+            !(star.ra_rad < 2.0 * k_pi) || !(std::abs(star.dec_rad) <= k_pi / 2.0)) {
+            return format_error(what + ": invalid direction or value");
+        }
+        if ((flags & k_star_has_proper_motion) != 0) {
+            star.proper_motion = catalog::ProperMotion{values[2], values[3]};
+        }
+        if ((flags & k_star_has_color) != 0) {
+            star.b_minus_v = values[4];
+        }
+        if (!result.stars.empty() && !(std::pair(result.stars.back().id.id_namespace, result.stars.back().id.value) <
+                                       std::pair(star.id.id_namespace, star.id.value))) {
+            return format_error(what + ": stars are not sorted by id, or a star appears twice");
+        }
+        result.stars.push_back(std::move(star));
+    }
+    return result;
+}
+
+Result<std::vector<catalog::Ring>> Parser::rings(const catalog::BodyCatalog& bodies,
+                                                 const std::vector<frames::IauRotationElements>& rotations) {
+    std::vector<catalog::Ring> result;
+    if (!has_section("RING")) {
+        return result; // no rings
+    }
+    const View view = section("RING");
+    const Result<std::uint32_t> count = record_count(view, k_ring_size);
+    if (!count) {
+        return count.error();
+    }
+    std::uint32_t previous_index = 0;
+    for (std::uint32_t i = 0; i < count.value(); ++i) {
+        const std::size_t at = k_counts_size + std::size_t{i} * k_ring_size;
+        const std::uint32_t index = view.u32(at);
+        if (index >= bodies.bodies().size()) {
+            return format_error("ring " + std::to_string(i) + ": body index out of range");
+        }
+        catalog::Ring ring;
+        ring.body = bodies.bodies()[index].id;
+        const std::uint32_t flags = view.u32(at + 4);
+        ring.gap = (flags & k_ring_gap) != 0;
+        ring.inner_radius_km = view.f64(at + 8);
+        ring.outer_radius_km = view.f64(at + 16);
+        Result<std::string> name = text(view, at + 48);
+        Result<std::string> radii_source = source_id(view.u32(at + 40));
+        Result<std::string> radii_locator = text(view, at + 56);
+        if (!name || !radii_source || !radii_locator) {
+            return !name ? name.error() : (!radii_source ? radii_source.error() : radii_locator.error());
+        }
+        ring.name = std::move(name).value();
+        ring.radii_source = catalog::SourceRef{std::move(radii_source).value(), std::move(radii_locator).value()};
+        const std::string what = "ring " + ring.name + " of " + catalog::to_string(ring.body);
+        if (ring.name.empty() || !std::isfinite(ring.inner_radius_km) || !std::isfinite(ring.outer_radius_km) ||
+            !(ring.inner_radius_km > 0.0) || !(ring.inner_radius_km < ring.outer_radius_km)) {
+            return format_error(what + ": needs a name and radii with 0 < inner < outer");
+        }
+        if (std::none_of(rotations.begin(), rotations.end(), [&](const auto& r) { return r.body == ring.body; })) {
+            return format_error(what + ": the body has no rotation model to define the ring plane");
+        }
+        if ((flags & k_ring_has_optical_depth) != 0) {
+            const double smallest = view.f64(at + 24);
+            const double largest = view.f64(at + 32);
+            Result<std::string> depth_source = source_id(view.u32(at + 44));
+            Result<std::string> depth_locator = text(view, at + 64);
+            if (!depth_source || !depth_locator) {
+                return !depth_source ? depth_source.error() : depth_locator.error();
+            }
+            if (ring.gap || !std::isfinite(smallest) || !std::isfinite(largest) || !(smallest >= 0.0) ||
+                !(smallest <= largest)) {
+                return format_error(what + ": invalid optical depth (or one given for a gap)");
+            }
+            ring.optical_depth = catalog::OpticalDepth{
+                smallest, largest, catalog::SourceRef{std::move(depth_source).value(), std::move(depth_locator).value()}};
+        }
+        if (!result.empty() && (previous_index > index || (previous_index == index &&
+                                                             result.back().inner_radius_km > ring.inner_radius_km))) {
+            return format_error(what + ": rings are not sorted by body and inner radius");
+        }
+        previous_index = index;
+        result.push_back(std::move(ring));
+    }
+    return result;
+}
+
 } // namespace
 
 DataPack::DataPack(DataPackHeader header, std::vector<std::pair<std::string, std::string>> metadata,
                    catalog::BodyCatalog catalog, std::vector<SourceFile> files, time::LeapSecondTable leap_seconds,
                    time::TdbModel tdb_model, catalog::SourceRef time_source,
-                   std::vector<frames::IauRotationElements> rotations, std::vector<EphemerisSegment> segments)
+                   std::vector<frames::IauRotationElements> rotations, std::vector<EphemerisSegment> segments,
+                   std::vector<PositionApproximation> approximations, catalog::StarCatalog stars,
+                   std::vector<catalog::Ring> rings)
     : header_(header), metadata_(std::move(metadata)), catalog_(std::move(catalog)), files_(std::move(files)),
       leap_seconds_(std::move(leap_seconds)), tdb_model_(tdb_model), time_source_(std::move(time_source)),
-      rotations_(std::move(rotations)), segments_(std::move(segments)) {}
+      rotations_(std::move(rotations)), segments_(std::move(segments)), approximations_(std::move(approximations)),
+      stars_(std::move(stars)), rings_(std::move(rings)) {}
 
 Result<DataPack> DataPack::parse(std::span<const std::byte> bytes) {
     Parser parser(bytes);
@@ -763,9 +956,22 @@ Result<DataPack> DataPack::parse(std::span<const std::byte> bytes) {
     if (!segments) {
         return segments.error();
     }
+    Result<std::vector<PositionApproximation>> approximations = parser.approximations(bodies_catalog.value(), segments.value());
+    if (!approximations) {
+        return approximations.error();
+    }
+    Result<catalog::StarCatalog> stars = parser.stars();
+    if (!stars) {
+        return stars.error();
+    }
+    Result<std::vector<catalog::Ring>> rings = parser.rings(bodies_catalog.value(), rotations.value());
+    if (!rings) {
+        return rings.error();
+    }
     return DataPack(header.value(), std::move(metadata).value(), std::move(bodies_catalog).value(), std::move(files).value(),
                     std::move(leap_seconds).value(), model, std::move(time_source), std::move(rotations).value(),
-                    std::move(segments).value());
+                    std::move(segments).value(), std::move(approximations).value(), std::move(stars).value(),
+                    std::move(rings).value());
 }
 
 Result<DataPack> DataPack::load_file(const std::filesystem::path& path) {

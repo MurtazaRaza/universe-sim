@@ -3,6 +3,7 @@
 #include "usim/catalog/body_catalog.hpp"
 #include "usim/catalog/body_id.hpp"
 #include "usim/catalog/quantity.hpp"
+#include "usim/catalog/sky.hpp"
 #include "usim/data/sha256.hpp"
 #include "usim/frames/frame_id.hpp"
 #include "usim/frames/iau_rotation.hpp"
@@ -32,7 +33,7 @@ struct FormatVersion {
 };
 
 /// The format version this reader implements.
-inline constexpr FormatVersion k_format_version{1, 0};
+inline constexpr FormatVersion k_format_version{1, 2};
 
 /// The fixed header of a pack.
 struct DataPackHeader {
@@ -79,6 +80,15 @@ struct EphemerisSegment {
     [[nodiscard]] std::uint32_t degree() const noexcept {
         return (record_size - 2) / (spk_type == 3 ? 6u : 3u) - 1;
     }
+};
+
+/// A body without an ephemeris segment of its own, placed at its primary instead, with every state flagged
+/// approximate (DATA_PACK.md, section APPX; ADR-0008). For example de440s.bsp has no segment for the center
+/// of Jupiter, so Jupiter is placed at the Jupiter system barycenter.
+struct PositionApproximation {
+    catalog::BodyId body;  ///< The approximated body.
+    catalog::BodyId proxy; ///< Where it is placed: its primary in the catalog.
+    std::string reason;    ///< Why, for display and provenance.
 };
 
 /// A loaded, validated data pack (SPEC FR-DATA-06): the catalog with per-value provenance, time scale data,
@@ -130,11 +140,25 @@ public:
     /// Ephemeris segments, in precedence order (later segments win where they overlap).
     [[nodiscard]] std::span<const EphemerisSegment> ephemeris_segments() const noexcept { return segments_; }
 
+    /// Bodies placed at their primary, in catalog order. Empty for a format 1.0 pack.
+    [[nodiscard]] std::span<const PositionApproximation> position_approximations() const noexcept {
+        return approximations_;
+    }
+
+    /// The star catalog of the sky background; no stars for a pack without one (format 1.2, section STAR).
+    [[nodiscard]] const catalog::StarCatalog& star_catalog() const noexcept { return stars_; }
+
+    /// Ring regions and gaps, sorted by body (in catalog order) and inner radius; empty for a pack without
+    /// rings (format 1.2, section RING).
+    [[nodiscard]] std::span<const catalog::Ring> rings() const noexcept { return rings_; }
+
 private:
     DataPack(DataPackHeader header, std::vector<std::pair<std::string, std::string>> metadata,
              catalog::BodyCatalog catalog, std::vector<SourceFile> files, time::LeapSecondTable leap_seconds,
              time::TdbModel tdb_model, catalog::SourceRef time_source,
-             std::vector<frames::IauRotationElements> rotations, std::vector<EphemerisSegment> segments);
+             std::vector<frames::IauRotationElements> rotations, std::vector<EphemerisSegment> segments,
+             std::vector<PositionApproximation> approximations, catalog::StarCatalog stars,
+             std::vector<catalog::Ring> rings);
 
     DataPackHeader header_;
     std::vector<std::pair<std::string, std::string>> metadata_;
@@ -145,6 +169,9 @@ private:
     catalog::SourceRef time_source_;
     std::vector<frames::IauRotationElements> rotations_;
     std::vector<EphemerisSegment> segments_;
+    std::vector<PositionApproximation> approximations_;
+    catalog::StarCatalog stars_;
+    std::vector<catalog::Ring> rings_;
 };
 
 } // namespace usim::data
