@@ -104,6 +104,23 @@ def test_fetch_without_publisher_list_pins_by_sha256(repo, server):
     assert server.requests == [URL]
 
 
+def test_files_pinned_before_a_failure_stay_pinned(repo, server):
+    other = "https://example.invalid/a/zzz.bin"
+    write_sources(repo, [
+        {"name": "data.bin", "path": "test/data.bin", "url": URL, "publisher_checksums": None},
+        {"name": "zzz.bin", "path": "test/zzz.bin", "url": other, "publisher_checksums": None},
+    ])  # fmt: skip
+    server.files[URL] = DATA  # zzz.bin (fetched after data.bin) is missing on the server
+    with pytest.raises(PipelineError, match="404"):
+        run(repo, server)
+    assert list(load_lock(repo.lock_file)) == [("S-TEST-A", "data.bin")]
+    server.files[other] = DATA
+    server.requests.clear()
+    run(repo, server)
+    assert server.requests == [other]  # data.bin is verified from its pin, not downloaded again
+    assert set(load_lock(repo.lock_file)) == {("S-TEST-A", "data.bin"), ("S-TEST-A", "zzz.bin")}
+
+
 def test_local_copy_matching_the_publisher_md5_is_pinned_without_downloading(repo, server):
     declare(repo)
     serve(server)

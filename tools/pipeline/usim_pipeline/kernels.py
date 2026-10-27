@@ -8,7 +8,7 @@ values differ, by 1 to 5 ulps; the largest is BODY5_GM), so the pack keeps the c
 the text the publisher wrote (ADR-0007).
 
 Text kernels are loaded one at a time (`kernel_pool`), so every value is known to come from that one file.
-SPK segments are read with the DAF routines and copied bit for bit.
+SPK and binary PCK segments are read with the DAF routines and copied bit for bit.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ EXPECTED_TOOLKIT = "CSPICE_N0067"
 SPK_COMPONENTS = {2: 3, 3: 6}
 
 NAIF_FRAME_J2000 = 1  # NAIF frame code of J2000, which SPICE uses to label the ICRF
+NAIF_FRAME_ECLIPJ2000 = 17  # NAIF frame code of ECLIPJ2000 (Frames Required Reading, built-in inertial frames)
 
 
 def toolkit_versions() -> dict[str, str]:
@@ -315,6 +316,53 @@ def record_range(
     return (first, last)
 
 
+@dataclass(frozen=True)
+class _Records:
+    """The records of a Chebyshev segment (SPK types 2 and 3, binary PCK type 2) held after windowing."""
+
+    start_s: float
+    end_s: float
+    init_s: float
+    interval_s: float
+    record_size: int
+    records: numpy.ndarray
+    first_address: int
+
+
+def _read_records(
+    handle: int, begin: int, end: int, where: str, components: int, kind: str, coverage: tuple[float, float],
+    window: tuple[float, float] | None,
+) -> _Records | None:
+    """The records of the Chebyshev segment at DAF addresses [begin, end], whose directory (INIT, INTLEN,
+    RSIZE, N) is its last four values; with a `window`, only those overlapping it (None if none do)."""
+    init, interval, rsize, count = (float(v) for v in spiceypy.dafgda(handle, end - 3, end))
+    record_size = _exact_int(rsize, f"{where}: RSIZE")
+    record_count = _exact_int(count, f"{where}: N")
+    if record_size < 2 + components or (record_size - 2) % components != 0:
+        raise PipelineError(f"{where}: record size {record_size} does not fit {kind}")
+    if end - begin + 1 != record_size * record_count + 4:
+        raise PipelineError(f"{where}: segment length does not match {record_count} records of {record_size}")
+    if not interval > 0:
+        raise PipelineError(f"{where}: record interval {interval} is not positive")
+    start_s, end_s = coverage
+    kept = record_range(init, interval, record_count, start_s, end_s, window)
+    if kept is None:
+        return None
+    first, last = kept
+    address = begin + first * record_size
+    data = spiceypy.dafgda(handle, address, begin + (last + 1) * record_size - 1)
+    kept_init = init + first * interval
+    return _Records(
+        start_s=max(start_s, kept_init),
+        end_s=min(end_s, init + (last + 1) * interval),
+        init_s=kept_init,
+        interval_s=interval,
+        record_size=record_size,
+        records=numpy.array(data, dtype=numpy.float64).reshape(last - first + 1, record_size),
+        first_address=address,
+    )
+
+
 def read_spk_segments(
     path: Path, keep: Callable[[int, int], bool] | None = None, window: tuple[float, float] | None = None
 ) -> list[SpkSegment]:
@@ -341,25 +389,12 @@ def read_spk_segments(
             where = f"{path.name} segment {index} ({target} wrt {center})"
             if data_type not in SPK_COMPONENTS:
                 raise PipelineError(f"{where}: SPK type {data_type} is not supported (only 2 and 3)")
-            init, interval, rsize, count = (float(v) for v in spiceypy.dafgda(handle, end - 3, end))
-            record_size = _exact_int(rsize, f"{where}: RSIZE")
-            record_count = _exact_int(count, f"{where}: N")
-            components = SPK_COMPONENTS[data_type]
-            if record_size < 2 + components or (record_size - 2) % components != 0:
-                raise PipelineError(f"{where}: record size {record_size} does not fit SPK type {data_type}")
-            if end - begin + 1 != record_size * record_count + 4:
-                raise PipelineError(f"{where}: segment length does not match {record_count} records of {record_size}")
-            if not interval > 0:
-                raise PipelineError(f"{where}: record interval {interval} is not positive")
-            start_s, end_s = float(dc[0]), float(dc[1])
-            kept = record_range(init, interval, record_count, start_s, end_s, window)
-            if kept is None:
+            held = _read_records(
+                handle, begin, end, where, SPK_COMPONENTS[data_type], f"SPK type {data_type}",
+                (float(dc[0]), float(dc[1])), window,
+            )  # fmt: skip
+            if held is None:
                 continue
-            first, last = kept
-            address = begin + first * record_size
-            data = spiceypy.dafgda(handle, address, begin + (last + 1) * record_size - 1)
-            records = numpy.array(data, dtype=numpy.float64).reshape(last - first + 1, record_size)
-            kept_init = init + first * interval
             segments.append(
                 SpkSegment(
                     file_name=path.name,
@@ -369,13 +404,90 @@ def read_spk_segments(
                     center=center,
                     frame=frame,
                     data_type=data_type,
-                    start_s=max(start_s, kept_init),
-                    end_s=min(end_s, init + (last + 1) * interval),
-                    init_s=kept_init,
-                    interval_s=interval,
-                    record_size=record_size,
-                    records=records,
-                    first_address=address,
+                    start_s=held.start_s,
+                    end_s=held.end_s,
+                    init_s=held.init_s,
+                    interval_s=held.interval_s,
+                    record_size=held.record_size,
+                    records=held.records,
+                    first_address=held.first_address,
+                )
+            )
+    finally:
+        spiceypy.dafcls(handle)
+    return segments
+
+
+# Binary PCK data types the pack supports: type 2, Chebyshev polynomials of three Euler angles (PCK Required
+# Reading). Each record holds MID and RADIUS followed by the coefficients of the angles, in radians.
+PCK_TYPE_CHEBYSHEV_ANGLES = 2
+PCK_ANGLES = 3
+
+
+@dataclass(frozen=True)
+class PckSegment:
+    """One binary PCK type 2 segment, as stored in the file: the Euler angles (phi, delta, w) of the frame
+    with class ID `frame_class_id` relative to the base frame, with R = [w]_3 [delta]_1 [phi]_3 the rotation
+    from the base frame to that frame. Times are TDB seconds past J2000."""
+
+    file_name: str
+    index: int  # position of the segment in the file (later segments take precedence in SPICE)
+    name: str  # segment identifier
+    frame_class_id: int  # the PCK frame's class ID (FRAME_<id>_CLASS_ID in the frame kernel)
+    base_frame: int  # NAIF frame code
+    data_type: int
+    start_s: float
+    end_s: float
+    init_s: float
+    interval_s: float
+    record_size: int
+    records: numpy.ndarray  # float64, shape (record_count, record_size)
+    first_address: int
+
+    @property
+    def record_count(self) -> int:
+        return int(self.records.shape[0])
+
+
+def read_pck_segments(path: Path, frame_class_id: int, window: tuple[float, float] | None = None) -> list[PckSegment]:
+    """The segments of a binary PCK file for the frame with class ID `frame_class_id`, in file order, with
+    only the records overlapping `window` like read_spk_segments. Fails on data types other than 2."""
+    handle = spiceypy.dafopr(str(path))
+    segments: list[PckSegment] = []
+    index = -1
+    try:
+        spiceypy.dafbfs(handle)
+        while spiceypy.daffna():
+            index += 1
+            summary = spiceypy.dafgs(5)  # ND = 2 doubles + NI = 5 integers
+            dc, ic = spiceypy.dafus(summary, 2, 5)
+            name = spiceypy.dafgn().strip()
+            class_id, base_frame, data_type, begin, end = (int(v) for v in ic)
+            if class_id != frame_class_id:
+                continue
+            where = f"{path.name} segment {index} (frame class {class_id})"
+            if data_type != PCK_TYPE_CHEBYSHEV_ANGLES:
+                raise PipelineError(f"{where}: binary PCK type {data_type} is not supported (only 2)")
+            held = _read_records(
+                handle, begin, end, where, PCK_ANGLES, "binary PCK type 2", (float(dc[0]), float(dc[1])), window
+            )
+            if held is None:
+                continue
+            segments.append(
+                PckSegment(
+                    file_name=path.name,
+                    index=index,
+                    name=name,
+                    frame_class_id=class_id,
+                    base_frame=base_frame,
+                    data_type=data_type,
+                    start_s=held.start_s,
+                    end_s=held.end_s,
+                    init_s=held.init_s,
+                    interval_s=held.interval_s,
+                    record_size=held.record_size,
+                    records=held.records,
+                    first_address=held.first_address,
                 )
             )
     finally:

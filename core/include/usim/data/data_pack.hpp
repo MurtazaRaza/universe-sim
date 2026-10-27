@@ -7,6 +7,7 @@
 #include "usim/data/sha256.hpp"
 #include "usim/frames/frame_id.hpp"
 #include "usim/frames/iau_rotation.hpp"
+#include "usim/frames/pck_orientation.hpp"
 #include "usim/result.hpp"
 #include "usim/time/time_scales.hpp"
 
@@ -33,7 +34,7 @@ struct FormatVersion {
 };
 
 /// The format version this reader implements.
-inline constexpr FormatVersion k_format_version{1, 2};
+inline constexpr FormatVersion k_format_version{1, 3};
 
 /// The fixed header of a pack.
 struct DataPackHeader {
@@ -92,7 +93,8 @@ struct PositionApproximation {
 };
 
 /// A loaded, validated data pack (SPEC FR-DATA-06): the catalog with per-value provenance, time scale data,
-/// IAU rotation elements and ephemeris segments. Immutable; safe to share between threads.
+/// IAU rotation elements, binary PCK orientation models and ephemeris segments. Immutable; safe to share
+/// between threads.
 class DataPack {
 public:
     /// Parses and validates a pack held in memory. Nothing is kept pointing into `bytes`. Fails with
@@ -152,13 +154,20 @@ public:
     /// rings (format 1.2, section RING).
     [[nodiscard]] std::span<const catalog::Ring> rings() const noexcept { return rings_; }
 
+    /// Binary PCK orientation models, sorted by body (in catalog order); empty for a pack without them (format
+    /// 1.3, section ORNT). A body's model replaces its IAU rotation elements for its body-fixed frame.
+    [[nodiscard]] std::span<const frames::PckOrientation> pck_orientations() const noexcept { return orientations_; }
+
+    /// The binary PCK orientation model of `body`, or nullptr.
+    [[nodiscard]] const frames::PckOrientation* find_pck_orientation(catalog::BodyId body) const noexcept;
+
 private:
     DataPack(DataPackHeader header, std::vector<std::pair<std::string, std::string>> metadata,
              catalog::BodyCatalog catalog, std::vector<SourceFile> files, time::LeapSecondTable leap_seconds,
              time::TdbModel tdb_model, catalog::SourceRef time_source,
              std::vector<frames::IauRotationElements> rotations, std::vector<EphemerisSegment> segments,
              std::vector<PositionApproximation> approximations, catalog::StarCatalog stars,
-             std::vector<catalog::Ring> rings);
+             std::vector<catalog::Ring> rings, std::vector<frames::PckOrientation> orientations);
 
     DataPackHeader header_;
     std::vector<std::pair<std::string, std::string>> metadata_;
@@ -172,6 +181,7 @@ private:
     std::vector<PositionApproximation> approximations_;
     catalog::StarCatalog stars_;
     std::vector<catalog::Ring> rings_;
+    std::vector<frames::PckOrientation> orientations_;
 };
 
 } // namespace usim::data

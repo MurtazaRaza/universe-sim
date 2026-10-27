@@ -89,6 +89,47 @@
       ]
     },
     {
+      "id": "S-NAIF-EARTHPCK",
+      "title": "NAIF combined historical and long-term predict Earth orientation: binary PCK earth_1962_260806_2126_combined.bpc",
+      "provider": "NAIF, NASA Jet Propulsion Laboratory (from the JPL Earth Orientation Parameter file latest.long)",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "citation": "NAIF/JPL, earth_1962_260806_2126_combined.bpc (created 2026-08-07 with WRTPEM 7.0.0 by N. Bachman) from the JPL Earth Orientation Parameter file latest.long (https://eop.jpl.nasa.gov/eop/latest.long), last datum 2026-08-06, as stated in the kernel's comments.",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "earth_1962_260806_2126_combined.bpc",
+          "path": "naif/earth_1962_260806_2126_combined.bpc",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_1962_260806_2126_combined.bpc",
+          "publisher_checksums": null,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "S-NAIF-MOONPA",
+      "title": "NAIF high-precision lunar orientation: binary PCK moon_pa_de440_200625.bpc and frame kernel moon_de440_250416.tf",
+      "provider": "NAIF, NASA Jet Propulsion Laboratory (lunar orientation from the JPL Solar System Dynamics group's DE440)",
+      "tier": 1,
+      "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/",
+      "citation": "Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H. (2021). The JPL Planetary and Lunar Ephemerides DE440 and DE441. The Astronomical Journal, 161:105. https://doi.org/10.3847/1538-3881/abd414 (cited in both kernels' comments)",
+      "license": "NAIF rules (https://naif.jpl.nasa.gov/naif/rules.html, read 2026-10-20): kernels on the NAIF server may be downloaded and used by anyone; unmodified kernels may be redistributed; acknowledgement is encouraged.",
+      "files": [
+        {
+          "name": "moon_pa_de440_200625.bpc",
+          "path": "naif/moon_pa_de440_200625.bpc",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/moon_pa_de440_200625.bpc",
+          "publisher_checksums": null
+        },
+        {
+          "name": "moon_de440_250416.tf",
+          "path": "naif/moon_de440_250416.tf",
+          "url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/fk/satellites/moon_de440_250416.tf",
+          "publisher_checksums": null
+        }
+      ]
+    },
+    {
       "id": "S-NAIF-GM440",
       "title": "NAIF gravitational parameters kernel gm_de440.tpc",
       "provider": "JPL Solar System Dynamics group (J. D. Giorgini); distributed by NAIF",
@@ -184,6 +225,393 @@
       "citation": "PDS Ring-Moon Systems Node, 'Vital Statistics for Saturn's Rings and Inner Satellites', table 'Rings of Saturn' (https://pds-rings.seti.org/saturn/saturn_tables.html, read 2026-10-22); a compilation whose rows cite the published sources (for example Colwell et al. 2009, French et al. 2017, Murray and Dermott 1999). Used for ring optical depths only, labeled Tier 2. Values enter through data/catalog/rings.json.",
       "license": "NASA Planetary Data System public web content; cite the PDS Ring-Moon Systems Node and the references of each row.",
       "files": []
+    },
+    {
+      "id": "S-USGS-ASTRO",
+      "title": "USGS Astrogeology Science Center global image mosaics of planets and moons (visual assets)",
+      "provider": "U.S. Geological Survey, Astrogeology Science Center, from NASA mission data (originators per product)",
+      "tier": 1,
+      "url": "https://astrogeology.usgs.gov/search",
+      "citation": "USGS Astrogeology Science Center, global mosaics as listed in data/catalog/textures.json, each with its product page and FGDC metadata (originators, for example NASA/JPL/Space Science Institute for the Cassini mosaics).",
+      "license": "USGS Copyrights and Credits (https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits, read 2026-10-23): 'USGS-authored or produced data and information are considered to be in the U.S. Public Domain'; credit is requested ('Credit: U.S. Geological Survey'). The products' FGDC metadata ask users to cite the authors.",
+      "files": [
+        {
+          "name": "Mercury_MESSENGER_mosaic_global_250m_2013.tif",
+          "path": "usgs/Mercury_MESSENGER_mosaic_global_250m_2013.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_MESSENGER_mosaic_global_250m_2013.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_MESSENGER_mosaic_global_250m_2013.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Mercury_MESSENGER_mosaic_global_250m_2013.lbl",
+          "path": "usgs/Mercury_MESSENGER_mosaic_global_250m_2013.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_MESSENGER_mosaic_global_250m_2013.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Mercury_MESSENGER_mosaic_global_250m_2013_pds3.lbl",
+          "path": "usgs/Mercury_MESSENGER_mosaic_global_250m_2013_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_MESSENGER_mosaic_global_250m_2013_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Mars_Viking_ClrMosaic_global_925m.tif",
+          "path": "usgs/Mars_Viking_ClrMosaic_global_925m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mars_Viking_ClrMosaic_global_925m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mars_Viking_ClrMosaic_global_925m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Mars_Viking_ClrMosaic_global_925m.lbl",
+          "path": "usgs/Mars_Viking_ClrMosaic_global_925m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mars_Viking_ClrMosaic_global_925m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Mars_Viking_ClrMosaic_global_925m_pds3.lbl",
+          "path": "usgs/Mars_Viking_ClrMosaic_global_925m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mars_Viking_ClrMosaic_global_925m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Phobos_ME_SRC_Mosaic_Global_16ppd.tif",
+          "path": "usgs/Phobos_ME_SRC_Mosaic_Global_16ppd.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Phobos_ME_SRC_Mosaic_Global_16ppd.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Phobos_ME_SRC_Mosaic_Global_16ppd.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Phobos_ME_SRC_Mosaic_Global_16ppd.lbl",
+          "path": "usgs/Phobos_ME_SRC_Mosaic_Global_16ppd.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Phobos_ME_SRC_Mosaic_Global_16ppd.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Phobos_ME_SRC_Mosaic_Global_16ppd_pds3.lbl",
+          "path": "usgs/Phobos_ME_SRC_Mosaic_Global_16ppd_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Phobos_ME_SRC_Mosaic_Global_16ppd_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif",
+          "path": "usgs/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.lbl",
+          "path": "usgs/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km_pds3.lbl",
+          "path": "usgs/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Europa_Voyager_GalileoSSI_global_mosaic_500m.tif",
+          "path": "usgs/Europa_Voyager_GalileoSSI_global_mosaic_500m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Europa_Voyager_GalileoSSI_global_mosaic_500m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Europa_Voyager_GalileoSSI_global_mosaic_500m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Europa_Voyager_GalileoSSI_global_mosaic_500m.lbl",
+          "path": "usgs/Europa_Voyager_GalileoSSI_global_mosaic_500m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Europa_Voyager_GalileoSSI_global_mosaic_500m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Europa_Voyager_GalileoSSI_global_mosaic_500m_pds3.lbl",
+          "path": "usgs/Europa_Voyager_GalileoSSI_global_mosaic_500m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Europa_Voyager_GalileoSSI_global_mosaic_500m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif",
+          "path": "usgs/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.lbl",
+          "path": "usgs/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m_pds3.lbl",
+          "path": "usgs/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif",
+          "path": "usgs/Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Callisto_Voyager_GalileoSSI_global_mosaic_1km.lbl",
+          "path": "usgs/Callisto_Voyager_GalileoSSI_global_mosaic_1km.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Callisto_Voyager_GalileoSSI_global_mosaic_1km.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Callisto_Voyager_GalileoSSI_global_mosaic_1km_pds3.lbl",
+          "path": "usgs/Callisto_Voyager_GalileoSSI_global_mosaic_1km_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Callisto_Voyager_GalileoSSI_global_mosaic_1km_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Enceladus_Cassini_mosaic_global_110m.tif",
+          "path": "usgs/Enceladus_Cassini_mosaic_global_110m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Enceladus_Cassini_mosaic_global_110m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Enceladus_Cassini_mosaic_global_110m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Enceladus_Cassini_mosaic_global_110m.lbl",
+          "path": "usgs/Enceladus_Cassini_mosaic_global_110m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Enceladus_Cassini_mosaic_global_110m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Enceladus_Cassini_mosaic_global_110m_pds3.lbl",
+          "path": "usgs/Enceladus_Cassini_mosaic_global_110m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Enceladus_Cassini_mosaic_global_110m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Tethys_Cassini_mosaic_global_293m.tif",
+          "path": "usgs/Tethys_Cassini_mosaic_global_293m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Tethys_Cassini_mosaic_global_293m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Tethys_Cassini_mosaic_global_293m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Tethys_Cassini_mosaic_global_293m.lbl",
+          "path": "usgs/Tethys_Cassini_mosaic_global_293m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Tethys_Cassini_mosaic_global_293m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Tethys_Cassini_mosaic_global_293m_pds3.lbl",
+          "path": "usgs/Tethys_Cassini_mosaic_global_293m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Tethys_Cassini_mosaic_global_293m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Dione_Cassini_Voyager_mosaic_global_154m.tif",
+          "path": "usgs/Dione_Cassini_Voyager_mosaic_global_154m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Dione_Cassini_Voyager_mosaic_global_154m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Dione_Cassini_Voyager_mosaic_global_154m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Dione_Cassini_Voyager_mosaic_global_154m.lbl",
+          "path": "usgs/Dione_Cassini_Voyager_mosaic_global_154m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Dione_Cassini_Voyager_mosaic_global_154m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Dione_Cassini_Voyager_mosaic_global_154m_pds3.lbl",
+          "path": "usgs/Dione_Cassini_Voyager_mosaic_global_154m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Dione_Cassini_Voyager_mosaic_global_154m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Rhea_Cassini_Voyager_mosaic_global_417m.tif",
+          "path": "usgs/Rhea_Cassini_Voyager_mosaic_global_417m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Rhea_Cassini_Voyager_mosaic_global_417m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Rhea_Cassini_Voyager_mosaic_global_417m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Rhea_Cassini_Voyager_mosaic_global_417m.lbl",
+          "path": "usgs/Rhea_Cassini_Voyager_mosaic_global_417m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Rhea_Cassini_Voyager_mosaic_global_417m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Rhea_Cassini_Voyager_mosaic_global_417m_pds3.lbl",
+          "path": "usgs/Rhea_Cassini_Voyager_mosaic_global_417m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Rhea_Cassini_Voyager_mosaic_global_417m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Iapetus_Cassini_Voyager_mosaic_global_783m.tif",
+          "path": "usgs/Iapetus_Cassini_Voyager_mosaic_global_783m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Iapetus_Cassini_Voyager_mosaic_global_783m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Iapetus_Cassini_Voyager_mosaic_global_783m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Iapetus_Cassini_Voyager_mosaic_global_783m.lbl",
+          "path": "usgs/Iapetus_Cassini_Voyager_mosaic_global_783m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Iapetus_Cassini_Voyager_mosaic_global_783m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Iapetus_Cassini_Voyager_mosaic_global_783m_pds3.lbl",
+          "path": "usgs/Iapetus_Cassini_Voyager_mosaic_global_783m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Iapetus_Cassini_Voyager_mosaic_global_783m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif",
+          "path": "usgs/Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Triton_Voyager2_ClrMosaic_GlobalFill_600m.lbl",
+          "path": "usgs/Triton_Voyager2_ClrMosaic_GlobalFill_600m.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Triton_Voyager2_ClrMosaic_GlobalFill_600m.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Triton_Voyager2_ClrMosaic_GlobalFill_600m_pds3.lbl",
+          "path": "usgs/Triton_Voyager2_ClrMosaic_GlobalFill_600m_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Triton_Voyager2_ClrMosaic_GlobalFill_600m_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+          "path": "usgs/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl",
+          "path": "usgs/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl",
+          "path": "usgs/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+          "path": "usgs/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+          "publisher_checksums": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif.md5",
+          "optional": true
+        },
+        {
+          "name": "Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl",
+          "path": "usgs/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl",
+          "path": "usgs/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl",
+          "publisher_checksums": null,
+          "optional": true
+        },
+        {
+          "name": "Cassini_DLR_Mimas.zip",
+          "path": "usgs/Cassini_DLR_Mimas.zip",
+          "url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mimas/Cassini_DLR_Mimas.zip",
+          "publisher_checksums": null,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "S-NASA-SVS-MOON",
+      "title": "NASA Scientific Visualization Studio, CGI Moon Kit (visual asset)",
+      "provider": "NASA Goddard Space Flight Center, Scientific Visualization Studio (Ernie Wright, Noah Petro), from the LRO LROC WAC Hapke normalized color mosaic",
+      "tier": 1,
+      "url": "https://svs.gsfc.nasa.gov/4720",
+      "citation": "NASA's Scientific Visualization Studio, CGI Moon Kit (ID 4720), 2025 color map lroc_color_16bit_srgb_4k.tif (page last updated 2026-01-09).",
+      "license": "SVS help page (https://svs.gsfc.nasa.gov/help/, read 2026-10-23): 'All of our content is in the public domain (unless otherwise noted)'. The page asks for credit to 'NASA's Scientific Visualization Studio'. NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA content 'generally [is] not subject to copyright in the United States'; 'NASA should be acknowledged as the source of the material'; use must not imply NASA's endorsement.",
+      "files": [
+        {
+          "name": "lroc_color_16bit_srgb_4k.tif",
+          "path": "nasa/lroc_color_16bit_srgb_4k.tif",
+          "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_16bit_srgb_4k.tif",
+          "publisher_checksums": null,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "S-NASA-EO-BMNG",
+      "title": "NASA Earth Observatory, Blue Marble: Next Generation with topography and bathymetry (visual asset)",
+      "provider": "NASA Earth Observatory (NASA Goddard Space Flight Center), produced by Reto Stöckli, from MODIS",
+      "tier": 1,
+      "url": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/",
+      "citation": "Blue Marble: Next Generation, produced by Reto Stöckli, NASA Earth Observatory (NASA Goddard Space Flight Center); acknowledgments in 'The Blue Marble Next Generation, A true color Earth dataset including seasonal dynamics from MODIS' (linked from the page). Monthly composite of August 2004, 5400 x 2700 GeoTIFF.",
+      "license": "The Blue Marble: Next Generation page (read 2026-10-23): 'Anyone using or republishing Blue Marble: Next Generation please credit “NASA Earth Observatory.”' NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA content 'generally [is] not subject to copyright in the United States'; 'NASA should be acknowledged as the source of the material'; use must not imply NASA's endorsement.",
+      "files": [
+        {
+          "name": "world.topo.bathy.200408.3x5400x2700_geo.tif",
+          "path": "nasa/world.topo.bathy.200408.3x5400x2700_geo.tif",
+          "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x5400x2700_geo.tif",
+          "publisher_checksums": null,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "id": "S-NASA-PHOTOJOURNAL",
+      "title": "NASA Photojournal: Cassini's Best Maps of Jupiter (Cylindrical Map), PIA07782 (visual asset)",
+      "provider": "NASA/JPL/Space Science Institute (Cassini Imaging Science Subsystem, narrow-angle camera)",
+      "tier": 1,
+      "url": "https://science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/",
+      "citation": "NASA/JPL/Space Science Institute, PIA07782, Cassini's Best Maps of Jupiter (Cylindrical Map), images of 2000-12-11 and 12, added 2006-03-27.",
+      "license": "NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA content 'generally [is] not subject to copyright in the United States'; 'NASA should be acknowledged as the source of the material'; use must not imply NASA's endorsement. Credit on the page: 'NASA/JPL/Space Science Institute'.",
+      "files": [
+        {
+          "name": "PIA07782.tif",
+          "path": "nasa/PIA07782.tif",
+          "url": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia07/pia07782/PIA07782.tif",
+          "publisher_checksums": null,
+          "optional": true
+        }
+      ]
     }
   ]
 }

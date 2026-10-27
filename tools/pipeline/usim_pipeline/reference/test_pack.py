@@ -4,8 +4,10 @@ pipeline's pack writer, and test_pack_expected.hpp, its expected contents for th
 All values are made up for the test and are not physical data. The content exercises every section and the
 optional parts of each record: uncertainties, derived values, nutation terms with quadratic phase angles,
 SPK types 2 and 3, coverage that ends inside the last record, a body placed at its primary (format 1.1), a
-non-ASCII name, and (format 1.2) stars with and without color and proper motion, and rings with and without
-optical depth, including a gap.
+non-ASCII name, (format 1.2) stars with and without color and proper motion, and rings with and without
+optical depth, including a gap, and (format 1.3) binary PCK orientation models with overlapping segments, a
+coverage ending inside the last record, segments relative to the ICRF and to ECLIPJ2000, and one model without
+an offset and one with an offset in degrees.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import numpy
 from ..catalog import MEAN_RADIUS_DERIVATION, volumetric_mean_radius
 from ..pack.binary import canonical, read_pack, write_pack
 from ..pack.model import (
+    AngleUnit,
     BodyKind,
     Field,
     Frame,
@@ -26,6 +29,8 @@ from ..pack.model import (
     PackContent,
     PackApproximation,
     PackFile,
+    PackOrientation,
+    PackOrientationSegment,
     PackQuantity,
     PackRing,
     PackRotation,
@@ -125,6 +130,27 @@ def synthetic_content() -> PackContent:
             PackRing(naif(1001), "Test Ring", False, 10.0, 20.0, "S-TEST-B", "synthetic-b.txt RING2",
                      (0.25, 0.5), "S-TEST-A", "synthetic-a.bin DEPTH2"),
             PackRing(naif(1001), "Test Gap", True, 12.0, 13.0, "S-TEST-B", "synthetic-b.txt GAP"),
+        ],
+        orientations=[
+            PackOrientation(
+                naif(1001), "TEST_PLANET_PCK", "TEST_PLANET_PCK", (0.0, 0.0, 0.0), (1, 2, 3), AngleUnit.RADIANS, None, "",
+                (
+                    PackOrientationSegment(-172800.0, 0.0, -172800.0, 86400.0, _records(2, 11, -172800.0, 86400.0, 0.125),
+                                           "S-TEST-A", "synthetic-a.bin pck segment 0"),
+                    PackOrientationSegment(-86400.0, 86400.0, -86400.0, 86400.0, _records(2, 11, -86400.0, 86400.0, -0.375),
+                                           "S-TEST-A", "synthetic-a.bin pck segment 1", Frame.ECLIPJ2000),
+                    PackOrientationSegment(86400.0, 129600.0, 86400.0, 86400.0, _records(1, 11, 86400.0, 86400.0, 0.625),
+                                           "S-TEST-A", "synthetic-a.bin pck segment 2"),
+                ),
+            ),
+            PackOrientation(
+                naif(1002), "TEST_MOON_FIXED", "TEST_MOON_PCK", (1.5, 0.0, -2.25), (1, 3, 2), AngleUnit.DEGREES,
+                "S-TEST-B", "synthetic-b.txt TKFRAME_2",
+                (
+                    PackOrientationSegment(0.0, 50000.0, 0.0, 43200.0, _records(2, 8, 0.0, 43200.0, 0.75),
+                                           "S-TEST-B", "synthetic-b.txt pck segment 0"),
+                ),
+            ),
         ],
     )  # fmt: skip
 
@@ -408,6 +434,58 @@ def expected_header(content: PackContent, data: bytes) -> str:
             f"{_cpp_string(r.optical_depth_locator)}}},"
             for r in content.rings
         ),
+        "};",
+        "",
+        "struct OrientationSegmentRow {",
+        "    double start_tdb_s;",
+        "    double end_tdb_s;",
+        "    double init_tdb_s;",
+        "    double interval_s;",
+        "    std::uint32_t record_size;",
+        "    std::uint32_t record_count;",
+        "    std::span<const double> records;",
+        "    const char* source_id;",
+        "    const char* locator;",
+        "    std::int32_t base_frame;",
+        "};",
+    ]
+    orientation_rows = []
+    for i, o in enumerate(content.orientations):
+        segment_rows = []
+        for j, s in enumerate(o.segments):
+            declaration, span = _array(f"k_orientation{i}_segment{j}_records", s.records.reshape(-1))
+            out.append(declaration or "")
+            segment_rows.append(
+                f"    {{{cpp_double(s.start_s)}, {cpp_double(s.end_s)}, {cpp_double(s.init_s)}, {cpp_double(s.interval_s)}, "
+                f"{s.record_size}, {s.record_count}, {span}, {_cpp_string(s.source_id)}, {_cpp_string(s.locator)}, "
+                f"{int(s.base_frame)}}},"
+            )
+        out += [f"inline constexpr OrientationSegmentRow k_orientation{i}_segments[] = {{", *segment_rows, "};"]
+        orientation_rows.append(
+            f"    {{{o.body[1]}, {_cpp_string(o.frame_name)}, {_cpp_string(o.pck_frame_name)}, "
+            f"{', '.join(cpp_double(a) for a in o.offset_angles)}, {', '.join(str(a) for a in o.offset_axes)}, "
+            f"{int(o.offset_unit)}, {_cpp_string(o.offset_source_id or '')}, {_cpp_string(o.offset_locator)}, "
+            f"std::span<const OrientationSegmentRow>{{k_orientation{i}_segments}}}},"
+        )
+    out += [
+        "",
+        "struct OrientationRow {",
+        "    std::int64_t naif_id;",
+        "    const char* frame_name;",
+        "    const char* pck_frame_name;",
+        "    double offset_angle1;",
+        "    double offset_angle2;",
+        "    double offset_angle3;",
+        "    std::int32_t offset_axis1;",
+        "    std::int32_t offset_axis2;",
+        "    std::int32_t offset_axis3;",
+        "    std::uint32_t offset_unit;",
+        "    const char* offset_source_id; // empty without an offset",
+        "    const char* offset_locator;   // empty without an offset",
+        "    std::span<const OrientationSegmentRow> segments;",
+        "};",
+        "inline constexpr OrientationRow k_orientations[] = {",
+        *orientation_rows,
         "};",
         "",
         "} // namespace usim::test::pack",

@@ -2,7 +2,9 @@
 
 - P2-08: building twice from the same lock file gives identical bytes, and the committed default pack is
   what the current pipeline builds.
-- P2-03: the pack's ephemeris records equal the raw bytes of the SPK file (read without SpiceyPy).
+- P2-03: the pack's ephemeris records equal the raw bytes of the SPK file (read without SpiceyPy), and its
+  lunar orientation records those of the binary PCK (P6-05); so do the moons pack's Earth orientation records
+  (P6-06, read for its window without building that pack).
 - P2-09 / P2-10: the committed fixtures are what the current generators produce.
 """
 
@@ -13,11 +15,13 @@ from pathlib import Path
 import pytest
 
 from usim_pipeline.build import build, load_pack_definitions
-from usim_pipeline.kernels import read_spk_segments
+from usim_pipeline.kernels import TextKernel, read_pck_segments, read_spk_segments
+from usim_pipeline.orientation import read_orientation
 from usim_pipeline.pack.binary import read_pack
+from usim_pipeline.pack.model import Frame, PackOrientationSegment
 from usim_pipeline.reference import test_pack, unit_fixtures
 
-from .conftest import REAL_REPO, needs_kernels
+from .conftest import REAL_REPO, needs_earth_pck, needs_kernels
 
 
 def quiet(_: str) -> None:
@@ -59,6 +63,55 @@ def test_ephemeris_records_equal_the_raw_spk_bytes(built):
         start = (source.first_address - 1) * 8
         expected = raw[start : start + source.record_count * source.record_size * 8]
         assert segment.records.astype("<f8").tobytes() == expected
+
+
+@needs_kernels
+def test_orientation_records_equal_the_raw_pck_bytes(built):
+    _, content = read_pack(built[0].read_bytes())
+    assert [o.body for o in content.orientations] == [(1, 301)]
+    model = content.orientations[0]
+    frame_kernel = TextKernel(REAL_REPO.raw / "naif" / "moon_de440_250416.tf")
+    pck_frame = int((frame_kernel.text(f"FRAME_{model.pck_frame_name}") or ["0"])[0])
+    class_id = int((frame_kernel.text(f"FRAME_{pck_frame}_CLASS_ID") or ["0"])[0])
+    _assert_raw_records(model.segments, REAL_REPO.raw / "naif" / "moon_pa_de440_200625.bpc", class_id)
+    # The orientation covers the ephemeris span, and no more than one record beyond it at each end.
+    start = min(s.start_s for s in content.segments)
+    end = max(s.end_s for s in content.segments)
+    assert model.segments[0].start_s <= start and model.segments[-1].end_s >= end
+    assert model.segments[0].init_s > start - model.segments[0].interval_s
+
+
+def _assert_raw_records(segments: tuple[PackOrientationSegment, ...], pck: Path, class_id: int) -> None:
+    """The segments' records are the bytes of the binary PCK's segments named in their locators."""
+    raw = pck.read_bytes()
+    assert raw[88:96] == b"LTL-IEEE"
+    by_index = {s.index: s for s in read_pck_segments(pck, class_id)}
+    for segment in segments:
+        index = int(segment.locator.split(" segment ")[1].split(" ")[0])
+        source = by_index[index]
+        # The pack keeps the records overlapping its span: a contiguous run starting at some record.
+        first = round((segment.init_s - source.init_s) / source.interval_s)
+        start = (source.first_address - 1 + first * source.record_size) * 8
+        expected = raw[start : start + segment.record_count * segment.record_size * 8]
+        assert segment.records.astype("<f8").tobytes() == expected
+
+
+@needs_earth_pck
+def test_the_moons_pack_earth_orientation_records_equal_the_raw_pck_bytes():
+    moons = next(d for d in load_pack_definitions(REAL_REPO.catalog / "packs.json") if d.name == "solar-system-moons")
+    definition = next(o for o in moons.orientation if o.body == 399)
+    assert moons.window is not None and definition.frame_kernel_file is None
+    pck = REAL_REPO.raw / "naif" / definition.pck_file
+    model = read_orientation(definition, pck, None, moons.window, quiet)
+    assert (model.frame_name, model.pck_frame_name, model.offset_source_id) == ("ITRF93", "ITRF93", None)
+    assert {s.base_frame for s in model.segments} == {Frame.ECLIPJ2000}
+    _assert_raw_records(model.segments, pck, 3000)
+    # Contiguous segments covering the window, with no more than one record beyond it at each end.
+    assert all(a.end_s == b.start_s for a, b in zip(model.segments, model.segments[1:]))
+    first, last = model.segments[0], model.segments[-1]
+    assert first.start_s <= moons.window[0] and last.end_s >= moons.window[1]
+    assert first.init_s > moons.window[0] - first.interval_s
+    assert last.init_s + (last.record_count - 1) * last.interval_s < moons.window[1]
 
 
 @needs_kernels

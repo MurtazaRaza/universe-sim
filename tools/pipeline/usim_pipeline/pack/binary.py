@@ -14,6 +14,7 @@ import numpy
 
 from .. import PipelineError
 from .model import (
+    AngleUnit,
     BodyKind,
     PackApproximation,
     Field,
@@ -21,6 +22,8 @@ from .model import (
     PackBody,
     PackContent,
     PackFile,
+    PackOrientation,
+    PackOrientationSegment,
     PackQuantity,
     PackRotation,
     PackRing,
@@ -35,7 +38,7 @@ from .model import (
 
 MAGIC = b"USIMPACK"
 FORMAT_MAJOR = 1
-FORMAT_MINOR = 2
+FORMAT_MINOR = 3
 ENDIAN_MARKER = 0x01020304
 SECTION_VERSION = 1
 ALIGNMENT = 8
@@ -57,13 +60,17 @@ APPROXIMATION = struct.Struct("<iiqqII")  # 32
 STAR_HEADER = struct.Struct("<IIdIIII")  # 32
 STAR = struct.Struct("<iIqddddddII")  # 72
 RING = struct.Struct("<IIddddIIIIIIII")  # 72
+ORIENTATION = struct.Struct("<IIIIIIIIdddIIIIII")  # 80
+ORIENTATION_SEGMENT = struct.Struct("<IiiIddddQIIII")  # 72
 
 # Sections in the order they are written. The format 1.0 sections are required; APPX (1.1) is optional and
-# always written; STAR and RING (1.2) are optional and written only when the pack has stars or rings.
+# always written; STAR and RING (1.2) and ORNT (1.3) are optional and written only when the pack has stars,
+# rings or orientation models.
 SECTION_ORDER = (
-    b"META", b"SRCS", b"FILE", b"BODY", b"QNTY", b"ROTN", b"TIME", b"EPHS", b"APPX", b"STAR", b"RING", b"STRS", b"EPHD",
+    b"META", b"SRCS", b"FILE", b"BODY", b"QNTY", b"ROTN", b"TIME", b"EPHS", b"APPX", b"STAR", b"RING", b"ORNT",
+    b"STRS", b"EPHD",
 )  # fmt: skip
-OPTIONAL_SECTIONS = (b"APPX", b"STAR", b"RING")
+OPTIONAL_SECTIONS = (b"APPX", b"STAR", b"RING", b"ORNT")
 REQUIRED_SECTIONS = tuple(s for s in SECTION_ORDER if s not in OPTIONAL_SECTIONS)
 
 QUANTITY_HAS_UNCERTAINTY = 1
@@ -76,6 +83,7 @@ RING_HAS_OPTICAL_DEPTH = 2
 assert HEADER.size == 128 and SECTION.size == 32 and SOURCE.size == 56 and FILE.size == 88
 assert BODY.size == 40 and QUANTITY.size == 56 and ROTATION.size == 88 and TIME.size == 56 and SEGMENT.size == 96
 assert APPROXIMATION.size == 32 and STAR_HEADER.size == 32 and STAR.size == 72 and RING.size == 72
+assert ORIENTATION.size == 80 and ORIENTATION_SEGMENT.size == 72
 
 
 class _Strings:
@@ -114,9 +122,10 @@ def canonical(content: PackContent) -> PackContent:
     if catalog is not None:
         catalog = dataclasses.replace(catalog, stars=tuple(sorted(catalog.stars, key=lambda s: s.id)))
     rings = sorted(content.rings, key=lambda r: (body_index[r.body], r.inner_km))
+    orientations = sorted(content.orientations, key=lambda o: body_index[o.body])
     return dataclasses.replace(
         content, quantities=quantities, approximations=approximations, metadata=dict(sorted(content.metadata.items())),
-        star_catalog=catalog, rings=rings,
+        star_catalog=catalog, rings=rings, orientations=orientations,
     )  # fmt: skip
 
 
@@ -241,6 +250,29 @@ def write_pack(content: PackContent) -> bytes:
                 depth_source, *strings.ref(r.name), *strings.ref(r.radii_locator), *strings.ref(r.optical_depth_locator),
             )  # fmt: skip
         sections[b"RING"] = bytes(ring_data)
+
+    if content.orientations:
+        orientations = sorted(content.orientations, key=lambda o: body_index[o.body])
+        models = bytearray()
+        segment_records = bytearray()
+        segment_index = 0
+        for o in orientations:
+            models += ORIENTATION.pack(
+                body_index[o.body], segment_index, len(o.segments),
+                source_index[o.offset_source_id] if o.offset_source_id is not None else 0,
+                *strings.ref(o.frame_name), *strings.ref(o.pck_frame_name), *o.offset_angles, *o.offset_axes,
+                int(o.offset_unit), *strings.ref(o.offset_locator),
+            )  # fmt: skip
+            for s in o.segments:
+                segment_records += ORIENTATION_SEGMENT.pack(
+                    source_index[s.source_id], int(s.base_frame), s.data_type, s.record_size, s.start_s, s.end_s,
+                    s.init_s, s.interval_s, first, s.record_count, 0, *strings.ref(s.locator),
+                )  # fmt: skip
+                data_parts.append(numpy.ascontiguousarray(s.records, dtype="<f8").tobytes())
+                first += s.records.size
+                segment_index += 1
+        sections[b"ORNT"] = COUNTS.pack(len(orientations), segment_index) + bytes(models) + bytes(segment_records)
+        sections[b"EPHD"] = b"".join(data_parts)
     sections[b"STRS"] = strings.data()
 
     written = [s for s in SECTION_ORDER if s in sections]
@@ -501,10 +533,54 @@ def read_pack(data: bytes) -> tuple[PackHeader, PackContent]:
                 )
             )  # fmt: skip
 
+    orientations = []
+    if "ORNT" in header.sections:
+        ornt = view("ORNT")
+        count, segment_count = ornt.unpack(COUNTS, 0)
+        segment_rows = ornt.records(ORIENTATION_SEGMENT, COUNTS.size + count * ORIENTATION.size, segment_count)
+        expected_first = 0
+        previous_body = -1
+        for r in ornt.records(ORIENTATION, COUNTS.size, count):
+            first_segment, n = r[1], r[2]
+            if r[0] <= previous_body:
+                raise PipelineError("pack: orientation models are not sorted by body")
+            previous_body = r[0]
+            if first_segment != expected_first or n == 0 or first_segment + n > segment_count:
+                raise PipelineError("pack: orientation segments out of range or not in model order")
+            expected_first += n
+            try:
+                unit = AngleUnit(r[14])
+            except ValueError:
+                raise PipelineError(f"pack: unknown angle unit {r[14]}") from None
+            if not r[16] and r[3] != 0:
+                raise PipelineError("pack: an orientation model without an offset has offset source index 0")
+            segments_of_model = []
+            for g in segment_rows[first_segment : first_segment + n]:
+                size, records_n, first = g[3], g[9], g[8]
+                if size == 0 or first + size * records_n > coefficients.size:
+                    raise PipelineError("pack: orientation records out of range")
+                records = coefficients[first : first + size * records_n].astype(numpy.float64).reshape(records_n, size)
+                segments_of_model.append(
+                    PackOrientationSegment(
+                        start_s=g[4], end_s=g[5], init_s=g[6], interval_s=g[7], records=records,
+                        source_id=source_id(g[0]), locator=text(g[11], g[12]), base_frame=_frame(g[1]), data_type=g[2],
+                    )
+                )  # fmt: skip
+            orientations.append(
+                PackOrientation(
+                    body=body_ref(r[0]), frame_name=text(r[4], r[5]), pck_frame_name=text(r[6], r[7]),
+                    offset_angles=(r[8], r[9], r[10]), offset_axes=(r[11], r[12], r[13]), offset_unit=unit,
+                    offset_source_id=source_id(r[3]) if r[16] else None, offset_locator=text(r[15], r[16]),
+                    segments=tuple(segments_of_model),
+                )
+            )  # fmt: skip
+        if expected_first != segment_count:
+            raise PipelineError("pack: orientation segments not referenced by a model")
+
     content = PackContent(
         metadata=metadata, lock_sha256=header.lock_sha256, sources=sources, files=files, bodies=bodies,
         quantities=quantities, rotations=rotations, time=time, segments=segments, approximations=approximations,
-        star_catalog=star_catalog, rings=rings,
+        star_catalog=star_catalog, rings=rings, orientations=orientations,
     )  # fmt: skip
     check_content(content)
     for q in quantities:

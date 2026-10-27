@@ -40,10 +40,11 @@ def describe(path: Path, log: Callable[[str], None] = print) -> PackContent:
     for q in content.quantities:
         by_body.setdefault(q.body, []).append(q)
     rotations = {r.body for r in content.rotations}
+    oriented = {o.body for o in content.orientations}
     log(f"\nbodies ({len(content.bodies)})")
     for b in content.bodies:
         primary = f", primary {names.get(b.primary, _id(b.primary))}" if b.primary else ""
-        rotation = ", IAU rotation model" if b.id in rotations else ""
+        rotation = ", binary PCK orientation" if b.id in oriented else ", IAU rotation model" if b.id in rotations else ""
         log(f"  {_id(b.id):<10} {b.name} ({b.kind.name.lower()}{primary}{rotation})")
         for q in sorted(by_body.get(b.id, []), key=lambda q: q.field):
             derived = " (derived)" if q.derivation else ""
@@ -94,4 +95,21 @@ def describe(path: Path, log: Callable[[str], None] = print) -> PackContent:
             depth = f", optical depth {r.optical_depth[0]!r} to {r.optical_depth[1]!r} [{r.optical_depth_source_id}]" if r.optical_depth else ""
             kind = "gap" if r.gap else "ring"
             log(f"  {names.get(r.body, _id(r.body))} {r.name} ({kind}): {r.inner_km!r} to {r.outer_km!r} km [{r.radii_source_id}]{depth}")
+    if content.orientations:
+        log(f"\nbinary PCK orientation models ({len(content.orientations)}), replacing the IAU model of their body")
+        for o in content.orientations:
+            angles = ", ".join(repr(a) for a in o.offset_angles)
+            offset = (
+                f"offset ({angles}) {o.offset_unit.name.lower()} about axes {o.offset_axes} from {o.pck_frame_name} "
+                f"[{o.offset_source_id}: {o.offset_locator}]"
+                if o.offset_source_id is not None
+                else "the binary PCK frame itself (no offset)"
+            )
+            log(f"  {names.get(o.body, _id(o.body))}: {o.frame_name}, {offset}")
+            for s in o.segments:
+                log(
+                    f"      {s.locator}: relative to {s.base_frame.name}, degree {(s.record_size - 2) // 3 - 1}, {s.record_count} records of "
+                    f"{s.interval_s / 86400:g} d, {format_tdb(s.start_s)} to {format_tdb(s.end_s)}, "
+                    f"{s.records.size * 8} bytes [{s.source_id}]"
+                )
     return content

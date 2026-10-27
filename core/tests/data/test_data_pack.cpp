@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cstring>
 #include <filesystem>
@@ -310,6 +311,45 @@ TEST_CASE("Data pack rings round-trip (format 1.2)", "[data][pack]") {
     }
 }
 
+TEST_CASE("Data pack binary PCK orientation models round-trip bit for bit (format 1.3)", "[data][pack]") {
+    const auto models = pack().pck_orientations();
+    REQUIRE(models.size() == std::size(expected::k_orientations));
+    for (std::size_t i = 0; i < models.size(); ++i) {
+        const auto& m = models[i];
+        const auto& e = expected::k_orientations[i];
+        INFO("model " << i);
+        CHECK(m.body == BodyId::naif(e.naif_id));
+        CHECK(m.frame_name == e.frame_name);
+        CHECK(m.pck_frame_name == e.pck_frame_name);
+        CHECK(m.offset_angles == std::array{e.offset_angle1, e.offset_angle2, e.offset_angle3});
+        CHECK(m.offset_axes == std::array{e.offset_axis1, e.offset_axis2, e.offset_axis3});
+        CHECK(static_cast<std::uint32_t>(m.offset_unit) == e.offset_unit);
+        REQUIRE(m.offset_source.has_value() == (std::string_view(e.offset_locator) != ""));
+        if (m.offset_source) {
+            CHECK(m.offset_source->source_id == e.offset_source_id);
+            CHECK(m.offset_source->locator == e.offset_locator);
+        }
+        REQUIRE(m.segments.size() == e.segments.size());
+        for (std::size_t j = 0; j < m.segments.size(); ++j) {
+            const auto& s = m.segments[j];
+            const auto& es = e.segments[j];
+            INFO("segment " << j);
+            CHECK(s.start_tdb_s == es.start_tdb_s);
+            CHECK(s.end_tdb_s == es.end_tdb_s);
+            CHECK(s.init_tdb_s == es.init_tdb_s);
+            CHECK(s.interval_s == es.interval_s);
+            CHECK(s.record_size == es.record_size);
+            CHECK(s.record_count == es.record_count);
+            CHECK(same_doubles(s.records, es.records));
+            CHECK(s.source.source_id == es.source_id);
+            CHECK(s.source.locator == es.locator);
+            CHECK(static_cast<std::int32_t>(s.base_frame) == es.base_frame);
+        }
+        CHECK(pack().find_pck_orientation(m.body) == &m);
+    }
+    CHECK(pack().find_pck_orientation(BodyId::naif(1000)) == nullptr);
+}
+
 TEST_CASE("Parsing from memory gives the same pack as loading the file", "[data][pack]") {
     const auto bytes = fixture_bytes();
     REQUIRE(bytes.size() == expected::k_file_size);
@@ -390,6 +430,85 @@ TEST_CASE("The reader rejects damaged and incompatible packs", "[data][pack]") {
         REQUIRE(result.has_value());
         CHECK(result.value().star_catalog().stars.empty());
         CHECK(result.value().rings().empty());
+    }
+    SECTION("a pack without ORNT (format 1.2) has no binary PCK orientation models") {
+        auto bytes = good;
+        std::memcpy(bytes.data() + section_entry(bytes, "ORNT"), "ZZZ3", 4); // unknown sections are skipped
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE(result.has_value());
+        CHECK(result.value().pck_orientations().empty());
+    }
+    SECTION("an orientation model needs a known offset unit") {
+        auto bytes = good;
+        std::uint64_t ornt = 0;
+        std::memcpy(&ornt, bytes.data() + section_entry(bytes, "ORNT") + 8, 8);
+        const std::uint32_t unit = 7;
+        std::memcpy(bytes.data() + ornt + 8 + 68, &unit, 4); // model 0
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().code == ErrorCode::data_format);
+    }
+    SECTION("an orientation model without an offset has offset source index 0") {
+        auto bytes = good;
+        std::uint64_t ornt = 0;
+        std::memcpy(&ornt, bytes.data() + section_entry(bytes, "ORNT") + 8, 8);
+        const std::uint32_t source = 1; // model 0 has no offset
+        std::memcpy(bytes.data() + ornt + 8 + 12, &source, 4);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message.find("offset source index 0") != std::string::npos);
+    }
+    SECTION("an orientation model without an offset has zero offset angles") {
+        auto bytes = good;
+        std::uint64_t ornt = 0;
+        std::memcpy(&ornt, bytes.data() + section_entry(bytes, "ORNT") + 8, 8);
+        const double angle = 0.5;
+        std::memcpy(bytes.data() + ornt + 8 + 40, &angle, 8); // model 0, angle 2
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message.find("without an offset") != std::string::npos);
+    }
+    SECTION("orientation segments are relative to the ICRF or ECLIPJ2000") {
+        auto bytes = good;
+        std::uint64_t ornt = 0;
+        std::memcpy(&ornt, bytes.data() + section_entry(bytes, "ORNT") + 8, 8);
+        const std::int32_t frame = static_cast<std::int32_t>(usim::frames::FrameKind::body_fixed);
+        std::memcpy(bytes.data() + ornt + 8 + 2 * 80 + 4, &frame, 4); // segment 0
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().code == ErrorCode::data_format);
+    }
+    SECTION("orientation segments must belong to their models in order") {
+        auto bytes = good;
+        std::uint64_t ornt = 0;
+        std::memcpy(&ornt, bytes.data() + section_entry(bytes, "ORNT") + 8, 8);
+        const std::uint32_t count = 1; // model 0 claims one of its two segments; the next model starts at 2
+        std::memcpy(bytes.data() + ornt + 8 + 8, &count, 4);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().code == ErrorCode::data_format);
+    }
+    SECTION("an orientation record must span its interval") {
+        auto bytes = good;
+        std::uint64_t ornt = 0;
+        std::memcpy(&ornt, bytes.data() + section_entry(bytes, "ORNT") + 8, 8);
+        // The first value of model 0's first segment in EPHD is its first record's MID.
+        std::uint64_t first = 0;
+        std::memcpy(&first, bytes.data() + ornt + 8 + 2 * 80 + 48, 8);
+        std::uint64_t ephd = 0;
+        std::memcpy(&ephd, bytes.data() + section_entry(bytes, "EPHD") + 8, 8);
+        const double mid = 1.0e9;
+        std::memcpy(bytes.data() + ephd + first * 8, &mid, 8);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message.find("does not span its interval") != std::string::npos);
     }
     SECTION("a ring needs inner < outer") {
         auto bytes = good;

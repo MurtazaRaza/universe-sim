@@ -10,8 +10,8 @@
 namespace usim::test::pack {
 
 inline constexpr const char* k_file_name = "test_pack_v1.uspack";
-inline constexpr std::uint64_t k_file_size = 4416;
-inline constexpr const char* k_content_sha256 = "db5a1099e88c90ee561b2136d78b9bac0eebcacc1d4ac684b1264543d6f50078";
+inline constexpr std::uint64_t k_file_size = 5656;
+inline constexpr const char* k_content_sha256 = "7a86af4fa03cc8d205e6979a0b774e6bb7031c2fde1403635b39144bbdf4c8ad";
 inline constexpr const char* k_lock_sha256 = "d916b278e664651247fc46d544faa2998e0c91344b3a397ac5f2ec811d467c78";
 
 struct MetaRow {
@@ -232,6 +232,51 @@ inline constexpr RingRow k_rings[] = {
     {1000, "Star Ring", false, 5.0, 6.0, "S-TEST-A", "synthetic-a.bin RING1", false, 0.0, 0.0, "", ""},
     {1001, "Test Ring", false, 10.0, 20.0, "S-TEST-B", "synthetic-b.txt RING2", true, 0.25, 0.5, "S-TEST-A", "synthetic-a.bin DEPTH2"},
     {1001, "Test Gap", true, 12.0, 13.0, "S-TEST-B", "synthetic-b.txt GAP", false, 0.0, 0.0, "", ""},
+};
+
+struct OrientationSegmentRow {
+    double start_tdb_s;
+    double end_tdb_s;
+    double init_tdb_s;
+    double interval_s;
+    std::uint32_t record_size;
+    std::uint32_t record_count;
+    std::span<const double> records;
+    const char* source_id;
+    const char* locator;
+    std::int32_t base_frame;
+};
+inline constexpr double k_orientation0_segment0_records[] = {-129600.0, 43200.0, 0.125, 0.375, 0.625, 0.875, 1.125, 1.375, 1.625, 1.875, 2.125, -43200.0, 43200.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25};
+inline constexpr double k_orientation0_segment1_records[] = {-43200.0, 43200.0, -0.375, -0.125, 0.125, 0.375, 0.625, 0.875, 1.125, 1.375, 1.625, 43200.0, 43200.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25};
+inline constexpr double k_orientation0_segment2_records[] = {129600.0, 43200.0, 0.625, 0.875, 1.125, 1.375, 1.625, 1.875, 2.125, 2.375, 2.625};
+inline constexpr OrientationSegmentRow k_orientation0_segments[] = {
+    {-172800.0, 0.0, -172800.0, 86400.0, 11, 2, std::span<const double>{k_orientation0_segment0_records}, "S-TEST-A", "synthetic-a.bin pck segment 0", 0},
+    {-86400.0, 86400.0, -86400.0, 86400.0, 11, 2, std::span<const double>{k_orientation0_segment1_records}, "S-TEST-A", "synthetic-a.bin pck segment 1", 1},
+    {86400.0, 129600.0, 86400.0, 86400.0, 11, 1, std::span<const double>{k_orientation0_segment2_records}, "S-TEST-A", "synthetic-a.bin pck segment 2", 0},
+};
+inline constexpr double k_orientation1_segment0_records[] = {21600.0, 21600.0, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 64800.0, 21600.0, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75};
+inline constexpr OrientationSegmentRow k_orientation1_segments[] = {
+    {0.0, 50000.0, 0.0, 43200.0, 8, 2, std::span<const double>{k_orientation1_segment0_records}, "S-TEST-B", "synthetic-b.txt pck segment 0", 0},
+};
+
+struct OrientationRow {
+    std::int64_t naif_id;
+    const char* frame_name;
+    const char* pck_frame_name;
+    double offset_angle1;
+    double offset_angle2;
+    double offset_angle3;
+    std::int32_t offset_axis1;
+    std::int32_t offset_axis2;
+    std::int32_t offset_axis3;
+    std::uint32_t offset_unit;
+    const char* offset_source_id; // empty without an offset
+    const char* offset_locator;   // empty without an offset
+    std::span<const OrientationSegmentRow> segments;
+};
+inline constexpr OrientationRow k_orientations[] = {
+    {1001, "TEST_PLANET_PCK", "TEST_PLANET_PCK", 0.0, 0.0, 0.0, 1, 2, 3, 0, "", "", std::span<const OrientationSegmentRow>{k_orientation0_segments}},
+    {1002, "TEST_MOON_FIXED", "TEST_MOON_PCK", 1.5, 0.0, -2.25, 1, 3, 2, 1, "S-TEST-B", "synthetic-b.txt TKFRAME_2", std::span<const OrientationSegmentRow>{k_orientation1_segments}},
 };
 
 } // namespace usim::test::pack

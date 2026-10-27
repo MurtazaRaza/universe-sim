@@ -1,6 +1,7 @@
 """data/reference/ validation vectors from CSPICE on the pinned kernels (VAL-01, VAL-03, VAL-04), and the
 kernel values the default pack must reproduce exactly (Phase 2 acceptance). When the satellite kernels of
-the optional moons pack are present, also VAL-01 and VAL-04 vectors for that pack (P6-01, P6-03).
+the optional moons pack are present, also VAL-01 and VAL-04 vectors for that pack (P6-01, P6-03). VAL-04
+uses a body's binary PCK frame where the pack has one (P6-05).
 
 Epochs are deterministic (seeded random.Random, whose random() sequence Python guarantees), so regenerating
 with the same kernels and tools gives identical files.
@@ -20,6 +21,7 @@ from ..build import PackDefinition, load_pack_definitions
 from ..catalog import load_selection, system_barycenter
 from ..fetch import locked_file
 from ..kernels import KernelReader, check_environment, kernel_pool, parse_at_date, read_spk_segments
+from ..orientation import read_orientation
 from ..repo import Repo
 from ..sources import LockEntry, Source, load_sources
 from .common import exact, kernel_lines, tool_line, write_csv
@@ -42,6 +44,7 @@ RANDOM_EPOCHS_PER_PAIR = 40
 RECORD_BOUNDARY_STEPS = (1, 2, 1000, 17123, 34000, 34249)  # multiples of 32 d, which every record grid contains
 COMMON_GRID_S = 32 * 86400.0
 ORIENTATION_EPOCHS_PER_BODY = 30
+PCK_RECORD_STEPS = (0, 1, 2, 1000)  # record boundaries of a binary PCK model's segments, from their first record
 UTC_RANDOM_EPOCHS = 100
 TDB_RANDOM_EPOCHS = 100
 
@@ -182,18 +185,40 @@ def write_time(directory: Path, lsk_entry: LockEntry, leap_dates: list[tuple[int
     return count
 
 
+def _orientation_models(repo: Repo, definition: PackDefinition, sources: tuple[Source, ...], span: tuple[float, float]):
+    """The pack's binary PCK orientation models (P6-05), their kernel paths and lock entries, and per body the
+    model frame and the record boundaries of its segments within `span`."""
+    models = []
+    for o in definition.orientation:
+        files = [locked_file(repo, sources, source_id, file) for source_id, file in o.files]
+        pck_path, fk_path = files[0][0], files[1][0] if len(files) > 1 else None
+        model = read_orientation(o, pck_path, fk_path, span, lambda _: None)
+        boundaries = [
+            s.init_s + k * s.interval_s for s in model.segments for k in PCK_RECORD_STEPS if k < s.record_count
+        ]
+        in_span = [b for b in boundaries if span[0] <= b <= span[1]]
+        models.append((o.body, o.frame, in_span, [path for path, _ in files], [entry for _, entry in files]))
+    return models
+
+
 def write_orientation(
-    path: Path, bodies: list[int], span: tuple[float, float], entries: list[LockEntry], scope: str = ""
+    path: Path, bodies: list[int], span: tuple[float, float], entries: list[LockEntry], scope: str = "",
+    models: dict[int, tuple[str, list[float]]] | None = None,
 ) -> int:
+    """`models` maps a body with a binary PCK orientation model to its frame and extra epochs (record
+    boundaries); the other bodies use their IAU frame."""
+    models = models or {}
     header = _header(
-        "VAL-04 reference: body orientation from CSPICE pxform and sxform with the same PCK the pack is built from."
-        + scope,
+        "VAL-04 reference: body orientation from CSPICE pxform and sxform with the same kernels the pack is built "
+        "from." + scope,
         entries,
         [
-            "Query: sxform('J2000', frame, et) for the body's IAU frame (cidfrm). R rotates ICRF vectors into the",
-            "body-fixed frame; dR is its time derivative (per TDB second), the lower left block of the 6x6 matrix.",
-            "Matrices are row-major: r01 is row 0, column 1.",
-            f"Epochs: J2000 and {ORIENTATION_EPOCHS_PER_BODY} seeded random epochs per body across the pack coverage.",
+            "Query: sxform('J2000', frame, et) for the body's IAU frame (cidfrm), or for a body with a binary PCK",
+            "orientation model in the pack, that model's frame (the binary PCK and frame kernel loaded). R rotates",
+            "ICRF vectors into the body-fixed frame; dR is its time derivative (per TDB second), the lower left",
+            "block of the 6x6 matrix. Matrices are row-major: r01 is row 0, column 1.",
+            f"Epochs: J2000 and {ORIENTATION_EPOCHS_PER_BODY} seeded random epochs per body across the pack coverage,",
+            f"and for a binary PCK model the boundaries of records {', '.join(map(str, PCK_RECORD_STEPS))} of its segments.",
             "CSPICE reads some PCK values one ulp away from the correctly rounded text the pack holds (ADR-0007);",
             "the effect on orientation is far below the VAL-04 threshold.",
         ],
@@ -202,9 +227,10 @@ def write_orientation(
 
     def rows() -> Iterator[list[str]]:
         for body in bodies:
-            _, frame = sp.cidfrm(body)
+            frame, extra = models.get(body) or (sp.cidfrm(body)[1], [])
             rng = random.Random(10_000 + body)
-            for et in [0.0] + [span[0] + rng.random() * (span[1] - span[0]) for _ in range(ORIENTATION_EPOCHS_PER_BODY)]:
+            epochs = [0.0] + [span[0] + rng.random() * (span[1] - span[0]) for _ in range(ORIENTATION_EPOCHS_PER_BODY)]
+            for et in epochs + extra:
                 m = sp.sxform("J2000", frame, et)
                 rotation = [exact(m[i][j]) for i in range(3) for j in range(3)]
                 rate = [exact(m[3 + i][j]) for i in range(3) for j in range(3)]
@@ -270,13 +296,17 @@ def generate(repo: Repo, log: Callable[[str], None] = print) -> list[Path]:
         written += [out / "val03_utc_to_tdb.csv", out / "val03_tdb_tt_tai.csv"]
         log(f"wrote {written[-2]} and {written[-1]} ({count} rows)")
 
-    with kernel_pool(pck_path, lsk_path):
+    models = _orientation_models(repo, definition, sources, span)  # before the pool: read_orientation clears it
+    with kernel_pool(pck_path, *(p for m in models for p in m[3]), lsk_path):
         with_rotation = []
         pck_reader = KernelReader(pck_path)
         for s in selection:
-            if pck_reader.kernel.text(f"BODY{s.naif_id}_PM") is not None:
+            if pck_reader.kernel.text(f"BODY{s.naif_id}_PM") is not None or any(m[0] == s.naif_id for m in models):
                 with_rotation.append(s.naif_id)
-        count = write_orientation(out / "val04_orientation.csv", with_rotation, span, [pck_entry])
+        count = write_orientation(
+            out / "val04_orientation.csv", with_rotation, span, [pck_entry, *(e for m in models for e in m[4])],
+            models={m[0]: (m[1], m[2]) for m in models},
+        )
         written.append(out / "val04_orientation.csv")
         log(f"wrote {written[-1]} ({count} orientations)")
 
@@ -325,13 +355,18 @@ def _moons_pack_references(
         written.append(path)
         log(f"wrote {path} ({count} states)")
 
-    with kernel_pool(pck_path, lsk_path):
+    models = _orientation_models(repo, definition, sources, span)  # before the pool: read_orientation clears it
+    with kernel_pool(pck_path, *(p for m in models for p in m[3]), lsk_path):
         pck_reader = KernelReader(pck_path)
+        oriented = {m[0] for m in models}
         bodies = [s.naif_id for s in selection
-                  if s.naif_id not in default_bodies and pck_reader.kernel.text(f"BODY{s.naif_id}_PM") is not None]
+                  if s.naif_id in oriented
+                  or (s.naif_id not in default_bodies and pck_reader.kernel.text(f"BODY{s.naif_id}_PM") is not None)]
         path = out / "val04_moons_orientation.csv"
-        count = write_orientation(path, bodies, span, [pck_entry],
-                                  f" Bodies of the optional pack '{MOONS_PACK}' that the default pack does not have.")
+        count = write_orientation(path, bodies, span, [pck_entry, *(e for m in models for e in m[4])],
+                                  f" Bodies of the optional pack '{MOONS_PACK}' that the default pack does not have, "
+                                  "and those with a binary PCK model (over this pack's window).",
+                                  models={m[0]: (m[1], m[2]) for m in models})
         written.append(path)
         log(f"wrote {path} ({count} orientations)")
     return written

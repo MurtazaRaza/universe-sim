@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Downloads the large NAIF kernels that Phase 6 needs into data/raw/naif/, where the data pipeline reads
-# its inputs (the "naif/<file>" paths of data/sources.json). The full set is about 3.4 GB, so run it on a
-# fast connection. `tools/pipeline/usim-pipeline fetch --optional` downloads the same satellite kernels
+# Downloads the large inputs of Phase 6 into data/raw/, where the data pipeline reads them (the paths of
+# data/sources.json): NAIF kernels into data/raw/naif/ and the USGS surface map mosaics into data/raw/usgs/.
+# The full set is about 8 GB, so run it on a fast connection. `tools/pipeline/usim-pipeline fetch --optional` downloads the same satellite kernels
 # without progress or resume; this script is the friendlier way on a slow or unreliable connection. It is
 # safe to stop and run again: finished files are checked and kept, and interrupted downloads resume where
 # they stopped.
@@ -15,27 +15,42 @@
 #   moons          the satellite kernels of the optional moons pack (S-NAIF-SAT, ADR-0010), one per planet
 #                  system, each holding the planet center and its major moons: mar099, jup365, sat441,
 #                  ura184_part-3, nep097, plu060. About 3.4 GB.
-#   orientation    optional binary PCKs: the lunar principal axes (P6-05) and the Earth (P6-06). About 17 MB.
-#                  Not registered yet.
+#   textures       the USGS global mosaics behind the surface maps (P6-07, S-USGS-ASTRO, ADR-0014), 15 files,
+#                  about 4.6 GB (Mercury's alone is 1.9 GB). Each is checked against the MD5 file USGS
+#                  publishes next to it (<file>.md5).
+#   orientation    binary PCKs: the lunar principal axes (P6-05, S-NAIF-MOONPA) and the Earth's combined
+#                  historical and predict orientation (P6-06, S-NAIF-EARTHPCK, moons pack only). The pck
+#                  directory has no checksum list, so `usim-pipeline fetch` (--optional for the Earth) downloads
+#                  them again rather than trusting these copies. About 44 MB.
 # (The Uranus alternative ura111xl-701 to 705 and -799, about 6.7 GB, was dropped on 2026-10-22: ADR-0010
 # chose ura184_part-3.)
 #
-# Checks: satellite kernels must match NAIF's aa_checksums.txt (MD5), downloaded on every run. The pck
+# Checks: satellite kernels must match NAIF's aa_checksums.txt (MD5), downloaded on every run; USGS mosaics
+# their <file>.md5. The pck
 # directory has no checksum list, so those files are checked against the size the server reports. The
 # small text files that document the kernels (aa_summaries.txt, aa_checksums.txt and one .cmt per kernel)
 # go to data/raw/naif/meta/satellites/. Everything under data/raw/ is ignored by git.
 #
-# Afterwards: tools/pipeline/usim-pipeline fetch checks the local copies against the lock file (they are
-# declared in data/sources.json), then build --pack solar-system-moons builds the moons pack.
+# Afterwards: tools/pipeline/usim-pipeline fetch --optional checks the local copies against the lock file
+# (they are declared in data/sources.json), then build --pack solar-system-moons builds the moons pack and
+# textures builds the surface maps (tools/scripts/fetch-texture-sources.sh does the texture steps).
 
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-raw_dir="$repo_root/data/raw/naif"
-meta_dir="$raw_dir/meta/satellites"
+meta_dir="$repo_root/data/raw/naif/meta/satellites"
 sat_url="https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites"
 pck_url="https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck"
-all_groups="moons orientation"
+usgs_url="https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic"
+all_groups="moons orientation textures"
+
+# The directory under data/raw/ of a group's files.
+group_dir() {
+    case "$1" in
+        textures) echo "$repo_root/data/raw/usgs" ;;
+        *) echo "$repo_root/data/raw/naif" ;;
+    esac
+}
 
 # group|directory URL|file|contents (bodies as listed in aa_summaries.txt)
 files=(
@@ -46,7 +61,22 @@ files=(
     "moons|$sat_url|nep097.bsp|Neptune, Triton"
     "moons|$sat_url|plu060.bsp|Pluto, Charon, Nix, Hydra, Kerberos, Styx"
     "orientation|$pck_url|moon_pa_de440_200625.bpc|Moon principal axes orientation"
-    "orientation|$pck_url|earth_latest_high_prec.bpc|Earth orientation (NAIF updates it often)"
+    "orientation|$pck_url|earth_1962_260806_2126_combined.bpc|Earth orientation, 1962 to 2126 (predict after 2026-08-06)"
+    "textures|$usgs_url|Mercury_MESSENGER_mosaic_global_250m_2013.tif|Mercury, MESSENGER MDIS"
+    "textures|$usgs_url|Mars_Viking_ClrMosaic_global_925m.tif|Mars, Viking color"
+    "textures|$usgs_url|Phobos_ME_SRC_Mosaic_Global_16ppd.tif|Phobos, Mars Express SRC"
+    "textures|$usgs_url|Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif|Io, Galileo SSI color"
+    "textures|$usgs_url|Europa_Voyager_GalileoSSI_global_mosaic_500m.tif|Europa, Voyager and Galileo SSI"
+    "textures|$usgs_url|Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif|Ganymede, Voyager and Galileo SSI color"
+    "textures|$usgs_url|Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif|Callisto, Voyager and Galileo SSI"
+    "textures|$usgs_url|Enceladus_Cassini_mosaic_global_110m.tif|Enceladus, Cassini ISS"
+    "textures|$usgs_url|Tethys_Cassini_mosaic_global_293m.tif|Tethys, Cassini ISS"
+    "textures|$usgs_url|Dione_Cassini_Voyager_mosaic_global_154m.tif|Dione, Cassini ISS and Voyager"
+    "textures|$usgs_url|Rhea_Cassini_Voyager_mosaic_global_417m.tif|Rhea, Cassini ISS and Voyager"
+    "textures|$usgs_url|Iapetus_Cassini_Voyager_mosaic_global_783m.tif|Iapetus, Cassini ISS and Voyager"
+    "textures|$usgs_url|Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif|Triton, Voyager 2 color"
+    "textures|$usgs_url|Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif|Charon, New Horizons"
+    "textures|$usgs_url|Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif|Pluto, New Horizons"
 )
 
 die() {
@@ -157,7 +187,7 @@ stop_curl() {
 }
 on_interrupt() {
     stop_curl
-    printf '\n\nStopped. Partial downloads are kept as data/raw/naif/*.part; run the script again to resume.\n' >&2
+    printf '\n\nStopped. Partial downloads are kept as data/raw/*/*.part; run the script again to resume.\n' >&2
     exit 130
 }
 trap on_interrupt INT TERM
@@ -171,7 +201,7 @@ echo "Asking the server for file sizes..."
 sizes=()
 total=0
 need=0
-printf '\n  %-3s %-28s %-13s %10s  %s\n' "#" "File" "Group" "Size" "Already here"
+printf '\n  %-3s %-54s %-12s %10s  %s\n' "#" "File" "Group" "Size" "Already here"
 index=0
 for entry in "${selected[@]}"; do
     index=$((index + 1))
@@ -180,17 +210,18 @@ for entry in "${selected[@]}"; do
     size="${size:-0}"
     sizes+=("$size")
     total=$((total + size))
-    if [ -f "$raw_dir/$name" ]; then
+    dir="$(group_dir "$group")"
+    if [ -f "$dir/$name" ]; then
         here="yes"
-    elif [ -f "$raw_dir/$name.part" ]; then
-        have=$(file_size "$raw_dir/$name.part")
+    elif [ -f "$dir/$name.part" ]; then
+        have=$(file_size "$dir/$name.part")
         here="partial, $(human "$have")"
         need=$((need + size - have))
     else
         here="no"
         need=$((need + size))
     fi
-    printf '  %-3s %-28s %-13s %10s  %s\n' "$index" "$name" "$group" "$(human_size "$size")" "$here"
+    printf '  %-3s %-54s %-12s %10s  %s\n' "$index" "$name" "$group" "$(human_size "$size")" "$here"
 done
 echo
 echo "Total: $(human "$total") in $count files. Left to download: $(human "$need")."
@@ -210,7 +241,6 @@ if [ "$dry_run" -eq 1 ]; then
 fi
 
 # NAIF's checksum list and summaries for the satellite kernels (small).
-mkdir -p "$raw_dir"
 case "${selected[*]}" in
     *"$sat_url"*)
         mkdir -p "$meta_dir"
@@ -281,7 +311,7 @@ fetch_file() {  # url part size; returns non-zero after repeated failures
 
 results=()
 record() {  # record <ok|FAILED> <file> <message>
-    results+=("$(printf '  %-7s %-28s %s' "$1" "$2" "$3")")
+    results+=("$(printf '  %-7s %-54s %s' "$1" "$2" "$3")")
     if [ "$1" = "FAILED" ]; then failures=$((failures + 1)); fi
 }
 
@@ -293,13 +323,24 @@ for entry in "${selected[@]}"; do
     index=$((index + 1))
     IFS='|' read -r group base name what <<<"$entry"
     size="${sizes[$((index - 1))]}"
-    dest="$raw_dir/$name"
+    mkdir -p "$(group_dir "$group")"
+    dest="$(group_dir "$group")/$name"
     part="$dest.part"
     echo
     echo "[$index/$count] $name ($(human_size "$size"), $group): $what"
 
     expected_md5=""
-    if [ "$base" = "$sat_url" ]; then
+    checker="NAIF"
+    if [ "$base" = "$usgs_url" ]; then
+        checker="USGS"
+        expected_md5="$(curl -sSf --connect-timeout 30 --max-time 120 "$base/$name.md5" 2>/dev/null |
+            awk -v name="$name" '$2 == name || $2 == "*" name { print tolower($1) }')" || expected_md5=""
+        if [ -z "$expected_md5" ]; then
+            echo "  cannot read $base/$name.md5; skipped"
+            record FAILED "$name" "no MD5 from $base/$name.md5; run again"
+            continue
+        fi
+    elif [ "$base" = "$sat_url" ]; then
         expected_md5="$(publisher_md5 "$name")"
         if [ -z "$expected_md5" ]; then
             echo "  not in NAIF's checksum list; skipped"
@@ -318,11 +359,11 @@ for entry in "${selected[@]}"; do
             printf '  already here; checking its MD5... '
             actual="$(md5_of "$dest")"
             if [ "$actual" = "$expected_md5" ]; then
-                echo "matches NAIF"
-                record ok "$name" "already here, MD5 matches NAIF"
+                echo "matches $checker"
+                record ok "$name" "already here, MD5 matches $checker"
             else
                 echo "DIFFERENT"
-                record FAILED "$name" "the local file's MD5 ($actual) is not NAIF's ($expected_md5); move it away and run again"
+                record FAILED "$name" "the local file's MD5 ($actual) is not $checker's ($expected_md5); move it away and run again"
             fi
         elif [ "$size" -eq 0 ] || [ "$(file_size "$dest")" -eq "$size" ]; then
             echo "  already here"
@@ -353,16 +394,16 @@ for entry in "${selected[@]}"; do
     fi
 
     if [ -n "$expected_md5" ]; then
-        printf '  checking MD5 against NAIF... '
+        printf '  checking MD5 against %s... ' "$checker"
         actual="$(md5_of "$part")"
         if [ "$actual" = "$expected_md5" ]; then
             echo "ok"
             mv "$part" "$dest"
-            record ok "$name" "downloaded, MD5 matches NAIF"
+            record ok "$name" "downloaded, MD5 matches $checker"
         else
             echo "MISMATCH"
             rm -f "$part"
-            record FAILED "$name" "MD5 $actual is not NAIF's $expected_md5; the download was removed, run again"
+            record FAILED "$name" "MD5 $actual is not $checker's $expected_md5; the download was removed, run again"
         fi
     elif [ "$size" -gt 0 ] && [ "$(file_size "$part")" -ne "$size" ]; then
         rm -f "$part"
@@ -382,6 +423,6 @@ if [ "$failures" -gt 0 ]; then
     echo "$failures file(s) failed. Run the script again: finished files are kept and partial ones resume."
     exit 1
 fi
-echo "All files are in data/raw/naif/ (documentation in data/raw/naif/meta/satellites/)."
-echo "Next: tools/pipeline/usim-pipeline fetch (checks these copies against the lock file), then"
-echo "tools/pipeline/usim-pipeline build --pack solar-system-moons."
+echo "All files are in data/raw/naif/ and data/raw/usgs/ (NAIF documentation in data/raw/naif/meta/satellites/)."
+echo "Next: tools/pipeline/usim-pipeline fetch --optional (checks these copies and pins them), then"
+echo "tools/pipeline/usim-pipeline build --pack solar-system-moons, or textures."

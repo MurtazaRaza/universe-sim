@@ -22,6 +22,7 @@ from .fetch import locked_file
 from .jsonio import read_json
 from .kernels import check_environment, read_spk_segments, toolkit_versions
 from .manual import load_manual_entries
+from .orientation import OrientationDefinition, parse_definition, read_orientation
 from .pack.binary import write_pack
 from .pack.model import PackApproximation, PackContent, PackFile, PackSource, naif
 from .repo import Repo
@@ -57,6 +58,7 @@ class PackDefinition:
     optional: bool = False  # built only when named (NFR-07: the default pack stays small)
     stars: tuple[FileRef, FileRef] | None = None  # the star catalog file and its ReadMe (format 1.2)
     rings: str | None = None  # rings file in data/catalog (format 1.2)
+    orientation: tuple[OrientationDefinition, ...] = ()  # binary PCK orientation models (format 1.3)
 
     @property
     def file_name(self) -> str:
@@ -83,8 +85,8 @@ def load_pack_definitions(path: Path) -> list[PackDefinition]:
     for index, entry in enumerate(document.get("packs", [])):
         where = f"{path.name}: packs[{index}]"
         keys = {"name", "version", "description", "bodies", "names", "ephemeris", "shape_and_rotation", "gm", "time", "window"}
-        if not isinstance(entry, dict) or not keys <= set(entry) <= keys | {"optional", "stars", "rings"}:
-            raise PipelineError(f"{where}: needs exactly {sorted(keys)}, and optionally optional, stars and rings")
+        if not isinstance(entry, dict) or not keys <= set(entry) <= keys | {"optional", "stars", "rings", "orientation"}:
+            raise PipelineError(f"{where}: needs exactly {sorted(keys)}, and optionally optional, stars, rings and orientation")
         optional = entry.get("optional", False)
         if not isinstance(optional, bool):
             raise PipelineError(f"{where}: optional must be true or false")
@@ -97,6 +99,12 @@ def load_pack_definitions(path: Path) -> list[PackDefinition]:
         rings = entry.get("rings")
         if rings is not None and not isinstance(rings, str):
             raise PipelineError(f"{where}: rings must be a file name in data/catalog")
+        orientation = entry.get("orientation", [])
+        if not isinstance(orientation, list):
+            raise PipelineError(f"{where}: orientation must be a list")
+        orientation_definitions = tuple(parse_definition(o, f"{where}: orientation[{i}]") for i, o in enumerate(orientation))
+        if len({o.body for o in orientation_definitions}) != len(orientation_definitions):
+            raise PipelineError(f"{where}: two orientation models for one body")
         window = entry["window"]
         if window is None:
             span, text = None, "full coverage of the ephemeris files"
@@ -114,7 +122,7 @@ def load_pack_definitions(path: Path) -> list[PackDefinition]:
                 ephemeris=tuple(_file_ref(e, where, ephemeris=True) for e in entry["ephemeris"]),
                 shape_and_rotation=_file_ref(entry["shape_and_rotation"], where), gm=_file_ref(entry["gm"], where),
                 time=_file_ref(entry["time"], where), window=span, window_text=text, optional=optional,
-                stars=stars, rings=rings,
+                stars=stars, rings=rings, orientation=orientation_definitions,
             )
         )  # fmt: skip
     names = [d.name for d in result]
@@ -129,6 +137,8 @@ def assemble(repo: Repo, definition: PackDefinition, sources: tuple[Source, ...]
     used_files: list[FileRef] = [*definition.ephemeris, definition.shape_and_rotation, definition.gm, definition.time]
     if definition.stars is not None:
         used_files += definition.stars
+    for o in definition.orientation:
+        used_files += [FileRef(source_id, file) for source_id, file in o.files]
     paths = {}
     for ref in used_files:
         if (ref.source_id, ref.file) not in paths:
@@ -179,6 +189,18 @@ def assemble(repo: Repo, definition: PackDefinition, sources: tuple[Source, ...]
     if definition.rings is not None:
         rings = load_rings(repo.catalog / definition.rings, sources, {s.naif_id for s in selection})
         log(f"  {definition.rings}: {len(rings)} ring regions and gaps")
+    orientations = []
+    if definition.orientation:
+        # The orientation records cover the pack's window, or without one the span of its ephemeris: the clock
+        # never leaves that span, so records outside it would only add size.
+        span = definition.window or (min(s.start_s for s in segments), max(s.end_s for s in segments))
+        for o in definition.orientation:
+            if naif(o.body) not in selected:
+                raise PipelineError(f"orientation of naif:{o.body}: the body is not selected")
+            frame_kernel = None
+            if o.frame_kernel_source_id is not None and o.frame_kernel_file is not None:
+                frame_kernel = paths[(o.frame_kernel_source_id, o.frame_kernel_file)]
+            orientations.append(read_orientation(o, paths[(o.pck_source_id, o.pck_file)], frame_kernel, span, log))
 
     cited = {definition.names, *(r.source_id for r in used_files), *(q.source_id for q in quantities)}
     cited |= {r.radii_source_id for r in rings} | {r.optical_depth_source_id for r in rings if r.optical_depth_source_id}
@@ -208,7 +230,7 @@ def assemble(repo: Repo, definition: PackDefinition, sources: tuple[Source, ...]
     return PackContent(
         metadata=metadata, lock_sha256=lock_digest(repo.lock_file), sources=pack_sources, files=files,
         bodies=bodies, quantities=quantities, rotations=rotations, time=time, segments=segments,
-        approximations=approximations, star_catalog=star_catalog, rings=rings,
+        approximations=approximations, star_catalog=star_catalog, rings=rings, orientations=orientations,
     )  # fmt: skip
 
 
@@ -274,7 +296,7 @@ def build(
         log(
             f"wrote {path} ({len(data)} bytes, sha256 {hashlib.sha256(data).hexdigest()}): {len(content.bodies)} bodies, "
             f"{len(content.quantities)} quantities, {len(content.rotations)} rotation models, "
-            f"{len(content.segments)} segments, coverage {span}"
+            f"{len(content.orientations)} binary PCK orientation models, {len(content.segments)} segments, coverage {span}"
         )
         written.append(path)
     return written

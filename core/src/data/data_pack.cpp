@@ -42,6 +42,8 @@ constexpr std::size_t k_approximation_size = 32;
 constexpr std::size_t k_star_header_size = 32;
 constexpr std::size_t k_star_size = 72;
 constexpr std::size_t k_ring_size = 72;
+constexpr std::size_t k_orientation_size = 80;
+constexpr std::size_t k_orientation_segment_size = 72;
 
 constexpr std::uint32_t k_max_phase_degree = 16; // DATA_PACK.md, ROTN
 constexpr std::uint32_t k_quantity_has_uncertainty = 1;
@@ -50,14 +52,15 @@ constexpr std::uint32_t k_star_has_color = 1;
 constexpr std::uint32_t k_star_has_proper_motion = 2;
 constexpr std::uint32_t k_ring_gap = 1;
 constexpr std::uint32_t k_ring_has_optical_depth = 2;
+constexpr std::int32_t k_pck_type_chebyshev_angles = 2; // DATA_PACK.md, ORNT
 constexpr double k_pi = 3.141592653589793; // the double nearest pi
 
 // The sections of format 1.0, all required.
 constexpr std::array<std::string_view, 10> k_required_sections = {"META", "SRCS", "FILE", "BODY", "QNTY",
                                                                   "ROTN", "TIME", "EPHS", "STRS", "EPHD"};
 
-// Sections added by later minor versions, optional (1.1: APPX; 1.2: STAR, RING).
-constexpr std::array<std::string_view, 3> k_optional_sections = {"APPX", "STAR", "RING"};
+// Sections added by later minor versions, optional (1.1: APPX; 1.2: STAR, RING; 1.3: ORNT).
+constexpr std::array<std::string_view, 4> k_optional_sections = {"APPX", "STAR", "RING", "ORNT"};
 
 Error format_error(std::string message) {
     return make_error(ErrorCode::data_format, "data pack: " + std::move(message));
@@ -223,6 +226,7 @@ public:
     Result<catalog::StarCatalog> stars();
     Result<std::vector<catalog::Ring>> rings(const catalog::BodyCatalog& bodies,
                                              const std::vector<frames::IauRotationElements>& rotations);
+    Result<std::vector<frames::PckOrientation>> orientations(const catalog::BodyCatalog& bodies);
 
 private:
     struct SectionEntry {
@@ -882,6 +886,118 @@ Result<std::vector<catalog::Ring>> Parser::rings(const catalog::BodyCatalog& bod
     return result;
 }
 
+Result<std::vector<frames::PckOrientation>> Parser::orientations(const catalog::BodyCatalog& bodies) {
+    std::vector<frames::PckOrientation> result;
+    if (!has_section("ORNT")) {
+        return result; // no binary PCK orientation models
+    }
+    const View data = section("EPHD"); // a whole number of doubles: checked by segments()
+    const std::uint64_t data_count = data.size() / 8;
+    const View view = section("ORNT");
+    const Result<std::uint32_t> count = record_count(view, k_orientation_size);
+    if (!count) {
+        return count.error();
+    }
+    const std::uint32_t segment_count = view.u32(4);
+    const std::size_t segments_at = k_counts_size + std::size_t{count.value()} * k_orientation_size;
+    if (!view.has(segments_at, std::size_t{segment_count} * k_orientation_segment_size)) {
+        return format_error("section ORNT is truncated");
+    }
+    std::uint32_t expected_first = 0;
+    std::uint32_t previous_index = 0;
+    for (std::uint32_t i = 0; i < count.value(); ++i) {
+        const std::size_t at = k_counts_size + std::size_t{i} * k_orientation_size;
+        const std::uint32_t index = view.u32(at);
+        if (index >= bodies.bodies().size()) {
+            return format_error("orientation model " + std::to_string(i) + ": body index out of range");
+        }
+        frames::PckOrientation model;
+        model.body = bodies.bodies()[index].id;
+        const std::string what = "orientation of " + catalog::to_string(model.body);
+        if (i > 0 && !(previous_index < index)) {
+            return format_error(what + ": models are not sorted by body, or a body appears twice");
+        }
+        previous_index = index;
+        const std::uint32_t first_segment = view.u32(at + 4);
+        const std::uint32_t segments = view.u32(at + 8);
+        if (first_segment != expected_first || segments == 0 || segments > segment_count - first_segment) {
+            return format_error(what + ": segments out of range or not in model order");
+        }
+        expected_first += segments;
+        const std::uint32_t offset_source_index = view.u32(at + 12);
+        Result<std::string> offset_source = source_id(offset_source_index);
+        Result<std::string> frame_name = text(view, at + 16);
+        Result<std::string> pck_frame_name = text(view, at + 24);
+        Result<std::string> offset_locator = text(view, at + 72);
+        if (!offset_source || !frame_name || !pck_frame_name || !offset_locator) {
+            return !offset_source ? offset_source.error()
+                   : !frame_name  ? frame_name.error()
+                   : !pck_frame_name ? pck_frame_name.error()
+                                     : offset_locator.error();
+        }
+        model.frame_name = std::move(frame_name).value();
+        model.pck_frame_name = std::move(pck_frame_name).value();
+        // An empty offset locator: no offset (the body-fixed frame is the PCK frame), source index 0.
+        if (!offset_locator.value().empty()) {
+            model.offset_source =
+                catalog::SourceRef{std::move(offset_source).value(), std::move(offset_locator).value()};
+        } else if (offset_source_index != 0) {
+            return format_error(what + ": a model without an offset has offset source index 0");
+        }
+        for (std::size_t k = 0; k < 3; ++k) {
+            model.offset_angles[k] = view.f64(at + 32 + 8 * k);
+            model.offset_axes[k] = view.i32(at + 56 + 4 * k);
+        }
+        const std::uint32_t unit = view.u32(at + 68);
+        if (unit > static_cast<std::uint32_t>(frames::AngleUnit::arcseconds) || model.frame_name.empty() ||
+            model.pck_frame_name.empty()) {
+            return format_error(what + ": unknown offset unit or empty frame name");
+        }
+        model.offset_unit = static_cast<frames::AngleUnit>(unit);
+
+        for (std::uint32_t j = first_segment; j < first_segment + segments; ++j) {
+            const std::size_t sat = segments_at + std::size_t{j} * k_orientation_segment_size;
+            Result<std::string> source = source_id(view.u32(sat));
+            Result<std::string> locator = text(view, sat + 64);
+            if (!source || !locator) {
+                return !source ? source.error() : locator.error();
+            }
+            const Result<frames::FrameId> base = inertial_frame(view.i32(sat + 4), what);
+            if (!base) {
+                return base.error();
+            }
+            if (view.i32(sat + 8) != k_pck_type_chebyshev_angles) {
+                return format_error(what + ": only binary PCK type 2 segments are supported");
+            }
+            frames::PckSegment segment;
+            segment.base_frame = base.value().kind();
+            segment.record_size = view.u32(sat + 12);
+            segment.start_tdb_s = view.f64(sat + 16);
+            segment.end_tdb_s = view.f64(sat + 24);
+            segment.init_tdb_s = view.f64(sat + 32);
+            segment.interval_s = view.f64(sat + 40);
+            const std::uint64_t first = view.u64(sat + 48);
+            segment.record_count = view.u32(sat + 56);
+            segment.source = catalog::SourceRef{std::move(source).value(), std::move(locator).value()};
+            const std::uint64_t doubles = std::uint64_t{segment.record_size} * segment.record_count;
+            if (first > data_count || doubles > data_count - first) {
+                return format_error(what + ": records out of range");
+            }
+            segment.records.resize(static_cast<std::size_t>(doubles));
+            data.copy_doubles(static_cast<std::size_t>(first) * 8, segment.records.size(), segment.records.data());
+            model.segments.push_back(std::move(segment));
+        }
+        if (Result<void> checked = frames::check_pck_orientation(model); !checked) {
+            return format_error(checked.error().message);
+        }
+        result.push_back(std::move(model));
+    }
+    if (expected_first != segment_count) {
+        return format_error("section ORNT has segments no model refers to");
+    }
+    return result;
+}
+
 } // namespace
 
 DataPack::DataPack(DataPackHeader header, std::vector<std::pair<std::string, std::string>> metadata,
@@ -889,11 +1005,11 @@ DataPack::DataPack(DataPackHeader header, std::vector<std::pair<std::string, std
                    time::TdbModel tdb_model, catalog::SourceRef time_source,
                    std::vector<frames::IauRotationElements> rotations, std::vector<EphemerisSegment> segments,
                    std::vector<PositionApproximation> approximations, catalog::StarCatalog stars,
-                   std::vector<catalog::Ring> rings)
+                   std::vector<catalog::Ring> rings, std::vector<frames::PckOrientation> orientations)
     : header_(header), metadata_(std::move(metadata)), catalog_(std::move(catalog)), files_(std::move(files)),
       leap_seconds_(std::move(leap_seconds)), tdb_model_(tdb_model), time_source_(std::move(time_source)),
       rotations_(std::move(rotations)), segments_(std::move(segments)), approximations_(std::move(approximations)),
-      stars_(std::move(stars)), rings_(std::move(rings)) {}
+      stars_(std::move(stars)), rings_(std::move(rings)), orientations_(std::move(orientations)) {}
 
 Result<DataPack> DataPack::parse(std::span<const std::byte> bytes) {
     Parser parser(bytes);
@@ -968,10 +1084,14 @@ Result<DataPack> DataPack::parse(std::span<const std::byte> bytes) {
     if (!rings) {
         return rings.error();
     }
+    Result<std::vector<frames::PckOrientation>> orientations = parser.orientations(bodies_catalog.value());
+    if (!orientations) {
+        return orientations.error();
+    }
     return DataPack(header.value(), std::move(metadata).value(), std::move(bodies_catalog).value(), std::move(files).value(),
                     std::move(leap_seconds).value(), model, std::move(time_source), std::move(rotations).value(),
                     std::move(segments).value(), std::move(approximations).value(), std::move(stars).value(),
-                    std::move(rings).value());
+                    std::move(rings).value(), std::move(orientations).value());
 }
 
 Result<DataPack> DataPack::load_file(const std::filesystem::path& path) {
@@ -1003,6 +1123,11 @@ std::optional<std::string_view> DataPack::metadata_value(std::string_view key) c
 const frames::IauRotationElements* DataPack::find_rotation(catalog::BodyId body) const noexcept {
     const auto it = std::find_if(rotations_.begin(), rotations_.end(), [&](const auto& r) { return r.body == body; });
     return it == rotations_.end() ? nullptr : &*it;
+}
+
+const frames::PckOrientation* DataPack::find_pck_orientation(catalog::BodyId body) const noexcept {
+    const auto it = std::find_if(orientations_.begin(), orientations_.end(), [&](const auto& o) { return o.body == body; });
+    return it == orientations_.end() ? nullptr : &*it;
 }
 
 } // namespace usim::data

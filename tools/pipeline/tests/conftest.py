@@ -74,8 +74,9 @@ def server() -> FakeServer:
 
 
 def real_kernels_available() -> bool:
-    """The inputs of the default pack: the kernels and the star catalog."""
-    naif = all((REAL_REPO.raw / "naif" / name).exists() for name in ("de440s.bsp", "pck00011.tpc", "gm_de440.tpc", "naif0012.tls"))
+    """The inputs of the default pack: the kernels (with the lunar orientation kernels) and the star catalog."""
+    names = ("de440s.bsp", "pck00011.tpc", "gm_de440.tpc", "naif0012.tls", "moon_pa_de440_200625.bpc", "moon_de440_250416.tf")
+    naif = all((REAL_REPO.raw / "naif" / name).exists() for name in names)
     return naif and all((REAL_REPO.raw / "cds" / "V50" / name).exists() for name in ("ReadMe", "catalog.gz"))
 
 
@@ -88,6 +89,10 @@ def satellite_kernels_available() -> bool:
 
 
 needs_kernels = pytest.mark.skipif(not real_kernels_available(), reason="real kernels not fetched (run usim-pipeline fetch)")
+needs_earth_pck = pytest.mark.skipif(
+    not (REAL_REPO.raw / "naif" / "earth_1962_260806_2126_combined.bpc").exists(),
+    reason="Earth binary PCK not fetched (run usim-pipeline fetch --optional)",
+)
 needs_satellite_kernels = pytest.mark.skipif(
     not (real_kernels_available() and satellite_kernels_available()),
     reason="satellite kernels not fetched (run usim-pipeline fetch --optional)",

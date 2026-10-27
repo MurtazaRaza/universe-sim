@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | Format 1.2, implemented |
+| Status | Format 1.3, implemented |
 | Last updated | 2026-10-22 |
 | Writer | `tools/pipeline/usim_pipeline/pack/binary.py` (Python) |
 | Readers | `core/src/data/data_pack.cpp` (C++, `usim::data::DataPack`); `binary.py` (Python, for `usim-pipeline info`) |
-| Related | [ARCHITECTURE.md section 3.7](../ARCHITECTURE.md#37-data-pack-format-v1), [ADR-0005](../adr/0005-data-provenance-and-storage.md), [ADR-0006](../adr/0006-default-pack-window-and-storage.md), [ADR-0007](../adr/0007-text-kernel-values.md), [ADR-0008](../adr/0008-planet-positions-at-system-barycenters.md) |
+| Related | [ARCHITECTURE.md section 3.7](../ARCHITECTURE.md#37-data-pack-format-v1), [ADR-0005](../adr/0005-data-provenance-and-storage.md), [ADR-0006](../adr/0006-default-pack-window-and-storage.md), [ADR-0007](../adr/0007-text-kernel-values.md), [ADR-0008](../adr/0008-planet-positions-at-system-barycenters.md), [ADR-0011](../adr/0011-sky-background-and-rings.md), [ADR-0012](../adr/0012-lunar-orientation-from-the-binary-pck.md) |
 
 A data pack (`.uspack`) is the only data the core reads at runtime. The pipeline writes it from verified sources; the core reads it without parsing any other format. Two independent implementations follow this document, and the round-trip fixture (`core/tests/fixtures/test_pack_v1.uspack`) keeps them consistent. Change this document first, then both implementations.
 
@@ -27,6 +27,7 @@ A data pack (`.uspack`) is the only data the core reads at runtime. The pipeline
 | Unit (`usim::catalog::Unit`) | 0 none, 1 km, 2 s, 3 km/s, 4 rad, 5 rad/s, 6 km^3/s^2 |
 | Field | 1 gm (unit 6), 2 mean_radius (1), 3 radius_a (1), 4 radius_b (1), 5 radius_c (1) |
 | Frame (`usim::frames::FrameKind`) | 0 ICRF, 1 ECLIPJ2000 |
+| Angle unit (`usim::frames::AngleUnit`) | 0 radians, 1 degrees, 2 arcseconds |
 
 ## 2. File layout
 
@@ -42,7 +43,7 @@ offset 128    section table: section_count entries of 32 bytes
 |---|---|---|---|
 | 0 | u8[8] | magic | `USIMPACK` |
 | 8 | u16 | format_major | 1 |
-| 10 | u16 | format_minor | 2 |
+| 10 | u16 | format_minor | 3 |
 | 12 | u32 | endian_marker | 0x01020304 (bytes 04 03 02 01) |
 | 16 | u32 | header_size | 128 |
 | 20 | u32 | section_count | |
@@ -71,7 +72,7 @@ Sections must lie inside the file and must not overlap. Ids are unique.
 
 ## 3. Sections
 
-The ten sections of format 1.0 are required. Format 1.1 adds APPX, and format 1.2 adds STAR and RING; all three are optional: a pack without APPX has no approximate positions, without STAR no star catalog, without RING no rings. The writer stores the sections in the order META, SRCS, FILE, BODY, QNTY, ROTN, TIME, EPHS, APPX, STAR, RING, STRS, EPHD (it omits STAR and RING when they are empty); readers use the table and do not depend on the order. Most sections start with an 8-byte count header (`u32 count, u32 second`), followed by `count` fixed-size records.
+The ten sections of format 1.0 are required. Format 1.1 adds APPX, format 1.2 adds STAR and RING, and format 1.3 adds ORNT; all four are optional: a pack without APPX has no approximate positions, without STAR no star catalog, without RING no rings, without ORNT no binary PCK orientation models (its bodies use their IAU models). The writer stores the sections in the order META, SRCS, FILE, BODY, QNTY, ROTN, TIME, EPHS, APPX, STAR, RING, ORNT, STRS, EPHD (it omits STAR, RING and ORNT when they are empty); readers use the table and do not depend on the order. Most sections start with an 8-byte count header (`u32 count, u32 second`), followed by `count` fixed-size records.
 
 ### META: metadata
 
@@ -229,7 +230,7 @@ The records are copied bit for bit from the SPK file. When the pack is trimmed t
 
 ### EPHD: ephemeris data
 
-The f64 values of all segments' records, concatenated. Its size is a multiple of 8.
+The f64 values of all segments' records, concatenated: those of EPHS, then (format 1.3) those of ORNT. Its size is a multiple of 8.
 
 ### APPX: approximate positions (format 1.1)
 
@@ -292,6 +293,61 @@ Header `u32 count, u32 reserved`, then records of 72 bytes, sorted by (body inde
 
 Constraints: 0 < inner radius < outer radius; 0 <= smallest <= largest optical depth; the body has a rotation model (ROTN), which defines the ring plane; a gap has no optical depth.
 
+### ORNT: binary PCK orientation models (format 1.3)
+
+A body's orientation from a SPICE binary PCK and, where the body-fixed frame is defined relative to the PCK frame, a frame kernel (P6-05 and P6-06, [ADR-0012](../adr/0012-lunar-orientation-from-the-binary-pck.md), [ADR-0013](../adr/0013-earth-orientation-in-the-moons-pack.md)): Chebyshev records of the Euler angles of a PCK frame relative to the ICRF or ECLIPJ2000, and a constant offset from that frame to the body-fixed frame, as the frame kernel defines it. Without a frame kernel (for example ITRF93, a PCK frame built into SPICE) the body-fixed frame is the PCK frame and there is no offset. A body's model replaces its IAU rotation elements (ROTN) for its body-fixed frame; outside the model's coverage the frame is not available (no fallback). Header `u32 model_count, u32 segment_count`, then `model_count` model records of 80 bytes sorted by body index, then `segment_count` segment records of 72 bytes, grouped by model in model order.
+
+Model record:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | body index |
+| 4 | u32 | first segment: index of the model's first segment record |
+| 8 | u32 | segment count (> 0) |
+| 12 | u32 | source index of the offset (the frame kernel); 0 without an offset |
+| 16 | str | frame name: the body-fixed frame (SPICE name, for example `MOON_ME_DE440_ME421` or `ITRF93`) |
+| 24 | str | PCK frame name: the frame of the segments' angles (for example `MOON_PA_DE440`; without an offset, the frame name) |
+| 32 | f64 | offset angle 1, in the offset unit |
+| 40 | f64 | offset angle 2 |
+| 48 | f64 | offset angle 3 |
+| 56 | i32 | axis of angle 1: 1 (X), 2 (Y) or 3 (Z) |
+| 60 | i32 | axis of angle 2 |
+| 64 | i32 | axis of angle 3 |
+| 68 | u32 | offset angle unit (angle unit code) |
+| 72 | str | locator of the offset: frame kernel and variables; empty without an offset |
+
+Segment record:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u32 | source index (the binary PCK) |
+| 4 | i32 | base frame: 0, the ICRF (SPICE J2000), or 1, ECLIPJ2000 |
+| 8 | i32 | binary PCK data type: 2 (Chebyshev angles) |
+| 12 | u32 | record_size: f64 values per record |
+| 16 | f64 | coverage start, TDB s (inclusive) |
+| 24 | f64 | coverage end, TDB s (inclusive) |
+| 32 | f64 | init: start of the first record, TDB s |
+| 40 | f64 | interval: length of every record, s (> 0) |
+| 48 | u64 | first: index of the segment's first value in EPHD |
+| 56 | u32 | record_count (> 0) |
+| 60 | u32 | reserved |
+| 64 | str | locator: PCK file, segment index (0-based, DAF order) and segment identifier |
+
+Each record is laid out as in the PCK file (PCK Required Reading), copied bit for bit, and trimmed to a window like EPHS records:
+
+```
+MID, RADIUS                       TDB s; the Chebyshev argument is (t - MID) / RADIUS
+phi coefficients    (degree + 1)  rad
+delta coefficients  (degree + 1)  rad
+w coefficients      (degree + 1)  rad
+```
+
+The rates are the derivatives of the polynomials. With the angles at t, the rotation from the segment's base frame to the PCK frame is R = [w]_3 [delta]_1 [phi]_3, where [x]_n is the frame rotation by x about axis n (SPICE ROTATE). For base frame ECLIPJ2000, the rotation from the ICRF is R E and its rate dR/dt E, with E the constant rotation from the ICRF to ECLIPJ2000 (the frame rotation by the J2000 obliquity about X, SPEC section 7.3); below, R stands for the rotation from the ICRF. With the offset angles a1, a2, a3 (in radians) about the axes n1, n2, n3, the matrix [a1]_n1 [a2]_n2 [a3]_n3 takes vectors from the body-fixed frame to the PCK frame (the SPICE TK frame convention), so the rotation from the ICRF to the body-fixed frame is ([a1]_n1 [a2]_n2 [a3]_n3)^T R. Where two segments of a model cover an instant, the later one is used, as in SPICE.
+
+An empty offset locator means the model has no offset: the frame name equals the PCK frame name, the offset angles are 0, the axes 1, 2, 3, the unit radians and the offset source index 0, and the rotation from the ICRF to the body-fixed frame is R.
+
+Constraints: at most one model per body; segments in model order (each model's first segment equals the sum of the counts before it, and every segment belongs to a model); `record_size = 2 + 3 (degree + 1)`; `init <= start < end <= init + record_count * interval`, the last within a microsecond (trimming sets init to the original init plus a whole number of intervals; with an interval that is not a whole number of seconds, as in the Earth's PCKs, the kept records can end a rounding error before the coverage the PCK file gives, where the next segment starts; the last record is used there); every record's RADIUS is positive and [MID - RADIUS, MID + RADIUS] contains the instants it is used for (within a microsecond); finite values; non-empty frame names; a model without an offset as described above.
+
 ## 4. Validation
 
 A reader rejects (`data_format` unless noted):
@@ -305,7 +361,7 @@ A reader rejects (`data_format` unless noted):
 - a rotation record that breaks the ROTN constraints;
 - TT - TAI other than 32.184 s, or an invalid leap second table;
 - a segment that breaks the EPHS constraints, or a non-finite value;
-- an approximate position that breaks the APPX constraints, a star that breaks the STAR constraints, or a ring that breaks the RING constraints;
+- an approximate position that breaks the APPX constraints, a star that breaks the STAR constraints, a ring that breaks the RING constraints, or an orientation model that breaks the ORNT constraints;
 - a catalog that `BodyCatalog::create` rejects (duplicates, missing primaries, cycles, unregistered sources).
 
 The pipeline's writer applies the same checks before writing (`check_content`).
@@ -317,4 +373,4 @@ The pipeline's writer applies the same checks before writing (`check_content`).
 
 ## 6. Size
 
-The default pack (`solar-system-1.2.0.uspack`, de440s.bsp untrimmed, with the star catalog) is about 33.4 MB; the ephemeris records are almost all of it (the 9,096 stars take about 0.7 MB). Trimming to a window shrinks it roughly in proportion to the window's length. The optional moons pack (`solar-system-moons-1.0.0.uspack`, 2000 to 2100) is about 304 MB, almost all of it the satellite records.
+The default pack (`solar-system-1.3.0.uspack`, de440s.bsp untrimmed, with the star catalog and the lunar orientation) is 36,877,232 bytes (36.9 MB); the ephemeris records are almost all of it (the 9,096 stars take about 0.7 MB, the lunar orientation records 3.5 MB: 13,700 records of 32 values over the ephemeris span). Trimming to a window shrinks it roughly in proportion to the window's length. The optional moons pack (`solar-system-moons-1.2.0.uspack`, 2000 to 2100) is 324,810,176 bytes (325 MB), almost all of it the satellite records; the Earth's orientation takes 19.0 MB of it (36,527 daily records of 65 values in 38 segments).

@@ -3,8 +3,8 @@
   "packs": [
     {
       "name": "solar-system",
-      "version": "1.2.0",
-      "description": "Solar System v1: Sun, planets, Moon, Pluto and the system barycenters. Mars to Pluto are placed at their system barycenters, flagged approximate (ADR-0008). Ephemeris DE440 (de440s.bsp), radii and IAU rotation elements from pck00011.tpc, GM from gm_de440.tpc, leap seconds and the TDB - TT model from naif0012.tls. Stars: the Bright Star Catalogue, 5th revised edition (CDS V/50). Saturn's rings: radii from the IAU WGPSN Gazetteer of Planetary Nomenclature, optical depths from the PDS Ring-Moon Systems Node (Tier 2).",
+      "version": "1.3.0",
+      "description": "Solar System v1: Sun, planets, Moon, Pluto and the system barycenters. Mars to Pluto are placed at their system barycenters, flagged approximate (ADR-0008). Ephemeris DE440 (de440s.bsp), radii and IAU rotation elements from pck00011.tpc, GM from gm_de440.tpc, leap seconds and the TDB - TT model from naif0012.tls. Stars: the Bright Star Catalogue, 5th revised edition (CDS V/50). Saturn's rings: radii from the IAU WGPSN Gazetteer of Planetary Nomenclature, optical depths from the PDS Ring-Moon Systems Node (Tier 2). The Moon's orientation: the DE440 lunar principal axes (moon_pa_de440_200625.bpc) rotated to the mean Earth/polar axis frame MOON_ME_DE440_ME421 (moon_de440_250416.tf).",
       "bodies": "bodies-v1.json",
       "names": "S-NAIF-IDS",
       "ephemeris": [{ "source_id": "S-JPL-DE440", "file": "de440s.bsp" }],
@@ -13,12 +13,20 @@
       "time": { "source_id": "S-NAIF-LSK", "file": "naif0012.tls" },
       "window": null,
       "stars": { "source_id": "S-CDS-BSC5", "file": "catalog.gz", "readme": "ReadMe" },
-      "rings": "rings.json"
+      "rings": "rings.json",
+      "orientation": [
+        {
+          "body": 301,
+          "frame": "MOON_ME_DE440_ME421",
+          "pck": { "source_id": "S-NAIF-MOONPA", "file": "moon_pa_de440_200625.bpc" },
+          "frame_kernel": { "source_id": "S-NAIF-MOONPA", "file": "moon_de440_250416.tf" }
+        }
+      ]
     },
     {
       "name": "solar-system-moons",
-      "version": "1.0.0",
-      "description": "Solar System with the major moons, 2000 to 2100 (optional, built locally: P6-01, NFR-07). The v1 bodies with the planet centers from the JPL satellite ephemerides, and 21 major moons. Planets, Sun and Moon from DE440 (de440s.bsp); each satellite system (moons and planet center relative to the system barycenter) from its satellite kernel (mar099, jup365, sat441, ura184_part-3, nep097, plu060); records copied bit for bit. Radii and IAU rotation elements from pck00011.tpc, GM from gm_de440.tpc, leap seconds and the TDB - TT model from naif0012.tls. Stars: the Bright Star Catalogue, 5th revised edition (CDS V/50). Saturn's rings: radii from the IAU WGPSN Gazetteer of Planetary Nomenclature, optical depths from the PDS Ring-Moon Systems Node (Tier 2).",
+      "version": "1.2.0",
+      "description": "Solar System with the major moons, 2000 to 2100 (optional, built locally: P6-01, NFR-07). The v1 bodies with the planet centers from the JPL satellite ephemerides, and 21 major moons. Planets, Sun and Moon from DE440 (de440s.bsp); each satellite system (moons and planet center relative to the system barycenter) from its satellite kernel (mar099, jup365, sat441, ura184_part-3, nep097, plu060); records copied bit for bit. Radii and IAU rotation elements from pck00011.tpc, GM from gm_de440.tpc, leap seconds and the TDB - TT model from naif0012.tls. Stars: the Bright Star Catalogue, 5th revised edition (CDS V/50). Saturn's rings: radii from the IAU WGPSN Gazetteer of Planetary Nomenclature, optical depths from the PDS Ring-Moon Systems Node (Tier 2). The Moon's orientation: the DE440 lunar principal axes (moon_pa_de440_200625.bpc) rotated to the mean Earth/polar axis frame MOON_ME_DE440_ME421 (moon_de440_250416.tf). The Earth's orientation: ITRF93 from the combined historical and long-term predict Earth PCK earth_1962_260806_2126_combined.bpc (low accuracy after its last datum, 2026-08-06).",
       "optional": true,
       "bodies": "bodies-moons.json",
       "names": "S-NAIF-IDS",
@@ -36,7 +44,20 @@
       "time": { "source_id": "S-NAIF-LSK", "file": "naif0012.tls" },
       "window": { "start": "2000-01-01T00:00:00 TDB", "end": "2100-01-01T00:00:00 TDB" },
       "stars": { "source_id": "S-CDS-BSC5", "file": "catalog.gz", "readme": "ReadMe" },
-      "rings": "rings.json"
+      "rings": "rings.json",
+      "orientation": [
+        {
+          "body": 301,
+          "frame": "MOON_ME_DE440_ME421",
+          "pck": { "source_id": "S-NAIF-MOONPA", "file": "moon_pa_de440_200625.bpc" },
+          "frame_kernel": { "source_id": "S-NAIF-MOONPA", "file": "moon_de440_250416.tf" }
+        },
+        {
+          "body": 399,
+          "frame": "ITRF93",
+          "pck": { "source_id": "S-NAIF-EARTHPCK", "file": "earth_1962_260806_2126_combined.bpc" }
+        }
+      ]
     }
   ]
 }

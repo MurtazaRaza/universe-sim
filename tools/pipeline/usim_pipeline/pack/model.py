@@ -69,6 +69,15 @@ class Frame(IntEnum):
     ECLIPJ2000 = 1
 
 
+class AngleUnit(IntEnum):
+    """Units of the offset angles of an orientation model (DATA_PACK.md, section ORNT): those of the frame
+    kernel (TKFRAME_<id>_UNITS)."""
+
+    RADIANS = 0
+    DEGREES = 1
+    ARCSECONDS = 2
+
+
 BodyRef = tuple[int, int]  # (namespace, value)
 
 MAX_PHASE_DEGREE = 16  # largest phase angle polynomial degree the format allows (DATA_PACK.md, ROTN)
@@ -243,6 +252,65 @@ class PackSegment:
     __hash__ = None  # type: ignore[assignment]
 
 
+PCK_TYPE_CHEBYSHEV_ANGLES = 2  # binary PCK type 2: Chebyshev polynomials of three Euler angles
+
+
+@dataclass(frozen=True, eq=False)
+class PackOrientationSegment:
+    """Chebyshev records of one binary PCK type 2 segment (DATA_PACK.md, sections ORNT and EPHD): the Euler
+    angles (phi, delta, w) of a body's PCK frame relative to `base_frame` (the ICRF or ECLIPJ2000), in
+    radians."""
+
+    start_s: float
+    end_s: float
+    init_s: float
+    interval_s: float
+    records: numpy.ndarray  # float64, shape (record_count, record_size)
+    source_id: str
+    locator: str
+    base_frame: Frame = Frame.ICRF
+    data_type: int = PCK_TYPE_CHEBYSHEV_ANGLES
+
+    @property
+    def record_size(self) -> int:
+        return int(self.records.shape[1])
+
+    @property
+    def record_count(self) -> int:
+        return int(self.records.shape[0])
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PackOrientationSegment):
+            return NotImplemented
+        scalars = ("start_s", "end_s", "init_s", "interval_s", "source_id", "locator", "base_frame", "data_type")
+        return (
+            all(getattr(self, n) == getattr(other, n) for n in scalars)
+            and self.records.shape == other.records.shape
+            and self.records.tobytes() == other.records.tobytes()
+        )
+
+    __hash__ = None  # type: ignore[assignment]
+
+
+@dataclass(frozen=True)
+class PackOrientation:
+    """A body's orientation from a binary PCK (DATA_PACK.md, section ORNT, format 1.3): the PCK frame given
+    by `segments`, followed by a constant offset from a frame kernel's TK frame specification (three angles
+    about coordinate axes) to the body-fixed frame `frame_name`. Without an offset (`offset_source_id` None,
+    for a frame such as ITRF93) the body-fixed frame is the PCK frame: equal names, zero angles about the
+    axes 1, 2, 3 in radians, and an empty locator."""
+
+    body: BodyRef
+    frame_name: str  # the body-fixed frame (SPICE name), for example MOON_ME_DE440_ME421
+    pck_frame_name: str  # the frame of the segments' Euler angles, for example MOON_PA_DE440
+    offset_angles: tuple[float, float, float]  # in offset_unit, as written in the frame kernel
+    offset_axes: tuple[int, int, int]  # 1, 2 or 3 each
+    offset_unit: AngleUnit
+    offset_source_id: str | None  # the frame kernel; None without an offset
+    offset_locator: str
+    segments: tuple[PackOrientationSegment, ...]  # precedence order: later segments win where they overlap
+
+
 @dataclass
 class PackContent:
     """Everything a pack holds. `metadata` keys are written sorted."""
@@ -259,6 +327,30 @@ class PackContent:
     approximations: list[PackApproximation] = field(default_factory=list)
     star_catalog: PackStarCatalog | None = None
     rings: list[PackRing] = field(default_factory=list)
+    orientations: list[PackOrientation] = field(default_factory=list)
+
+
+# How far an ORNT segment's coverage may extend past its last record (DATA_PACK.md, section ORNT): trimming
+# recomputes INIT as INIT + first * INTERVAL, and with a record length that is not a whole number of seconds
+# (the Earth's PCKs: 86398.565... s) the grid of the kept records can end an ulp before the coverage the PCK
+# file gives, which the next segment starts from. The same slack as for record intervals (C++ reader).
+ORIENTATION_COVERAGE_SLACK_S = 1.0e-6
+
+
+def _check_records(
+    segment: PackSegment | PackOrientationSegment, what: str, components: int, kind: str, end_slack_s: float = 0.0
+) -> None:
+    """The EPHS and ORNT constraints on a segment's records and coverage."""
+    if segment.records.dtype != numpy.float64 or segment.records.ndim != 2 or segment.record_count == 0:
+        raise PipelineError(f"pack: {what}: records must be a non-empty float64 matrix")
+    if segment.record_size < 2 + components or (segment.record_size - 2) % components:
+        raise PipelineError(f"pack: {what}: record size {segment.record_size} does not fit {kind}")
+    if not (segment.interval_s > 0 and segment.init_s <= segment.start_s < segment.end_s):
+        raise PipelineError(f"pack: {what}: invalid coverage")
+    if segment.end_s > segment.init_s + segment.record_count * segment.interval_s + end_slack_s:
+        raise PipelineError(f"pack: {what}: coverage extends past the last record")
+    if not numpy.isfinite(segment.records).all():
+        raise PipelineError(f"pack: {what}: non-finite coefficient")
 
 
 def check_content(content: PackContent) -> None:
@@ -326,17 +418,7 @@ def check_content(content: PackContent) -> None:
             raise PipelineError(f"pack: {what}: target or center is not in the pack")
         if segment.spk_type not in (2, 3):
             raise PipelineError(f"pack: {what}: SPK type {segment.spk_type}")
-        components = 3 if segment.spk_type == 2 else 6
-        if segment.records.dtype != numpy.float64 or segment.records.ndim != 2 or segment.record_count == 0:
-            raise PipelineError(f"pack: {what}: records must be a non-empty float64 matrix")
-        if segment.record_size < 2 + components or (segment.record_size - 2) % components:
-            raise PipelineError(f"pack: {what}: record size {segment.record_size} does not fit SPK type {segment.spk_type}")
-        if not (segment.interval_s > 0 and segment.init_s <= segment.start_s < segment.end_s):
-            raise PipelineError(f"pack: {what}: invalid coverage")
-        if segment.end_s > segment.init_s + segment.record_count * segment.interval_s:
-            raise PipelineError(f"pack: {what}: coverage extends past the last record")
-        if not numpy.isfinite(segment.records).all():
-            raise PipelineError(f"pack: {what}: non-finite coefficient")
+        _check_records(segment, what, 3 if segment.spk_type == 2 else 6, f"SPK type {segment.spk_type}")
     primaries = {b.id: b.primary for b in content.bodies}
     targets = {s.target for s in content.segments}
     approximated: set[BodyRef] = set()
@@ -375,6 +457,40 @@ def check_content(content: PackContent) -> None:
             check_source(ring.optical_depth_source_id, what)
         elif ring.optical_depth_source_id is not None or ring.optical_depth_locator:
             raise PipelineError(f"pack: {what}: optical depth source without a value")
+    oriented = [o.body for o in content.orientations]
+    if len(set(oriented)) != len(oriented):
+        raise PipelineError("pack: two orientation models for one body")
+    for o in content.orientations:
+        what = f"orientation of {o.body}"
+        if o.body not in known_bodies:
+            raise PipelineError(f"pack: {what}: body is not in the pack")
+        if not o.frame_name or not o.pck_frame_name:
+            raise PipelineError(f"pack: {what}: frame names must not be empty")
+        if o.offset_source_id is None:
+            no_offset = (o.frame_name, (0.0, 0.0, 0.0), (1, 2, 3), AngleUnit.RADIANS, "")
+            if (o.pck_frame_name, tuple(o.offset_angles), tuple(o.offset_axes), o.offset_unit, o.offset_locator) != no_offset:
+                raise PipelineError(
+                    f"pack: {what}: without an offset, the frame is the PCK frame, with zero angles about the axes "
+                    "1, 2, 3 in radians and an empty locator"
+                )
+        else:
+            check_source(o.offset_source_id, what)
+            if not o.offset_locator:
+                raise PipelineError(f"pack: {what}: an offset needs a locator")
+        if len(o.offset_angles) != 3 or not all(math.isfinite(a) for a in o.offset_angles):
+            raise PipelineError(f"pack: {what}: the offset needs three finite angles")
+        if len(o.offset_axes) != 3 or not all(a in (1, 2, 3) for a in o.offset_axes):
+            raise PipelineError(f"pack: {what}: offset axes must be 1, 2 or 3")
+        if not isinstance(o.offset_unit, AngleUnit):
+            raise PipelineError(f"pack: {what}: unknown offset unit")
+        if not o.segments:
+            raise PipelineError(f"pack: {what}: no segments")
+        for index, segment in enumerate(o.segments):
+            where = f"{what}, segment {index}"
+            check_source(segment.source_id, where)
+            if segment.base_frame not in (Frame.ICRF, Frame.ECLIPJ2000) or segment.data_type != PCK_TYPE_CHEBYSHEV_ANGLES:
+                raise PipelineError(f"pack: {where}: only binary PCK type 2 relative to the ICRF or ECLIPJ2000 is supported")
+            _check_records(segment, where, 3, "binary PCK type 2", ORIENTATION_COVERAGE_SLACK_S)
 
 
 def _check_stars(catalog: PackStarCatalog | None, check_source) -> None:

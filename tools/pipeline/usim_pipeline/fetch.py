@@ -138,6 +138,9 @@ def fetch(
     Files declared optional (only optional packs need them) are downloaded with `optional=True`. Without it
     they are skipped ('skipped' in the result) unless a local copy exists, which is checked as usual; their
     lock entries are kept either way.
+
+    When a file fails (for example a download that times out), the files pinned before it are written to the
+    lock file before the error is raised, so a later run does not download them again.
     """
     sources = load_sources(repo.sources_file)
     lock = load_lock(repo.lock_file)
@@ -153,6 +156,22 @@ def fetch(
     new_lock = {key: lock[key] for key in lock if key in declared}
     changed = bool(stale)
 
+    try:
+        changed = _fetch_files(repo, declared, lock, new_lock, checksum_lists, actions, update, optional, opener, now, log) or changed
+    except BaseException:
+        if any(new_lock.get(key) != lock.get(key) for key in new_lock):
+            write_lock(repo.lock_file, new_lock)
+            log(f"wrote {repo.lock_file} with the files pinned before the failure")
+        raise
+    if changed:
+        write_lock(repo.lock_file, new_lock)
+        log(f"wrote {repo.lock_file}")
+    return FetchResult(actions, changed)
+
+
+def _fetch_files(repo, declared, lock, new_lock, checksum_lists, actions, update, optional, opener, now, log) -> bool:
+    """The per-file work of fetch(); fills `new_lock` and `actions` and returns True if a lock entry changed."""
+    changed = False
     for key in sorted(declared):
         source, file = declared[key]
         destination = repo.raw / file.path
@@ -233,11 +252,7 @@ def fetch(
         if adopted:
             checked = " (local copy, publisher MD5 verified)"
         log(f"{action:<10} {label} ({digests.size} bytes, sha256 {digests.sha256}){checked}")
-
-    if changed:
-        write_lock(repo.lock_file, new_lock)
-        log(f"wrote {repo.lock_file}")
-    return FetchResult(actions, changed)
+    return changed
 
 
 def _read_checksum_list(url: str, opener: Opener) -> dict[str, str]:
