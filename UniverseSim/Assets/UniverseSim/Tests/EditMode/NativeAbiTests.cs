@@ -72,8 +72,17 @@ namespace UniverseSim.Unity.Tests.EditMode
                     BodyScale = 1.0,
                 };
                 var snapshots = new UsimBodySnapshot[count];
-                Assert.That(NativeMethods.FillSnapshot(sim, ref request, snapshots, count, out var filled), Is.EqualTo((int)Status.Ok),
-                            CoreLibrary.LastErrorMessage);
+                var pinned = GCHandle.Alloc(snapshots, GCHandleType.Pinned);
+                int status, filled;
+                try
+                {
+                    status = NativeMethods.FillSnapshot(sim, ref request, pinned.AddrOfPinnedObject(), count, out filled);
+                }
+                finally
+                {
+                    pinned.Free();
+                }
+                Assert.That(status, Is.EqualTo((int)Status.Ok), CoreLibrary.LastErrorMessage);
                 Assert.That(filled, Is.EqualTo(count));
                 var earth = snapshots.Single(s => s.Id.Value == 399);
                 Assert.That(earth.RenderPosition.X, Is.EqualTo(0.0)); // the center itself

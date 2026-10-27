@@ -143,6 +143,26 @@ namespace UniverseSim.Unity.Tests.EditMode
         }
 
         [Test]
+        public void TheMoonIsOrientedByItsBinaryPckAndThePlanetsByIauElements()
+        {
+            var moon = sim.Bodies[sim.IndexOf(UsimBodyId.Naif(301))];
+            Assert.That(moon.HasRotation, NUnit.Framework.Is.True);
+            Assert.That(moon.RotationKind, NUnit.Framework.Is.EqualTo(NativeConstants.RotationBinaryPck));
+            Assert.That(moon.RotationFrameName, NUnit.Framework.Is.EqualTo("MOON_ME_DE440_ME421"));
+            Assert.That(moon.RotationSourceId, NUnit.Framework.Is.EqualTo("S-NAIF-MOONPA"));
+            StringAssert.Contains("moon_pa_de440_200625.bpc", moon.RotationLocator);
+            StringAssert.Contains("moon_de440_250416.tf", moon.RotationLocator);
+
+            var earth = sim.Bodies[sim.IndexOf(UsimBodyId.Naif(399))];
+            Assert.That(earth.RotationKind, NUnit.Framework.Is.EqualTo(NativeConstants.RotationIau));
+            Assert.That(earth.RotationFrameName, NUnit.Framework.Is.Empty);
+            Assert.That(earth.RotationSourceId, NUnit.Framework.Is.EqualTo("S-NAIF-PCK11"));
+
+            var barycenter = sim.Bodies[sim.IndexOf(UsimBodyId.Naif(0))];
+            Assert.That(barycenter.RotationKind, NUnit.Framework.Is.EqualTo(NativeConstants.RotationNone));
+        }
+
+        [Test]
         public void RingDisplayProfileUsesTheMiddleOfEachRangeAndEmptiesGaps()
         {
             var saturn = sim.IndexOf(UsimBodyId.Naif(699));

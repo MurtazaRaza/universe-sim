@@ -45,10 +45,25 @@ namespace UniverseSim.Unity.Native
         public uint Flags { get; internal set; }         // NativeConstants.Body*
         public string Name { get; internal set; }
         public string ApproximationReason { get; internal set; } // "" unless approximate
+
+        /// <summary>The model that defines the body-fixed frame (NativeConstants.Rotation*).</summary>
+        public int RotationKind { get; internal set; }
+
+        /// <summary>The binary PCK model's frame, for example "MOON_ME_DE440_ME421"; "" otherwise.</summary>
+        public string RotationFrameName { get; internal set; }
+
+        /// <summary>The rotation model's source id and its files and variables or segments.</summary>
+        public string RotationSourceId { get; internal set; }
+        public string RotationLocator { get; internal set; }
         public double MeanRadiusKm { get; internal set; }
 
         /// <summary>The largest of the mean and triaxial radii, km (0 without a radius).</summary>
         public double MaxRadiusKm { get; internal set; }
+
+        /// <summary>The triaxial radii a, b (equatorial) and c (polar), km; 0 where the pack has none.</summary>
+        public double RadiusAKm { get; internal set; }
+        public double RadiusBKm { get; internal set; }
+        public double RadiusCKm { get; internal set; }
 
         public bool HasPosition => (Flags & NativeConstants.BodyHasEphemeris) != 0;
         public bool IsApproximate => (Flags & NativeConstants.BodyApproximate) != 0;
@@ -212,6 +227,7 @@ namespace UniverseSim.Unity.Native
             {
                 Check(NativeMethods.BodyInfoAt(Pointer, i, out var info));
                 Check(NativeMethods.BodyApproximation(Pointer, i, out var reason));
+                Check(NativeMethods.BodyRotationModel(Pointer, i, out var rotation));
                 bodies.Add(new BodyInfo
                 {
                     Index = i,
@@ -221,8 +237,15 @@ namespace UniverseSim.Unity.Native
                     Flags = info.Flags,
                     Name = Marshal.PtrToStringUTF8(info.Name) ?? string.Empty,
                     ApproximationReason = Marshal.PtrToStringUTF8(reason) ?? string.Empty,
+                    RotationKind = rotation.Kind,
+                    RotationFrameName = Marshal.PtrToStringUTF8(rotation.FrameName) ?? string.Empty,
+                    RotationSourceId = Marshal.PtrToStringUTF8(rotation.SourceId) ?? string.Empty,
+                    RotationLocator = Marshal.PtrToStringUTF8(rotation.Locator) ?? string.Empty,
                     MeanRadiusKm = info.MeanRadiusKm,
                     MaxRadiusKm = Math.Max(info.MeanRadiusKm, Math.Max(info.RadiusAKm, Math.Max(info.RadiusBKm, info.RadiusCKm))),
+                    RadiusAKm = info.RadiusAKm,
+                    RadiusBKm = info.RadiusBKm,
+                    RadiusCKm = info.RadiusCKm,
                 });
             }
             Check(NativeMethods.SourceCount(Pointer, out var sourceCount));
@@ -372,8 +395,18 @@ namespace UniverseSim.Unity.Native
         /// </summary>
         public int FillSnapshot(ref UsimSnapshotRequest request, UsimBodySnapshot[] buffer)
         {
-            Check(NativeMethods.FillSnapshot(Pointer, ref request, buffer, buffer.Length, out var count));
-            return count;
+            // The output buffers are pinned and passed as pointers, so the core writes into them directly
+            // (NativeMethods). A pinning handle allocates no managed memory.
+            var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                Check(NativeMethods.FillSnapshot(Pointer, ref request, pinned.AddrOfPinnedObject(), buffer.Length, out var count));
+                return count;
+            }
+            finally
+            {
+                pinned.Free();
+            }
         }
 
         /// <summary>
@@ -382,8 +415,16 @@ namespace UniverseSim.Unity.Native
         /// </summary>
         public int FillStars(ref UsimSnapshotRequest request, UsimStar[] buffer)
         {
-            Check(NativeMethods.FillStars(Pointer, ref request, buffer, buffer.Length, out var count));
-            return count;
+            var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                Check(NativeMethods.FillStars(Pointer, ref request, pinned.AddrOfPinnedObject(), buffer.Length, out var count));
+                return count;
+            }
+            finally
+            {
+                pinned.Free();
+            }
         }
 
         /// <summary>The body an orbit line of <paramref name="body"/> is usually drawn around, if any.</summary>
@@ -398,9 +439,17 @@ namespace UniverseSim.Unity.Native
         public int OrbitPath(UsimBodyId body, UsimBodyId center, ref UsimSnapshotRequest request, UsimVec3d[] buffer,
                              out uint flags)
         {
-            var status = NativeMethods.OrbitPath(Pointer, body, center, ref request, buffer, buffer.Length, out var count,
-                                                 out flags);
-            return status == (int)Status.Ok ? count : -1;
+            var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                var status = NativeMethods.OrbitPath(Pointer, body, center, ref request, pinned.AddrOfPinnedObject(), buffer.Length,
+                                                     out var count, out flags);
+                return status == (int)Status.Ok ? count : -1;
+            }
+            finally
+            {
+                pinned.Free();
+            }
         }
 
         /// <summary>A vector from the host's axes to the core's (the inverse of the snapshot's mapping).</summary>

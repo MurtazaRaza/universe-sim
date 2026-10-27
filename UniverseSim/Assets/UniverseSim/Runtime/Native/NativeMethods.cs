@@ -7,7 +7,9 @@ namespace UniverseSim.Unity.Native
     /// Raw P/Invoke declarations for the core's C ABI (core/capi/include/usim/usim.h).
     /// Keep this file in sync with that header. Only blittable types cross the boundary: strings going in
     /// are NUL-terminated UTF-8 byte arrays, strings coming out are IntPtr owned by the library, and
-    /// output arrays are caller-owned (pinned, not copied, because their elements are blittable).
+    /// output arrays are caller-owned. The per-frame outputs (snapshots, stars, orbit paths) take a pointer to
+    /// an array the caller pins (<see cref="CoreSimulation"/>): declared as [Out] arrays, Unity's Mono copied
+    /// every element of the buffer back after each call, whatever the core had written.
     /// Statuses are the int values of <see cref="Status"/>.
     /// </summary>
     internal static class NativeMethods
@@ -65,6 +67,9 @@ namespace UniverseSim.Unity.Native
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_body_approximation")]
         internal static extern int BodyApproximation(IntPtr simulation, int index, out IntPtr reason);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_body_rotation_model")]
+        internal static extern int BodyRotationModel(IntPtr simulation, int index, out UsimRotationModel model);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_source_count")]
         internal static extern int SourceCount(IntPtr simulation, out int count);
@@ -128,7 +133,7 @@ namespace UniverseSim.Unity.Native
         // Snapshots and orbit paths.
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_fill_snapshot")]
         internal static extern int FillSnapshot(IntPtr simulation, ref UsimSnapshotRequest request,
-                                                [Out] UsimBodySnapshot[] snapshots, int capacity, out int count);
+                                                IntPtr snapshots, int capacity, out int count);
 
         // Sky background and rings (ABI 3).
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_star_count")]
@@ -139,8 +144,8 @@ namespace UniverseSim.Unity.Native
                                                      out IntPtr derivation);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_fill_stars")]
-        internal static extern int FillStars(IntPtr simulation, ref UsimSnapshotRequest request, [Out] UsimStar[] stars,
-                                             int capacity, out int count);
+        internal static extern int FillStars(IntPtr simulation, ref UsimSnapshotRequest request, IntPtr stars, int capacity,
+                                             out int count);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_ring_count")]
         internal static extern int RingCount(IntPtr simulation, out int count);
@@ -153,7 +158,7 @@ namespace UniverseSim.Unity.Native
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_orbit_path")]
         internal static extern int OrbitPath(IntPtr simulation, UsimBodyId body, UsimBodyId orbitCenter,
-                                             ref UsimSnapshotRequest request, [Out] UsimVec3d[] positions, int capacity,
+                                             ref UsimSnapshotRequest request, IntPtr positions, int capacity,
                                              out int count, out uint flags);
     }
 }

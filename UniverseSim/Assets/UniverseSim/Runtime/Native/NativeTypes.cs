@@ -190,6 +190,17 @@ namespace UniverseSim.Unity.Native
         public IntPtr OpticalDepthLocator;
     }
 
+    /// <summary>usim_rotation_model: what defines a body's body-fixed frame, with its provenance (ABI 4).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct UsimRotationModel
+    {
+        public int Kind;          // NativeConstants.Rotation*
+        public int Reserved;
+        public IntPtr FrameName;  // UTF-8, owned by the simulation; "" except for a binary PCK model
+        public IntPtr SourceId;
+        public IntPtr Locator;
+    }
+
     /// <summary>The constants of usim.h that bindings need.</summary>
     public static class NativeConstants
     {
@@ -214,6 +225,7 @@ namespace UniverseSim.Unity.Native
         public const int StructCoverage = 13;
         public const int StructStar = 14;
         public const int StructRing = 15;
+        public const int StructRotationModel = 16;
 
         public const uint BodyHasEphemeris = 0x1;
         public const uint BodyApproximate = 0x2;
@@ -262,5 +274,9 @@ namespace UniverseSim.Unity.Native
         public const uint StarHasColor = 0x1;
         public const uint RingGap = 0x1;
         public const uint RingHasOpticalDepth = 0x2;
+
+        public const int RotationNone = 0;
+        public const int RotationIau = 1;
+        public const int RotationBinaryPck = 2;
     }
 }
