@@ -16,6 +16,7 @@ from pathlib import Path
 PINS = (
     ("numpy", "2.5.3", None),
     ("spiceypy", "8.2.0", None),
+    ("pillow", "12.3.0", None),  # surface map textures (P6-07): decoding, resampling and JPEG encoding
     ("pytest", "9.1.1", None),
     ("pluggy", "1.6.0", None),
     ("iniconfig", "2.3.0", None),

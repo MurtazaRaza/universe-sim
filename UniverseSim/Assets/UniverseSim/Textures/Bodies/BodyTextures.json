@@ -1,0 +1,175 @@
+{
+  "textures": [
+    {
+      "naifId": 199,
+      "name": "Mercury",
+      "file": "body-199.jpg",
+      "content": "Monochrome (750 nm) global mosaic of MESSENGER MDIS images, May 2013 basemap",
+      "credit": "Arizona State University, MESSENGER Team; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m"
+    },
+    {
+      "naifId": 301,
+      "name": "Moon",
+      "file": "body-301.jpg",
+      "content": "Color from the LROC WAC Hapke normalized mosaic (643, 566 and 415 nm as red, green and blue), exposure and white balance adjusted toward human vision (2025 map)",
+      "credit": "NASA's Scientific Visualization Studio; LRO LROC and LOLA teams",
+      "sourceId": "S-NASA-SVS-MOON",
+      "page": "https://svs.gsfc.nasa.gov/4720"
+    },
+    {
+      "naifId": 399,
+      "name": "Earth",
+      "file": "body-399.jpg",
+      "content": "Cloud-free true color composite of August 2004 from MODIS, with shading for topography and bathymetry",
+      "credit": "NASA Earth Observatory (Reto Stöckli)",
+      "sourceId": "S-NASA-EO-BMNG",
+      "page": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/"
+    },
+    {
+      "naifId": 401,
+      "name": "Phobos",
+      "file": "body-401.jpg",
+      "content": "Monochrome global mosaic of Mars Express SRC images",
+      "credit": "Europlanet Research Infrastructure; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/phobos_mars_express_src_global_mosaic_12m"
+    },
+    {
+      "naifId": 499,
+      "name": "Mars",
+      "file": "body-499.jpg",
+      "content": "Color synthesized from Viking Orbiter red- and violet-filter images, photometrically normalized",
+      "credit": "Planetary Data System; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/mars_viking_global_color_mosaic_925m"
+    },
+    {
+      "naifId": 501,
+      "name": "Io",
+      "file": "body-501.jpg",
+      "content": "False color from Galileo SSI violet, green and near-infrared (756 nm) images; the colors the eye would see are similar but much more muted (product description)",
+      "credit": "Planetary Data System; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/io_galileo_ssi_global_color_merge_mosaic_1km"
+    },
+    {
+      "naifId": 502,
+      "name": "Europa",
+      "file": "body-502.jpg",
+      "content": "Monochrome global mosaic of Voyager and Galileo SSI images",
+      "credit": "Archinal, B., Colvin, T., Davies, M., Gitlin, A., Kirk, R., Weller, L.; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/europa_voyager_galileo_ssi_global_mosaic_500m"
+    },
+    {
+      "naifId": 503,
+      "name": "Ganymede",
+      "file": "body-503.jpg",
+      "content": "Color global mosaic of Galileo SSI and Voyager images",
+      "credit": "USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/ganymede_voyager_galileo_ssi_color_global_mosaic_1_4km"
+    },
+    {
+      "naifId": 504,
+      "name": "Callisto",
+      "file": "body-504.jpg",
+      "content": "Monochrome global mosaic of Voyager and Galileo SSI images",
+      "credit": "USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif"
+    },
+    {
+      "naifId": 599,
+      "name": "Jupiter",
+      "file": "body-599.jpg",
+      "content": "Color close to what the eye would see, from Cassini ISS 750 nm and 451 nm images of 2000-12-11 and 12; Jupiter's clouds have moved and changed since",
+      "credit": "NASA/JPL/Space Science Institute",
+      "sourceId": "S-NASA-PHOTOJOURNAL",
+      "page": "https://science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/"
+    },
+    {
+      "naifId": 601,
+      "name": "Mimas",
+      "file": "body-601.jpg",
+      "content": "Monochrome global basemap of Cassini ISS images (DLR)",
+      "credit": "DLR (German Aerospace Center), Cassini ISS; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mimas/Cassini_DLR_Mimas.zip"
+    },
+    {
+      "naifId": 602,
+      "name": "Enceladus",
+      "file": "body-602.jpg",
+      "content": "Monochrome global mosaic of Cassini ISS images",
+      "credit": "Cassini Team, Jet Propulsion Laboratory, Space Science Institute; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/enceladus_cassini_global_mosaic_110m"
+    },
+    {
+      "naifId": 603,
+      "name": "Tethys",
+      "file": "body-603.jpg",
+      "content": "Monochrome global mosaic of Cassini ISS images",
+      "credit": "NASA, JPL, Space Science Institute; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/tethys_cassini_global_mosaic_293m"
+    },
+    {
+      "naifId": 604,
+      "name": "Dione",
+      "file": "body-604.jpg",
+      "content": "Monochrome global mosaic of Cassini ISS and Voyager images",
+      "credit": "NASA, JPL, Space Science Institute; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/dione_cassini_voyager_global_mosaic_154m"
+    },
+    {
+      "naifId": 605,
+      "name": "Rhea",
+      "file": "body-605.jpg",
+      "content": "Monochrome global mosaic of Cassini ISS and Voyager images",
+      "credit": "NASA, JPL, Space Science Institute; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/rhea_cassini_voyager_global_mosaic_417m"
+    },
+    {
+      "naifId": 608,
+      "name": "Iapetus",
+      "file": "body-608.jpg",
+      "content": "Monochrome global mosaic of Cassini ISS and Voyager images",
+      "credit": "Space Science Institute, Cassini Team, Jet Propulsion Laboratory; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/iapetus_cassini_voyager_global_mosaic_803m"
+    },
+    {
+      "naifId": 801,
+      "name": "Triton",
+      "file": "body-801.jpg",
+      "content": "Color synthesized from Voyager 2 orange, violet and ultraviolet filter images shown as red, green and blue",
+      "credit": "NASA, Jet Propulsion Laboratory, Paul Schenk; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m"
+    },
+    {
+      "naifId": 901,
+      "name": "Charon",
+      "file": "body-901.jpg",
+      "content": "Monochrome global mosaic of New Horizons LORRI and MVIC images",
+      "credit": "NASA, Johns Hopkins University Applied Physics Laboratory, Southwest Research Institute, Lunar and Planetary Institute; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/charon_new_horizons_lorri_mvic_global_mosaic_300m"
+    },
+    {
+      "naifId": 999,
+      "name": "Pluto",
+      "file": "body-999.jpg",
+      "content": "Monochrome global mosaic of New Horizons LORRI and MVIC images",
+      "credit": "NASA, Johns Hopkins University Applied Physics Laboratory, Southwest Research Institute, Lunar and Planetary Institute; USGS Astrogeology Science Center",
+      "sourceId": "S-USGS-ASTRO",
+      "page": "https://astrogeology.usgs.gov/search/map/pluto_new_horizons_lorri_mvic_global_mosaic_300m"
+    }
+  ]
+}

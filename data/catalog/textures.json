@@ -1,0 +1,319 @@
+{
+  "schema_version": 1,
+  "description": "Surface maps of planets and moons for the Unity viewer (P6-07, visual assets only). Each map is reprojected by `usim-pipeline textures` to an equirectangular grid in planetocentric latitude and east longitude, the left edge at 180 degrees, and written as a JPEG with ATTRIBUTION.md. Not simulation data. Venus, Saturn, Uranus, Neptune, Titan, Deimos and the Uranian moons have no map: no visible-light global mosaic from a verified source (Venus and Titan show only cloud or haze tops in visible light).",
+  "output": {
+    "directory": "UniverseSim/Assets/UniverseSim/Textures/Bodies",
+    "width": 2048,
+    "height": 1024,
+    "jpeg_quality": 90
+  },
+  "textures": [
+    {
+      "body": 199,
+      "name": "Mercury",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Mercury_MESSENGER_mosaic_global_250m_2013.tif",
+        "layout": "Mercury_MESSENGER_mosaic_global_250m_2013_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Mercury_MESSENGER_mosaic_global_250m_2013.lbl"
+      },
+      "content": "Monochrome (750 nm) global mosaic of MESSENGER MDIS images, May 2013 basemap",
+      "credit": "Arizona State University, MESSENGER Team; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/mercury_messenger_mdis_global_mosaic_250m"
+    },
+    {
+      "body": 301,
+      "name": "Moon",
+      "image": {
+        "source_id": "S-NASA-SVS-MOON",
+        "file": "lroc_color_16bit_srgb_4k.tif"
+      },
+      "geometry": {
+        "kind": "manual",
+        "first_column_longitude_deg": -180.0,
+        "first_row_latitude_deg": 90.0,
+        "registration": "area",
+        "latitude": "planetocentric",
+        "locator": "https://svs.gsfc.nasa.gov/4720 (read 2026-10-23): 'The map is centered on 0° longitude'; 4096 x 2048 pixels over the whole globe (LRO coordinates are planetocentric)"
+      },
+      "content": "Color from the LROC WAC Hapke normalized mosaic (643, 566 and 415 nm as red, green and blue), exposure and white balance adjusted toward human vision (2025 map)",
+      "credit": "NASA's Scientific Visualization Studio; LRO LROC and LOLA teams",
+      "page": "https://svs.gsfc.nasa.gov/4720"
+    },
+    {
+      "body": 399,
+      "name": "Earth",
+      "image": {
+        "source_id": "S-NASA-EO-BMNG",
+        "file": "world.topo.bathy.200408.3x5400x2700_geo.tif"
+      },
+      "geometry": {
+        "kind": "geotiff"
+      },
+      "content": "Cloud-free true color composite of August 2004 from MODIS, with shading for topography and bathymetry",
+      "credit": "NASA Earth Observatory (Reto Stöckli)",
+      "page": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/"
+    },
+    {
+      "body": 401,
+      "name": "Phobos",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Phobos_ME_SRC_Mosaic_Global_16ppd.tif",
+        "layout": "Phobos_ME_SRC_Mosaic_Global_16ppd_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Phobos_ME_SRC_Mosaic_Global_16ppd.lbl"
+      },
+      "content": "Monochrome global mosaic of Mars Express SRC images",
+      "credit": "Europlanet Research Infrastructure; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/phobos_mars_express_src_global_mosaic_12m"
+    },
+    {
+      "body": 499,
+      "name": "Mars",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Mars_Viking_ClrMosaic_global_925m.tif",
+        "layout": "Mars_Viking_ClrMosaic_global_925m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Mars_Viking_ClrMosaic_global_925m.lbl"
+      },
+      "content": "Color synthesized from Viking Orbiter red- and violet-filter images, photometrically normalized",
+      "credit": "Planetary Data System; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/mars_viking_global_color_mosaic_925m"
+    },
+    {
+      "body": 501,
+      "name": "Io",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.tif",
+        "layout": "Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Io_GalileoSSI-Voyager_Global_Mosaic_ClrMerge_1km.lbl"
+      },
+      "content": "False color from Galileo SSI violet, green and near-infrared (756 nm) images; the colors the eye would see are similar but much more muted (product description)",
+      "credit": "Planetary Data System; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/io_galileo_ssi_global_color_merge_mosaic_1km"
+    },
+    {
+      "body": 502,
+      "name": "Europa",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Europa_Voyager_GalileoSSI_global_mosaic_500m.tif",
+        "layout": "Europa_Voyager_GalileoSSI_global_mosaic_500m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Europa_Voyager_GalileoSSI_global_mosaic_500m.lbl"
+      },
+      "content": "Monochrome global mosaic of Voyager and Galileo SSI images",
+      "credit": "Archinal, B., Colvin, T., Davies, M., Gitlin, A., Kirk, R., Weller, L.; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/europa_voyager_galileo_ssi_global_mosaic_500m"
+    },
+    {
+      "body": 503,
+      "name": "Ganymede",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.tif",
+        "layout": "Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Ganymede_Voyager_GalileoSSI_Global_ClrMosaic_1435m.lbl"
+      },
+      "content": "Color global mosaic of Galileo SSI and Voyager images",
+      "credit": "USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/ganymede_voyager_galileo_ssi_color_global_mosaic_1_4km"
+    },
+    {
+      "body": 504,
+      "name": "Callisto",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif",
+        "layout": "Callisto_Voyager_GalileoSSI_global_mosaic_1km_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Callisto_Voyager_GalileoSSI_global_mosaic_1km.lbl"
+      },
+      "content": "Monochrome global mosaic of Voyager and Galileo SSI images",
+      "credit": "USGS Astrogeology Science Center",
+      "page": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Callisto_Voyager_GalileoSSI_global_mosaic_1km.tif"
+    },
+    {
+      "body": 599,
+      "name": "Jupiter",
+      "image": {
+        "source_id": "S-NASA-PHOTOJOURNAL",
+        "file": "PIA07782.tif"
+      },
+      "geometry": {
+        "kind": "manual",
+        "first_column_longitude_deg": -180.0,
+        "first_row_latitude_deg": 90.0,
+        "registration": "point",
+        "latitude": "planetocentric",
+        "locator": "PIA07782 (read 2026-10-23): 'Pixels in the rectangular map cover equal increments of planetocentric latitude ... and longitude, and extend to 180 degrees of latitude and 360 degrees of longitude'; the gridded version (PIA07782_fig1) runs from 180 to 0 to 180 degrees west, left to right; 3601 x 1801 pixels"
+      },
+      "content": "Color close to what the eye would see, from Cassini ISS 750 nm and 451 nm images of 2000-12-11 and 12; Jupiter's clouds have moved and changed since",
+      "credit": "NASA/JPL/Space Science Institute",
+      "page": "https://science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/"
+    },
+    {
+      "body": 601,
+      "name": "Mimas",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Cassini_DLR_Mimas.zip",
+        "member": "Cassini_DLR/MI_170630_DLR_basemap_degrees.tif"
+      },
+      "geometry": {
+        "kind": "geotiff"
+      },
+      "content": "Monochrome global basemap of Cassini ISS images (DLR)",
+      "credit": "DLR (German Aerospace Center), Cassini ISS; USGS Astrogeology Science Center",
+      "page": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mimas/Cassini_DLR_Mimas.zip"
+    },
+    {
+      "body": 602,
+      "name": "Enceladus",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Enceladus_Cassini_mosaic_global_110m.tif",
+        "layout": "Enceladus_Cassini_mosaic_global_110m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Enceladus_Cassini_mosaic_global_110m.lbl"
+      },
+      "content": "Monochrome global mosaic of Cassini ISS images",
+      "credit": "Cassini Team, Jet Propulsion Laboratory, Space Science Institute; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/enceladus_cassini_global_mosaic_110m"
+    },
+    {
+      "body": 603,
+      "name": "Tethys",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Tethys_Cassini_mosaic_global_293m.tif",
+        "layout": "Tethys_Cassini_mosaic_global_293m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Tethys_Cassini_mosaic_global_293m.lbl"
+      },
+      "content": "Monochrome global mosaic of Cassini ISS images",
+      "credit": "NASA, JPL, Space Science Institute; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/tethys_cassini_global_mosaic_293m"
+    },
+    {
+      "body": 604,
+      "name": "Dione",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Dione_Cassini_Voyager_mosaic_global_154m.tif",
+        "layout": "Dione_Cassini_Voyager_mosaic_global_154m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Dione_Cassini_Voyager_mosaic_global_154m.lbl"
+      },
+      "content": "Monochrome global mosaic of Cassini ISS and Voyager images",
+      "credit": "NASA, JPL, Space Science Institute; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/dione_cassini_voyager_global_mosaic_154m"
+    },
+    {
+      "body": 605,
+      "name": "Rhea",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Rhea_Cassini_Voyager_mosaic_global_417m.tif",
+        "layout": "Rhea_Cassini_Voyager_mosaic_global_417m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Rhea_Cassini_Voyager_mosaic_global_417m.lbl"
+      },
+      "content": "Monochrome global mosaic of Cassini ISS and Voyager images",
+      "credit": "NASA, JPL, Space Science Institute; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/rhea_cassini_voyager_global_mosaic_417m"
+    },
+    {
+      "body": 608,
+      "name": "Iapetus",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Iapetus_Cassini_Voyager_mosaic_global_783m.tif",
+        "layout": "Iapetus_Cassini_Voyager_mosaic_global_783m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Iapetus_Cassini_Voyager_mosaic_global_783m.lbl"
+      },
+      "content": "Monochrome global mosaic of Cassini ISS and Voyager images",
+      "credit": "Space Science Institute, Cassini Team, Jet Propulsion Laboratory; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/iapetus_cassini_voyager_global_mosaic_803m"
+    },
+    {
+      "body": 801,
+      "name": "Triton",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif",
+        "layout": "Triton_Voyager2_ClrMosaic_GlobalFill_600m_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Triton_Voyager2_ClrMosaic_GlobalFill_600m.lbl"
+      },
+      "content": "Color synthesized from Voyager 2 orange, violet and ultraviolet filter images shown as red, green and blue",
+      "credit": "NASA, Jet Propulsion Laboratory, Paul Schenk; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/triton_voyager_2_global_color_mosaic_600m"
+    },
+    {
+      "body": 901,
+      "name": "Charon",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+        "layout": "Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Charon_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl"
+      },
+      "content": "Monochrome global mosaic of New Horizons LORRI and MVIC images",
+      "credit": "NASA, Johns Hopkins University Applied Physics Laboratory, Southwest Research Institute, Lunar and Planetary Institute; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/charon_new_horizons_lorri_mvic_global_mosaic_300m"
+    },
+    {
+      "body": 999,
+      "name": "Pluto",
+      "image": {
+        "source_id": "S-USGS-ASTRO",
+        "file": "Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.tif",
+        "layout": "Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit_pds3.lbl"
+      },
+      "geometry": {
+        "kind": "isis",
+        "label": "Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl"
+      },
+      "content": "Monochrome global mosaic of New Horizons LORRI and MVIC images",
+      "credit": "NASA, Johns Hopkins University Applied Physics Laboratory, Southwest Research Institute, Lunar and Planetary Institute; USGS Astrogeology Science Center",
+      "page": "https://astrogeology.usgs.gov/search/map/pluto_new_horizons_lorri_mvic_global_mosaic_300m"
+    }
+  ]
+}

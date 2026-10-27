@@ -1,4 +1,4 @@
-"""Command line: fetch, verify, build, info and reference (ARCHITECTURE section 4)."""
+"""Command line: fetch, verify, build, info, textures and reference (ARCHITECTURE section 4)."""
 
 from __future__ import annotations
 
@@ -40,6 +40,13 @@ def _cmd_info(repo: Repo, args: argparse.Namespace) -> int:
         if index:
             print()
         describe(path)
+    return 0
+
+
+def _cmd_textures(repo: Repo, args: argparse.Namespace) -> int:
+    from .textures import build_textures
+
+    build_textures(repo)
     return 0
 
 
@@ -91,6 +98,12 @@ def main(argv: list[str] | None = None) -> int:
     info = commands.add_parser("info", help="print the contents of packs (default: all in data/packs)")
     info.add_argument("packs", nargs="*", type=Path)
     info.set_defaults(run=_cmd_info)
+
+    textures = commands.add_parser(
+        "textures",
+        help="reproject the surface maps of data/catalog/textures.json into the Unity project, with ATTRIBUTION.md",
+    )
+    textures.set_defaults(run=_cmd_textures)
 
     reference = commands.add_parser(
         "reference",
