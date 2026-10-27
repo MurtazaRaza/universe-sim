@@ -8,8 +8,10 @@ add_library(usim_core STATIC
     ephemeris/chebyshev_segment.cpp
     ephemeris/coverage.cpp
     ephemeris/ephemeris_chain.cpp
+    frames/euler.cpp
     frames/frames.cpp
     frames/iau_rotation.cpp
+    frames/pck_orientation.cpp
     math/chebyshev.cpp
     math/quat.cpp
     presentation/axis_convention.cpp

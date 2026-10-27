@@ -51,7 +51,8 @@ double largest_element(const Mat3& m) {
 }
 
 void check_orientations(const usim::data::DataPack& pack, const std::string& reference) {
-    const FrameSystem frames(std::vector(pack.rotation_elements().begin(), pack.rotation_elements().end()));
+    const FrameSystem frames(std::vector(pack.rotation_elements().begin(), pack.rotation_elements().end()),
+                             pack.pck_orientations());
     const auto table = v::read_reference(reference);
     const auto body_col = table.column("body");
     const auto tdb_col = table.column("tdb_s");

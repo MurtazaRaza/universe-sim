@@ -40,7 +40,7 @@ extern "C" {
 #endif
 
 /* Version of this binary interface. */
-#define USIM_ABI_VERSION 3u
+#define USIM_ABI_VERSION 4u
 
 /* Returns the ABI version the library was built with (USIM_ABI_VERSION of its header). */
 USIM_API uint32_t usim_abi_version(void);
@@ -109,7 +109,8 @@ typedef struct usim_instant {
 #define USIM_FRAME_ECLIPJ2000 1
 #define USIM_FRAME_BODY_FIXED 2
 
-/* A reference frame: its kind, and for USIM_FRAME_BODY_FIXED the body (the IAU body-fixed frame). */
+/* A reference frame: its kind, and for USIM_FRAME_BODY_FIXED the body (its body-fixed frame: the binary PCK
+ * model where the pack has one, else the IAU frame; see usim_body_rotation_model). */
 typedef struct usim_frame {
     int32_t kind;
     int32_t reserved; /* zero */
@@ -132,6 +133,7 @@ typedef struct usim_frame {
 #define USIM_STRUCT_COVERAGE 13
 #define USIM_STRUCT_STAR 14
 #define USIM_STRUCT_RING 15
+#define USIM_STRUCT_ROTATION_MODEL 16
 
 /* The size in bytes of the struct with identifier struct_id as the library declares it, or 0 for an
  * unknown identifier. */
@@ -180,7 +182,7 @@ USIM_API int32_t usim_simulation_coverage(const usim_simulation* sim, usim_cover
 /* usim_body_info flags. */
 #define USIM_BODY_HAS_EPHEMERIS 0x1u    /* a position is available (possibly approximate) */
 #define USIM_BODY_APPROXIMATE 0x2u      /* placed at its primary (ADR-0008) */
-#define USIM_BODY_HAS_ROTATION 0x4u     /* has an IAU rotation model (orientation, body-fixed frame) */
+#define USIM_BODY_HAS_ROTATION 0x4u     /* has a rotation model (orientation, body-fixed frame) */
 #define USIM_BODY_HAS_MEAN_RADIUS 0x8u
 #define USIM_BODY_HAS_RADII 0x10u       /* triaxial radii a, b, c */
 #define USIM_BODY_HAS_GM 0x20u
@@ -242,6 +244,23 @@ USIM_API int32_t usim_body_quantity(const usim_simulation* sim, int32_t index, i
 
 /* Why a body is approximate (ADR-0008), or "" if it is not. */
 USIM_API int32_t usim_body_approximation(const usim_simulation* sim, int32_t index, const char** out_reason);
+
+/* Rotation model kinds (usim::sim::RotationModelKind). */
+#define USIM_ROTATION_NONE 0       /* no rotation model: no body-fixed frame */
+#define USIM_ROTATION_IAU 1        /* IAU rotation elements from a text PCK */
+#define USIM_ROTATION_BINARY_PCK 2 /* a binary PCK with a frame kernel offset (P6-05; the Moon's mean Earth frame) */
+
+/* What defines a body's body-fixed frame and orientation, with its provenance. */
+typedef struct usim_rotation_model {
+    int32_t kind;           /* USIM_ROTATION_* */
+    int32_t reserved;       /* zero */
+    const char* frame_name; /* SPICE name of a binary PCK model's frame, for example "MOON_ME_DE440_ME421"; else "" */
+    const char* source_id;  /* registry id of the model's data, "" for USIM_ROTATION_NONE */
+    const char* locator;    /* the files and variables or segments the model comes from */
+} usim_rotation_model;
+
+/* The rotation model of the body at index. Strings live as long as the simulation. */
+USIM_API int32_t usim_body_rotation_model(const usim_simulation* sim, int32_t index, usim_rotation_model* out);
 
 /* A registered data source (docs/DATA_SOURCES.md). */
 typedef struct usim_source {
@@ -345,8 +364,8 @@ typedef struct usim_state {
 USIM_API int32_t usim_state_at(const usim_simulation* sim, usim_body_id body, usim_body_id center, usim_frame frame,
                                usim_instant t, usim_state* out);
 
-/* The rotation from the body's IAU body-fixed frame to frame at t. Fails with USIM_STATUS_NOT_FOUND
- * without a rotation model. */
+/* The rotation from the body's body-fixed frame to frame at t. Fails with USIM_STATUS_NOT_FOUND without a
+ * rotation model, and USIM_STATUS_OUT_OF_COVERAGE outside a binary PCK model's coverage. */
 USIM_API int32_t usim_orientation_at(const usim_simulation* sim, usim_body_id body, usim_frame frame, usim_instant t,
                                      usim_quatd* out);
 

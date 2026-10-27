@@ -11,7 +11,8 @@ namespace usim::frames {
 enum class FrameKind : std::int32_t {
     icrf = 0,       ///< International Celestial Reference Frame (SPICE "J2000"): the core's native frame.
     eclipj2000 = 1, ///< Mean ecliptic and equinox of J2000 (SPICE "ECLIPJ2000"): the default display frame.
-    body_fixed = 2, ///< A body's IAU body-fixed frame (SPICE "IAU_<body>"). Available from P4-03.
+    body_fixed = 2, ///< A body's body-fixed frame: its binary PCK model's frame where the pack has one
+                    ///< (P6-05), else its IAU frame (SPICE "IAU_<body>"). Available from P4-03.
 };
 
 /// Identifies a reference frame: its kind and, for body-fixed frames, the body.
@@ -23,7 +24,7 @@ public:
     /// ECLIPJ2000.
     [[nodiscard]] static constexpr FrameId eclipj2000() noexcept { return FrameId(FrameKind::eclipj2000, {}); }
 
-    /// The IAU body-fixed frame of `body`.
+    /// The body-fixed frame of `body` (FrameSystem resolves which model defines it).
     [[nodiscard]] static constexpr FrameId body_fixed(catalog::BodyId body) noexcept {
         return FrameId(FrameKind::body_fixed, body);
     }

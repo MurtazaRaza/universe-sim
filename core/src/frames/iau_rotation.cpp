@@ -1,6 +1,7 @@
 #include "usim/frames/iau_rotation.hpp"
 
 #include "usim/constants.hpp"
+#include "usim/frames/euler.hpp"
 #include "usim/frames/frame_system.hpp"
 #include "usim/math/angle.hpp"
 
@@ -29,22 +30,6 @@ PolyValue polynomial(std::span<const double> c, double x) noexcept {
         value = value * x + c[k];
     }
     return {value, derivative};
-}
-
-// The frame rotation [angle]_3 (SPICE ROTATE(angle, 3)) and its derivative with respect to the angle.
-math::Mat3 frame_z(double c, double s) noexcept {
-    return math::Mat3{{c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0}};
-}
-math::Mat3 frame_z_derivative(double c, double s) noexcept {
-    return math::Mat3{{-s, c, 0.0, -c, -s, 0.0, 0.0, 0.0, 0.0}};
-}
-
-// The frame rotation [angle]_1 and its derivative with respect to the angle.
-math::Mat3 frame_x(double c, double s) noexcept {
-    return math::Mat3{{1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c}};
-}
-math::Mat3 frame_x_derivative(double c, double s) noexcept {
-    return math::Mat3{{0.0, 0.0, 0.0, 0.0, -s, c, 0.0, -c, -s}};
 }
 
 } // namespace
@@ -95,30 +80,15 @@ IauAngles iau_angles(const IauRotationElements& e, time::Instant t) noexcept {
 
 FrameTransform iau_transform(const IauRotationElements& e, time::Instant t) noexcept {
     const IauAngles a = iau_angles(e, t);
-    // R = M_w M_dec M_ra with M_w = [W]_3, M_dec = [pi/2 - dec]_1 and M_ra = [pi/2 + ra]_3, so
-    // dR/dt = M_w' W' M_dec M_ra + M_w M_dec' (-dec') M_ra + M_w M_dec M_ra' ra'.
-    const double phi = math::k_half_pi - a.pole_dec_rad;
-    const double psi = math::k_half_pi + a.pole_ra_rad;
-    const double cw = std::cos(a.prime_meridian_rad);
-    const double sw = std::sin(a.prime_meridian_rad);
-    const double cp = std::cos(phi);
-    const double sp = std::sin(phi);
-    const double cs = std::cos(psi);
-    const double ss = std::sin(psi);
-    const math::Mat3 m_w = frame_z(cw, sw);
-    const math::Mat3 m_dec = frame_x(cp, sp);
-    const math::Mat3 m_ra = frame_z(cs, ss);
-    const math::Mat3 pole = m_dec * m_ra;
-    math::Mat3 rotation = m_w * pole;
-    math::Mat3 rate = frame_z_derivative(cw, sw) * pole * a.prime_meridian_rate_rad_s +
-                      m_w * frame_x_derivative(cp, sp) * m_ra * (-a.pole_dec_rate_rad_s) +
-                      m_w * m_dec * frame_z_derivative(cs, ss) * a.pole_ra_rate_rad_s;
+    // R = [W]_3 [pi/2 - delta_0]_1 [pi/2 + alpha_0]_3.
+    FrameTransform transform = euler_313_transform({math::k_half_pi + a.pole_ra_rad, math::k_half_pi - a.pole_dec_rad,
+                                                    a.prime_meridian_rad, a.pole_ra_rate_rad_s, -a.pole_dec_rate_rad_s,
+                                                    a.prime_meridian_rate_rad_s});
     if (e.frame.kind() == FrameKind::eclipj2000) {
         const math::Mat3 to_ecliptic = icrf_to_eclipj2000();
-        rotation = rotation * to_ecliptic;
-        rate = rate * to_ecliptic;
+        transform = FrameTransform(transform.rotation() * to_ecliptic, transform.rotation_rate_per_s() * to_ecliptic);
     }
-    return {rotation, rate};
+    return transform;
 }
 
 } // namespace usim::frames

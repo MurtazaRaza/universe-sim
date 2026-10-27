@@ -64,6 +64,9 @@ static_assert(USIM_SNAPSHOT_COMPRESSED == usim::sim::snapshot_compressed);
 static_assert(USIM_SNAPSHOT_NO_LIGHT == usim::sim::snapshot_no_light);
 static_assert(USIM_ID_NAMESPACE_HR == static_cast<std::int32_t>(usim::catalog::IdNamespace::hr));
 static_assert(USIM_STAR_HAS_COLOR == usim::sim::star_has_color);
+static_assert(USIM_ROTATION_NONE == static_cast<std::int32_t>(usim::sim::RotationModelKind::none));
+static_assert(USIM_ROTATION_IAU == static_cast<std::int32_t>(usim::sim::RotationModelKind::iau));
+static_assert(USIM_ROTATION_BINARY_PCK == static_cast<std::int32_t>(usim::sim::RotationModelKind::binary_pck));
 
 struct usim_simulation {
     usim_simulation(usim::sim::Simulation s)
@@ -257,6 +260,8 @@ USIM_API uint32_t usim_struct_size(int32_t struct_id) {
         return sizeof(usim_star);
     case USIM_STRUCT_RING:
         return sizeof(usim_ring);
+    case USIM_STRUCT_ROTATION_MODEL:
+        return sizeof(usim_rotation_model);
     default:
         return 0;
     }
@@ -427,6 +432,23 @@ USIM_API int32_t usim_body_approximation(const usim_simulation* sim, int32_t ind
         }
         const usim::data::PositionApproximation* a = sim->sim.ephemeris().approximation(body->id);
         *out_reason = a != nullptr ? a->reason.c_str() : "";
+        return USIM_STATUS_OK;
+    });
+}
+
+USIM_API int32_t usim_body_rotation_model(const usim_simulation* sim, int32_t index, usim_rotation_model* out) {
+    return guarded([&] {
+        if (sim == nullptr || out == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : "out");
+        }
+        std::int32_t status = USIM_STATUS_OK;
+        const usim::catalog::Body* body = body_at(sim, index, status);
+        if (body == nullptr) {
+            return status;
+        }
+        const usim::sim::RotationModelInfo& model = sim->sim.rotation_model(static_cast<std::size_t>(index));
+        *out = {static_cast<std::int32_t>(model.kind), 0, model.frame_name.c_str(), model.source.source_id.c_str(),
+                model.source.locator.c_str()};
         return USIM_STATUS_OK;
     });
 }

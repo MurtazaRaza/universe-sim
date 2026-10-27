@@ -9,6 +9,7 @@
 #include <cmath>
 #include <filesystem>
 #include <span>
+#include <string>
 #include <vector>
 
 using usim::ErrorCode;
@@ -88,7 +89,7 @@ TEST_CASE("states in a body-fixed frame include the frame's rotation", "[sim]") 
     CHECK(s.value().state.velocity_km_s == expected_state.velocity_km_s);
     CHECK(s.value().frame == fixed);
     // A body without a rotation model has no body-fixed frame.
-    CHECK(sim.state(naif(1002), naif(1001), FrameId::body_fixed(naif(1002)), t).error().code ==
+    CHECK(sim.state(naif(1002), naif(1001), FrameId::body_fixed(naif(1003)), t).error().code ==
           ErrorCode::not_found);
 }
 
@@ -100,7 +101,45 @@ TEST_CASE("orientations rotate body-fixed axes into the requested frame", "[sim]
     const auto to_ecliptic =
         sim.frames().transform(FrameId::body_fixed(naif(1001)), FrameId::eclipj2000(), t).value();
     CHECK(usim::math::same_rotation(q.value(), Quat::from_matrix(to_ecliptic.rotation()), 1e-15));
-    CHECK(sim.orientation(naif(1002), FrameId::icrf(), t).error().code == ErrorCode::not_found);
+    CHECK(sim.orientation(naif(1003), FrameId::icrf(), t).error().code == ErrorCode::not_found);
+    // 1002's binary PCK model ends at 50000 s.
+    CHECK(sim.orientation(naif(1002), FrameId::icrf(), t).has_value());
+    CHECK(sim.orientation(naif(1002), FrameId::icrf(), at(60000.0)).error().code == ErrorCode::out_of_coverage);
+}
+
+TEST_CASE("rotation models name the binary PCK frame or the IAU elements, with their sources", "[sim]") {
+    const Simulation sim = make_simulation();
+    const auto index_of = [&](std::int64_t id) {
+        const auto bodies = sim.catalog().bodies();
+        for (std::size_t i = 0; i < bodies.size(); ++i) {
+            if (bodies[i].id == naif(id)) {
+                return i;
+            }
+        }
+        FAIL("no body " << id);
+        return std::size_t{0};
+    };
+    const auto& star = sim.rotation_model(index_of(1000));
+    CHECK(star.kind == usim::sim::RotationModelKind::iau);
+    CHECK(star.frame_name.empty());
+    CHECK(star.source.source_id == expected::k_rotations[0].source_id);
+    CHECK(star.source.locator == expected::k_rotations[0].locator);
+
+    // 1001 has both: the binary PCK model wins. It has no offset, and its three segments are summarized.
+    const auto& planet = sim.rotation_model(index_of(1001));
+    const auto& model = expected::k_orientations[0];
+    REQUIRE(model.segments.size() == 3);
+    CHECK(planet.kind == usim::sim::RotationModelKind::binary_pck);
+    CHECK(planet.frame_name == model.frame_name);
+    CHECK(planet.source.source_id == model.segments[0].source_id);
+    CHECK(planet.source.locator ==
+          std::string(model.segments[0].locator) + " to " + model.segments[2].locator + " (3 segments)");
+
+    // 1002's offset comes from the segments' own source, so its id is not repeated.
+    const auto& moon = sim.rotation_model(index_of(1002));
+    CHECK(moon.source.locator == std::string(expected::k_orientations[1].segments[0].locator) + "; " +
+                                     expected::k_orientations[1].offset_locator);
+    CHECK(sim.rotation_model(index_of(1003)).kind == usim::sim::RotationModelKind::none);
 }
 
 TEST_CASE("a snapshot gives render positions, orientations, radii and flags", "[sim][snapshot]") {

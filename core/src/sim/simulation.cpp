@@ -6,11 +6,46 @@
 
 namespace usim::sim {
 
+namespace {
+
+// The rotation model of `body` for display: its binary PCK model, else its IAU elements.
+RotationModelInfo describe_rotation(const frames::FrameSystem& frames, catalog::BodyId body) {
+    RotationModelInfo info;
+    if (const frames::PckOrientation* model = frames.find_pck_orientation(body)) {
+        info.kind = RotationModelKind::binary_pck;
+        info.frame_name = model->frame_name;
+        info.source.source_id = model->segments.front().source.source_id;
+        // Up to two segments are listed; a longer run (the Earth's 1000-day segments) by its first and last.
+        const std::vector<frames::PckSegment>& segments = model->segments;
+        if (segments.size() <= 2) {
+            for (std::size_t i = 0; i < segments.size(); ++i) {
+                info.source.locator += (i > 0 ? "; " : "") + segments[i].source.locator;
+            }
+        } else {
+            info.source.locator = segments.front().source.locator + " to " + segments.back().source.locator + " (" +
+                                  std::to_string(segments.size()) + " segments)";
+        }
+        if (model->offset_source) {
+            info.source.locator += "; ";
+            if (model->offset_source->source_id != info.source.source_id) {
+                info.source.locator += model->offset_source->source_id + " ";
+            }
+            info.source.locator += model->offset_source->locator;
+        }
+    } else if (const frames::IauRotationElements* elements = frames.find_rotation(body)) {
+        info.kind = RotationModelKind::iau;
+        info.source = elements->source;
+    }
+    return info;
+}
+
+} // namespace
+
 Simulation::Simulation(std::unique_ptr<const data::DataPack> pack, ephemeris::EphemerisChain chain,
                        frames::FrameSystem frames, ephemeris::TimeInterval coverage,
-                       std::vector<SnapshotBody> bodies)
+                       std::vector<SnapshotBody> bodies, std::vector<RotationModelInfo> rotation_models)
     : pack_(std::move(pack)), chain_(std::move(chain)), frames_(std::move(frames)), coverage_(coverage),
-      clock_(coverage, time::Instant()), bodies_(std::move(bodies)) {
+      clock_(coverage, time::Instant()), bodies_(std::move(bodies)), rotation_models_(std::move(rotation_models)) {
     for (const catalog::Body& body : pack_->catalog().bodies()) {
         if (body.kind == catalog::BodyKind::star && chain_.contains(body.id)) {
             light_ = body.id;
@@ -26,7 +61,8 @@ Result<Simulation> Simulation::create(data::DataPack pack) {
         return chain.error();
     }
     frames::FrameSystem frames(std::vector<frames::IauRotationElements>(owned->rotation_elements().begin(),
-                                                                        owned->rotation_elements().end()));
+                                                                        owned->rotation_elements().end()),
+                               owned->pck_orientations());
 
     // The clock's limits: where every catalog body with a position is covered. With gaps, the span of
     // that intersection; queries in a gap still report out of coverage.
@@ -44,7 +80,7 @@ Result<Simulation> Simulation::create(data::DataPack pack) {
         }
         entry.max_radius_km =
             std::max({entry.radius_km, entry.radii_km.x, entry.radii_km.y, entry.radii_km.z});
-        entry.has_rotation = frames.find_rotation(body.id) != nullptr;
+        entry.has_rotation = frames.has_body_fixed_frame(body.id);
         const auto is_planet = [](catalog::BodyKind k) {
             return k == catalog::BodyKind::planet || k == catalog::BodyKind::dwarf_planet;
         };
@@ -74,8 +110,13 @@ Result<Simulation> Simulation::create(data::DataPack pack) {
         return make_error(ErrorCode::data_format,
                           "the pack's ephemeris covers no time span common to all its bodies");
     }
+    std::vector<RotationModelInfo> rotation_models;
+    rotation_models.reserve(owned->catalog().bodies().size());
+    for (const catalog::Body& body : owned->catalog().bodies()) {
+        rotation_models.push_back(describe_rotation(frames, body.id));
+    }
     return Simulation(std::move(owned), std::move(chain).value(), std::move(frames), *span,
-                      std::move(bodies));
+                      std::move(bodies), std::move(rotation_models));
 }
 
 Result<Simulation> Simulation::load(std::span<const std::byte> bytes) {

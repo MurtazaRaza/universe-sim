@@ -19,6 +19,7 @@ add_executable(usim_core_tests
     ephemeris/test_ephemeris_chain.cpp
     frames/test_frames.cpp
     frames/test_iau_rotation.cpp
+    frames/test_pck_orientation.cpp
     math/test_chebyshev.cpp
     math/test_quat.cpp
     math/test_vec_mat.cpp

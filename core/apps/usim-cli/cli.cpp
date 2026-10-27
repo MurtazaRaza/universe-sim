@@ -32,7 +32,7 @@ Commands:
   catalog                             Bodies, their sourced values and the sources
   coverage                            The time span the pack covers
   state BODY                          Position and velocity of BODY relative to --center
-  orientation BODY                    Rotation from BODY's IAU body-fixed frame to --frame
+  orientation BODY                    Rotation from BODY's body-fixed frame to --frame
   snapshot                            Every body in render coordinates, as a host receives them
   orbit BODY                          One revolution of BODY around --center (default: its usual center)
 
@@ -312,16 +312,30 @@ Result<void> cmd_catalog(const Context& c) {
         return !chain.contains(id) ? "none"
                                    : (chain.approximation(id) != nullptr ? "approximate" : "ephemeris");
     };
+    // The model that defines the body-fixed frame of the body at catalog index i.
+    const auto rotation = [&](std::size_t i) {
+        switch (c.sim.rotation_model(i).kind) {
+        case sim::RotationModelKind::iau:
+            return "iau";
+        case sim::RotationModelKind::binary_pck:
+            return "binary-pck";
+        case sim::RotationModelKind::none:
+            break;
+        }
+        return "none";
+    };
     if (c.csv) {
         c.out << "id,name,kind,primary,position,rotation_model,gm_km3_s2,mean_radius_km,radius_a_km,radius_b_"
                  "km,radius_c_km\n";
-        for (const catalog::Body& b : c.sim.catalog().bodies()) {
+        const auto bodies = c.sim.catalog().bodies();
+        for (std::size_t i = 0; i < bodies.size(); ++i) {
+            const catalog::Body& b = bodies[i];
             const auto value = [](const catalog::Quantity& q) {
                 return q.has_value() ? number(*q.value) : std::string();
             };
             c.out << catalog::to_string(b.id) << ',' << csv_field(b.name) << ',' << catalog::to_string(b.kind)
                   << ',' << (b.primary ? catalog::to_string(*b.primary) : std::string()) << ','
-                  << position(b.id) << ',' << (c.sim.frames().find_rotation(b.id) != nullptr ? "yes" : "no")
+                  << position(b.id) << ',' << rotation(i)
                   << ',' << value(b.gm) << ',' << value(b.mean_radius) << ',' << value(b.radius_a) << ','
                   << value(b.radius_b) << ',' << value(b.radius_c) << '\n';
         }
@@ -336,7 +350,9 @@ Result<void> cmd_catalog(const Context& c) {
           << "},\"coverage\":{\"start\":" << json_time(c, c.sim.coverage().start)
           << ",\"end\":" << json_time(c, c.sim.coverage().end) << "},\"bodies\":[";
     bool first = true;
-    for (const catalog::Body& b : c.sim.catalog().bodies()) {
+    const auto bodies = c.sim.catalog().bodies();
+    for (std::size_t i = 0; i < bodies.size(); ++i) {
+        const catalog::Body& b = bodies[i];
         const data::PositionApproximation* a = chain.approximation(b.id);
         c.out << (first ? "" : ",") << "{\"id\":" << json_string(catalog::to_string(b.id))
               << ",\"name\":" << json_string(b.name)
@@ -344,7 +360,7 @@ Result<void> cmd_catalog(const Context& c) {
               << (b.primary ? json_string(catalog::to_string(*b.primary)) : std::string("null"))
               << ",\"position\":" << json_string(position(b.id))
               << ",\"approximation\":" << (a != nullptr ? json_string(a->reason) : std::string("null"))
-              << ",\"rotation_model\":" << (c.sim.frames().find_rotation(b.id) != nullptr ? "true" : "false")
+              << ",\"rotation_model\":" << json_string(rotation(i))
               << ",\"gm\":" << json_quantity(b.gm) << ",\"mean_radius\":" << json_quantity(b.mean_radius)
               << ",\"radius_a\":" << json_quantity(b.radius_a)
               << ",\"radius_b\":" << json_quantity(b.radius_b)

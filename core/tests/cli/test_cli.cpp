@@ -96,15 +96,20 @@ TEST_CASE("usim reports query failures with the status", "[cli]") {
 TEST_CASE("usim catalog and coverage", "[cli]") {
     const Output json = run({"catalog"});
     REQUIRE(json.code == 0);
-    CHECK(contains(json.out, R"("format":"1.2")"));
+    CHECK(contains(json.out, R"("format":"1.3")"));
     CHECK(contains(
         json.out,
         R"("position":"approximate","approximation":"Synthetic: no segment; placed at its primary")"));
     CHECK(contains(json.out, R"("source":"S-TEST-A")"));
     CHECK(contains(json.out, "\"name\":\"Test K\xc3\xb6rper\""));
+    CHECK(contains(json.out, R"("name":"Test Star","kind":"star")"));
+    CHECK(contains(json.out, R"("rotation_model":"iau")"));        // 1000
+    CHECK(contains(json.out, R"("rotation_model":"binary-pck")")); // 1001 and 1002
+    CHECK(contains(json.out, R"("rotation_model":"none")"));       // 1003
     const Output csv = run({"catalog", "--format", "csv"});
     REQUIRE(csv.code == 0);
     CHECK(lines(csv.out) == 1 + std::size(expected::k_bodies));
+    CHECK(contains(csv.out, ",ephemeris,binary-pck,"));
     const Output coverage = run({"coverage", "--format", "csv"});
     REQUIRE(coverage.code == 0);
     CHECK(contains(coverage.out, ",3600,86400\n"));
@@ -125,7 +130,7 @@ TEST_CASE("usim snapshot, orientation and orbit", "[cli]") {
     const Output orientation = run({"orientation", "1001", "--time", "2000-01-01T20:00:00 TDB"});
     REQUIRE(orientation.code == 0);
     CHECK(contains(orientation.out, "\"quaternion_wxyz\":["));
-    CHECK(run({"orientation", "1002"}).code == usim::cli::k_exit_failed); // no rotation model
+    CHECK(run({"orientation", "1003"}).code == usim::cli::k_exit_failed); // no rotation model
 
     const Output orbit = run({"orbit", "1001", "--time", "2000-01-01T20:00:00 TDB", "--format", "csv"});
     REQUIRE(orbit.code == 0);

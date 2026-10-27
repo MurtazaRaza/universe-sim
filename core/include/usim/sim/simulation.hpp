@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <memory>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace usim::sim {
@@ -107,6 +108,23 @@ struct StarSnapshot {
     std::uint32_t flags = 0;  ///< StarFlag bits.
 };
 
+/// The kind of model that defines a body's body-fixed frame. Values are stable and shared with the C ABI
+/// (USIM_ROTATION_*).
+enum class RotationModelKind : std::int32_t {
+    none = 0,       ///< No rotation model: no body-fixed frame.
+    iau = 1,        ///< IAU rotation elements from a text PCK (data pack section ROTN).
+    binary_pck = 2, ///< A binary PCK model with a frame kernel offset (section ORNT, P6-05).
+};
+
+/// What defines a body's body-fixed frame, with its provenance, for display.
+struct RotationModelInfo {
+    RotationModelKind kind = RotationModelKind::none; ///< The model in use.
+    std::string frame_name;    ///< SPICE name of a binary PCK model's body-fixed frame; empty otherwise.
+    /// The model's source and locator: the text PCK and its variables; for a binary PCK model, the PCK's
+    /// segments and the frame kernel's offset variables (prefixed with the offset's source id when it differs).
+    catalog::SourceRef source;
+};
+
 /// The facade hosts use (ARCHITECTURE section 3.4): a loaded pack with its catalog, ephemeris, frames and
 /// clock, answering state and orientation queries and filling per-frame snapshots.
 ///
@@ -137,6 +155,13 @@ public:
     /// The frames, including the body-fixed frames of the pack's rotation models.
     [[nodiscard]] const frames::FrameSystem& frames() const noexcept { return frames_; }
 
+    /// The model that defines the body-fixed frame of the catalog body at `index` (catalog order): a binary
+    /// PCK model where the pack has one, else IAU rotation elements. Precondition: index < catalog size.
+    /// The reference lives as long as the simulation.
+    [[nodiscard]] const RotationModelInfo& rotation_model(std::size_t index) const noexcept {
+        return rotation_models_[index];
+    }
+
     /// The span in which every body with a position is covered: the clock's limits (FR-SIM-03).
     [[nodiscard]] ephemeris::TimeInterval coverage() const noexcept { return coverage_; }
 
@@ -153,7 +178,8 @@ public:
                                           time::Instant t) const;
 
     /// The orientation of `body` at `t` (FR-SIM-02): the rotation from its body-fixed frame to `frame`.
-    /// Fails with ErrorCode::not_found if the body has no rotation model or `frame` is not available.
+    /// Fails with ErrorCode::not_found if the body has no rotation model or `frame` is not available, and
+    /// with ErrorCode::out_of_coverage outside a binary PCK model's coverage.
     [[nodiscard]] Result<math::Quat> orientation(catalog::BodyId body, frames::FrameId frame,
                                                  time::Instant t) const;
 
@@ -213,14 +239,15 @@ private:
 
     Simulation(std::unique_ptr<const data::DataPack> pack, ephemeris::EphemerisChain chain,
                frames::FrameSystem frames, ephemeris::TimeInterval coverage,
-               std::vector<SnapshotBody> bodies);
+               std::vector<SnapshotBody> bodies, std::vector<RotationModelInfo> rotation_models);
 
-    std::unique_ptr<const data::DataPack> pack_; // owned at a fixed address: chain_ points into it
+    std::unique_ptr<const data::DataPack> pack_; // owned at a fixed address: chain_ and frames_ point into it
     ephemeris::EphemerisChain chain_;
     frames::FrameSystem frames_;
     ephemeris::TimeInterval coverage_;
     SimulationClock clock_;
     std::vector<SnapshotBody> bodies_;
+    std::vector<RotationModelInfo> rotation_models_; // catalog order
     catalog::BodyId light_;
 };
 

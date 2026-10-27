@@ -64,7 +64,7 @@ usim::sim::Simulation cpp_simulation() {
 
 TEST_CASE("C ABI reports the ABI version of its header", "[capi]") {
     CHECK(usim_abi_version() == USIM_ABI_VERSION);
-    CHECK(USIM_ABI_VERSION == 3u);
+    CHECK(USIM_ABI_VERSION == 4u);
 }
 
 TEST_CASE("C ABI version string matches the core", "[capi]") {
@@ -100,6 +100,7 @@ TEST_CASE("C ABI struct sizes are reported for binding checks", "[capi]") {
     CHECK(usim_struct_size(USIM_STRUCT_COVERAGE) == sizeof(usim_coverage));
     CHECK(usim_struct_size(USIM_STRUCT_STAR) == 48);
     CHECK(usim_struct_size(USIM_STRUCT_RING) == sizeof(usim_ring));
+    CHECK(usim_struct_size(USIM_STRUCT_ROTATION_MODEL) == 32);
     CHECK(usim_struct_size(0) == 0);
     CHECK(usim_struct_size(999) == 0);
 }
@@ -293,7 +294,7 @@ TEST_CASE("C ABI states and orientations equal the C++ facade", "[capi]") {
         sim.orientation(usim::catalog::BodyId::naif(1001), usim::frames::FrameId::icrf(), instant);
     REQUIRE(expected_q.has_value());
     CHECK((q.w == expected_q.value().w && q.x == expected_q.value().x && q.z == expected_q.value().z));
-    CHECK(usim_orientation_at(h.sim, naif(1002), frame(USIM_FRAME_ICRF), t, &q) == USIM_STATUS_NOT_FOUND);
+    CHECK(usim_orientation_at(h.sim, naif(1003), frame(USIM_FRAME_ICRF), t, &q) == USIM_STATUS_NOT_FOUND);
 }
 
 TEST_CASE("C ABI snapshots equal the C++ facade", "[capi]") {
@@ -487,3 +488,27 @@ TEST_CASE("C ABI rings with their sources", "[capi][rings]") {
     CHECK(usim_ring_at(h.sim, count, &ring) == USIM_STATUS_INVALID_ARGUMENT);
 }
 
+
+TEST_CASE("C ABI rotation models equal the C++ facade", "[capi]") {
+    Handle h;
+    const auto sim = cpp_simulation();
+    std::int32_t count = 0;
+    REQUIRE(usim_body_count(h.sim, &count) == USIM_STATUS_OK);
+    for (std::int32_t i = 0; i < count; ++i) {
+        const auto& expected_model = sim.rotation_model(static_cast<std::size_t>(i));
+        usim_rotation_model model{};
+        REQUIRE(usim_body_rotation_model(h.sim, i, &model) == USIM_STATUS_OK);
+        CHECK(model.kind == static_cast<std::int32_t>(expected_model.kind));
+        CHECK(std::string(model.frame_name) == expected_model.frame_name);
+        CHECK(std::string(model.source_id) == expected_model.source.source_id);
+        CHECK(std::string(model.locator) == expected_model.source.locator);
+    }
+    usim_rotation_model model{};
+    REQUIRE(usim_body_rotation_model(h.sim, 2, &model) == USIM_STATUS_OK); // 1001: binary PCK over IAU
+    CHECK(model.kind == USIM_ROTATION_BINARY_PCK);
+    CHECK(std::string(model.frame_name) == expected::k_orientations[0].frame_name);
+    REQUIRE(usim_body_rotation_model(h.sim, 4, &model) == USIM_STATUS_OK); // 1003: none
+    CHECK(model.kind == USIM_ROTATION_NONE);
+    CHECK(usim_body_rotation_model(h.sim, count, &model) == USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_body_rotation_model(h.sim, 0, nullptr) == USIM_STATUS_INVALID_ARGUMENT);
+}
