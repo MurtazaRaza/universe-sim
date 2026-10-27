@@ -158,6 +158,26 @@ namespace UniverseSim.Unity.Tests.PlayMode
             rig.Select(earth);
             yield return Frames(3);
             yield return Screenshot("10-earth-and-stars");
+
+            // Surface maps (P6-07), from the side they are lit from: the Earth and Jupiter from the Sun, the
+            // Moon from the Earth (its near side).
+            yield return JumpAlong(earth, earthRadius * 3.0, host.Views[earth].LightDirection);
+            yield return Screenshot("11-earth-sunlit");
+            var moonToEarth = host.Views[earth].transform.position - host.Views[moon].transform.position;
+            yield return JumpAlong(moon, Sim.Bodies[moon].MaxRadiusKm * 3.0, moonToEarth);
+            yield return Screenshot("12-moon-from-earth");
+            yield return JumpAlong(jupiter, Sim.Bodies[jupiter].MaxRadiusKm * 3.0, host.Views[jupiter].LightDirection);
+            yield return Screenshot("13-jupiter-sunlit");
+        }
+
+        // Places the camera on the side of a body that `direction` (render space, host axes) points to, the
+        // inverse of the rig's yaw and pitch (CameraRig: yaw = atan2(x, z), pitch = asin(y)).
+        private IEnumerator JumpAlong(int index, double distanceKm, Vector3 direction)
+        {
+            var d = direction.normalized;
+            rig.JumpTo(index, distanceKm, Math.Atan2(d.x, d.z), Math.Asin(Mathf.Clamp(d.y, -1f, 1f)));
+            rig.Select(index);
+            yield return Frames(3);
         }
 
         [UnityTest]

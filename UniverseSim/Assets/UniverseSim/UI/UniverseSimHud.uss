@@ -16,8 +16,17 @@
     bottom: 0;
 }
 
+.body-label-anchor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+}
+
 .body-label {
     position: absolute;
+    white-space: nowrap;
     font-size: 12px;
     color: rgb(200, 210, 230);
     -unity-text-outline-width: 0;

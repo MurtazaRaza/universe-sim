@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UniverseSim.Unity;
 using UnityEditor;
@@ -59,6 +60,9 @@ namespace UniverseSim.Unity.Editor
             var host = simulation.AddComponent<SimulationHost>();
             Set(host, "bodyMaterial", bodyMaterial);
             Set(host, "starMaterial", starMaterial);
+            var (manifest, maps) = LoadSurfaceMaps();
+            Set(host, "surfaceMapManifest", manifest);
+            SetArray(host, "surfaceMapTextures", maps);
             var orbits = simulation.AddComponent<OrbitLines>();
             Set(orbits, "host", host);
             Set(orbits, "lineMaterial", lineMaterial);
@@ -141,6 +145,48 @@ namespace UniverseSim.Unity.Editor
             settings.match = 0.5f;
             EditorUtility.SetDirty(settings);
             return settings;
+        }
+
+        // The surface maps the pipeline wrote (P6-07): Textures/Bodies/BodyTextures.json and the textures it names.
+        // None before `usim-pipeline textures` has run; a named texture that is missing is an error.
+        private static (TextAsset Manifest, Texture2D[] Textures) LoadSurfaceMaps()
+        {
+            var manifest = AssetDatabase.LoadAssetAtPath<TextAsset>(SurfaceMapFolder + "/BodyTextures.json");
+            if (manifest == null)
+            {
+                return (null, new Texture2D[0]);
+            }
+            var textures = new List<Texture2D>();
+            foreach (var map in SurfaceMaps.ReadManifest(manifest.text))
+            {
+                var path = SurfaceMapFolder + "/" + map.file;
+                var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (texture == null)
+                {
+                    throw new System.IO.FileNotFoundException("The surface map manifest names a texture that is missing", path);
+                }
+                textures.Add(texture);
+            }
+            return (manifest, textures.ToArray());
+        }
+
+        private const string SurfaceMapFolder = Root + "/Textures/Bodies";
+
+        // Sets a serialized (private) array field of object references.
+        private static void SetArray(Object target, string field, Object[] values)
+        {
+            var serialized = new SerializedObject(target);
+            var property = serialized.FindProperty(field);
+            if (property == null || !property.isArray)
+            {
+                throw new System.MissingFieldException(target.GetType().Name, field);
+            }
+            property.arraySize = values.Length;
+            for (var i = 0; i < values.Length; ++i)
+            {
+                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // Sets a serialized (private) field, as the Inspector would.

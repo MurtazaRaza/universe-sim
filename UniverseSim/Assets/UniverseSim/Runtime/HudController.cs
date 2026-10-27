@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Unity.Profiling;
 using UniverseSim.Unity.Native;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -52,6 +53,10 @@ namespace UniverseSim.Unity
         private Toggle toggleOrbits, toggleLabels, toggleStars, toggleEnlarged, toggleFly;
         private VisualElement labelsLayer;
         private readonly List<Label> labels = new List<Label>();
+        // Each label sits in a zero-size anchor moved by translate, which repaints without a layout pass (left
+        // and top would lay out the panel every frame); the label centers itself on the anchor in USS.
+        private readonly List<VisualElement> labelAnchors = new List<VisualElement>();
+        private readonly List<bool> labelShown = new List<bool>();
         private InputAction togglePause, faster, slower;
 
         private int rateIndex;
@@ -171,13 +176,20 @@ namespace UniverseSim.Unity
             focusField.choices = names;
 
             labels.Clear();
+            labelAnchors.Clear();
+            labelShown.Clear();
             labelsLayer.Clear();
             foreach (var body in sim.Bodies)
             {
+                var anchor = new VisualElement { pickingMode = PickingMode.Ignore };
+                anchor.AddToClassList("body-label-anchor");
                 var label = new Label(body.Kind == 0 ? string.Empty : body.Name) { pickingMode = PickingMode.Ignore };
                 label.AddToClassList("body-label");
-                labelsLayer.Add(label);
+                anchor.Add(label);
+                labelsLayer.Add(anchor);
                 labels.Add(label);
+                labelAnchors.Add(anchor);
+                labelShown.Add(true);
             }
             sim.TryFormatTime(sim.Clock.Now, NativeConstants.ScaleUtc, 0, out var nowText);
             dateEntry.value = nowText;
@@ -335,12 +347,15 @@ namespace UniverseSim.Unity
         // planet's label otherwise), and always when the moon is selected or in focus.
         private const float MoonLabelMinPixels = 28f;
 
+        private static readonly ProfilerMarker LabelsMarker = new ProfilerMarker("UniverseSim.Labels");
+
         private void PlaceLabels()
         {
             if (labelsLayer.resolvedStyle.display == DisplayStyle.None || root.panel == null)
             {
                 return;
             }
+            using var marker = LabelsMarker.Auto();
             // Labels of bodies hidden behind the focus body are not shown: the camera is at the origin, so a
             // body is hidden if it is farther away than the focus and its line of sight passes through it.
             var focus = rig.FocusIndex >= 0 && rig.FocusIndex < host.Views.Count ? host.Views[rig.FocusIndex] : null;
@@ -358,15 +373,19 @@ namespace UniverseSim.Unity
                 var chosen = i == rig.SelectedIndex || i == rig.FocusIndex;
                 var visible = view.HasPosition && p.z > 0f && label.text.Length > 0 && !behindFocus &&
                               (chosen || view.StandsApart(cam, MoonLabelMinPixels));
-                label.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+                var anchor = labelAnchors[i];
+                if (visible != labelShown[i])
+                {
+                    labelShown[i] = visible;
+                    anchor.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+                }
                 if (!visible)
                 {
                     continue;
                 }
                 // Screen coordinates of the camera's own target (the screen, or a texture when one is set).
                 var panelPosition = RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(p.x, cam.pixelHeight - p.y));
-                label.style.left = panelPosition.x;
-                label.style.top = panelPosition.y;
+                anchor.style.translate = new Translate(panelPosition.x, panelPosition.y);
                 label.EnableInClassList("selected", i == rig.SelectedIndex);
             }
         }
@@ -394,8 +413,9 @@ namespace UniverseSim.Unity
             AddQuantity(index, NativeConstants.FieldRadiusA, "Equatorial radius a", cited);
             AddQuantity(index, NativeConstants.FieldRadiusB, "Equatorial radius b", cited);
             AddQuantity(index, NativeConstants.FieldRadiusC, "Polar radius c", cited);
-            AddRow("Rotation model", body.HasRotation ? "IAU rotation elements (pck00011.tpc)" : "none in the data", null);
+            AddRotation(body, cited);
             AddRings(index, cited);
+            AddSurfaceMap(body);
 
             infoValues.Add(MakeLabel("Motion", "value-name"));
             motionLabel = MakeLabel(string.Empty, "value");
@@ -446,6 +466,37 @@ namespace UniverseSim.Unity
                 {
                     cited.Add(ring.OpticalDepthSource.Id);
                 }
+            }
+        }
+
+        // The body's surface map (P6-07): a visual asset, so its credit is shown here rather than among the
+        // pack's sources; ATTRIBUTION.md has the full record.
+        private void AddSurfaceMap(BodyInfo body)
+        {
+            if (host.SurfaceMaps.TryGet(body.Id, out var map, out _))
+            {
+                AddRow("Surface map", map.content, $"{map.credit} ({map.sourceId}, {map.page})");
+            }
+            else if (body.HasMeanRadius && body.Kind != 1)
+            {
+                AddRow("Surface map", "none: plain lit sphere", null);
+            }
+        }
+
+        // The model that orients the body, from the core: IAU elements, or a binary PCK frame (P6-05).
+        private void AddRotation(BodyInfo body, ISet<string> cited)
+        {
+            var value = body.RotationKind switch
+            {
+                NativeConstants.RotationIau => "IAU rotation elements",
+                NativeConstants.RotationBinaryPck => $"binary PCK, frame {body.RotationFrameName}",
+                _ => "none in the data",
+            };
+            var source = body.RotationSourceId.Length > 0 ? $"{body.RotationSourceId}: {body.RotationLocator}" : null;
+            AddRow("Rotation model", value, source);
+            if (body.RotationSourceId.Length > 0)
+            {
+                cited.Add(body.RotationSourceId);
             }
         }
 

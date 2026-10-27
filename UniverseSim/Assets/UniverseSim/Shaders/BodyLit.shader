@@ -1,7 +1,8 @@
 // Bodies lit by the star from its true direction (SPEC FR-REN-07, P5-07). The direction comes per body from
 // the core's snapshot (_LightDirection, unit vector in render space), not from a scene light, so phases
 // stay correct at every scale and for bodies whose distance is compressed (ADR-0009). Lambert diffuse
-// with a small ambient term; no textures in v1 (P5-12 deferred), so the albedo is neutral.
+// with a small ambient term. The albedo is the body's surface map where it has one (P6-07, ADR-0014: set per
+// body with a white base color, on a mesh whose UVs are planetocentric longitude and latitude), else neutral.
 //
 // A body with rings (P6-04) also gets their shadow: the ray from the surface toward the light crosses the
 // ring plane (the body's equatorial plane, its local XZ plane) at some radius, and the light is dimmed by
@@ -13,6 +14,7 @@ Shader "UniverseSim/BodyLit"
     Properties
     {
         _BaseColor ("Base color (neutral, not a measured albedo)", Color) = (0.75, 0.75, 0.75, 1)
+        _BaseMap ("Surface map (set per body)", 2D) = "white" {}
         _Ambient ("Ambient", Range(0, 0.2)) = 0.015
         _LightDirection ("Light direction (set per body)", Vector) = (0, 1, 0, 0)
         _RingParams ("Ring parameters (set per body)", Vector) = (0, 0, 0, 0)
@@ -34,6 +36,7 @@ Shader "UniverseSim/BodyLit"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
+                float4 _BaseMap_ST;
                 half _Ambient;
                 float4 _LightDirection;
                 float4 _RingParams;
@@ -41,11 +44,14 @@ Shader "UniverseSim/BodyLit"
 
             TEXTURE2D(_RingProfile);
             SAMPLER(sampler_RingProfile);
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
             };
 
             struct Varyings
@@ -53,6 +59,7 @@ Shader "UniverseSim/BodyLit"
                 float4 positionHCS : SV_POSITION;
                 float3 normalWS : TEXCOORD0;
                 float3 positionWS : TEXCOORD1;
+                float2 uv : TEXCOORD2;
             };
 
             Varyings vert(Attributes input)
@@ -61,6 +68,7 @@ Shader "UniverseSim/BodyLit"
                 output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.uv = input.uv;
                 return output;
             }
 
@@ -102,7 +110,8 @@ Shader "UniverseSim/BodyLit"
                 {
                     lit *= RingTransmission(input.positionWS, light);
                 }
-                return half4(_BaseColor.rgb * (lit + _Ambient), 1);
+                half3 albedo = _BaseColor.rgb * SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb;
+                return half4(albedo * (lit + _Ambient), 1);
             }
             ENDHLSL
         }
@@ -120,6 +129,7 @@ Shader "UniverseSim/BodyLit"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
+                float4 _BaseMap_ST;
                 half _Ambient;
                 float4 _LightDirection;
                 float4 _RingParams;

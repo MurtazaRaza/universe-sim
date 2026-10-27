@@ -1,12 +1,12 @@
 // Orbit lines with a constant width in pixels at any distance (P5-10). Each point of the path is two
 // vertices; the vertex shader moves them apart across the screen-space direction to the neighbouring point
 // (TEXCOORD0.xyz), by _HalfWidthPixels on the side given by TEXCOORD0.w. A width in world units would make
-// a line passing near the camera cover the whole screen.
+// a line passing near the camera cover the whole screen. Every line is in one mesh (OrbitLines.cs), so the
+// color comes per vertex (COLOR, already linear).
 Shader "UniverseSim/Line"
 {
     Properties
     {
-        _Color ("Color", Color) = (0.45, 0.6, 0.85, 0.55)
         _HalfWidthPixels ("Half width (pixels)", Float) = 0.75
     }
     SubShader
@@ -27,7 +27,6 @@ Shader "UniverseSim/Line"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
-                half4 _Color;
                 float _HalfWidthPixels;
             CBUFFER_END
 
@@ -35,11 +34,13 @@ Shader "UniverseSim/Line"
             {
                 float4 positionOS : POSITION;
                 float4 neighbour : TEXCOORD0; // xyz: the neighbouring point; w: side (+1 or -1)
+                half4 color : COLOR;
             };
 
             struct Varyings
             {
                 float4 positionHCS : SV_POSITION;
+                half4 color : COLOR;
             };
 
             Varyings vert(Attributes input)
@@ -61,12 +62,13 @@ Shader "UniverseSim/Line"
                     }
                 }
                 output.positionHCS = here;
+                output.color = input.color;
                 return output;
             }
 
             half4 frag(Varyings input) : SV_Target
             {
-                return _Color;
+                return input.color;
             }
             ENDHLSL
         }
