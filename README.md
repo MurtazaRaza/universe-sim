@@ -1,14 +1,15 @@
 # Universe Simulation
 
-A physically accurate simulation of the universe, built on real data from verified scientific sources. It starts with the Solar System and expands outward.
+An educational simulation of the universe: physically accurate underneath, built on real data from verified scientific sources, and beautiful and fun to explore on top. It starts with the Solar System and expands outward.
 
 - **Real data:** positions come from the JPL DE440 planetary ephemeris, and physical constants from NAIF and IAU sources. Every value is traceable to its source.
 - **Engine-agnostic core:** all calculations live in a standalone C++20 library (`core/`) with no engine dependencies and a stable C ABI.
 - **Unity renders:** the Unity project is a thin host that displays what the core computes. Other engines can be added later.
+- **Stylized look, real facts:** effects may be exaggerated and the art style leans a little toward the toon-like, but positions, timing, lighting and every number shown stay true. A realistic style turns the exaggerations off.
 
 ## Status
 
-Phases 0 to 5 are complete on macOS: the engine-agnostic core and the Unity viewer (v1). A reproducible Python pipeline builds the data pack from pinned NAIF kernels. The core evaluates the DE440 ephemeris (within 1 mm of NASA's CSPICE toolkit and within 10 m of JPL Horizons), orients bodies with the IAU rotation models, runs the simulation clock, samples orbit paths and fills per-frame snapshots in a few microseconds. It is exposed through a C ABI and the `usim` command line. The Unity viewer shows the Solar System at the current time with time controls, focus and zoom from 1 km above a surface to the whole system, orbit lines, labels, an info panel with sources, and a scale mode switch. Phase 6 adds the 9,096 naked-eye stars of the Bright Star Catalogue as the sky, Saturn's rings, and, in an optional pack built from the JPL satellite ephemerides, the planet centers and 21 major moons from 2000 to 2100. Textures are still to come. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+Phases 0 to 6 are complete on macOS: the engine-agnostic core and the Unity viewer (v1). A reproducible Python pipeline builds the data pack from pinned NAIF kernels. The core evaluates the DE440 ephemeris (within 1 mm of NASA's CSPICE toolkit and within 10 m of JPL Horizons), orients bodies with the IAU rotation models (the Moon with DE440's high-precision lunar orientation), runs the simulation clock, samples orbit paths and fills per-frame snapshots in a few microseconds. It is exposed through a C ABI and the `usim` command line. The Unity viewer shows the Solar System at the current time with time controls, focus and zoom from 1 km above a surface to the whole system, orbit lines, labels, an info panel with sources, and a scale mode switch. Phase 6 adds the 9,096 naked-eye stars of the Bright Star Catalogue as the sky, Saturn's rings, and, in an optional pack built from the JPL satellite ephemerides, the planet centers and 21 major moons from 2000 to 2100, with the Earth oriented by NAIF's Earth orientation file. Surface maps of 19 planets and moons, reprojected from NASA and USGS mission mosaics, cover their spheres; rebuilding them needs their sources (`tools/scripts/fetch-texture-sources.sh`, about 4.8 GB). See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## Documentation
 
@@ -72,7 +73,7 @@ core/build/dev/apps/usim-cli/usim --help
 
 In the default pack, Mars to Pluto are shown at their system barycenters and flagged approximate, because the default ephemeris file has no planet-center data for them ([ADR-0008](docs/adr/0008-planet-positions-at-system-barycenters.md)). The optional moons pack has the real centers and the moons; the viewer uses it when it has been built ([ADR-0010](docs/adr/0010-moons-in-an-optional-pack.md)).
 
-The default data pack (`data/packs/solar-system-1.2.0.uspack`) is committed through Git LFS, so a clone has data without running the pipeline. To rebuild data from the sources:
+The default data pack (`data/packs/solar-system-1.3.0.uspack`) is committed through Git LFS, so a clone has data without running the pipeline. To rebuild data from the sources:
 
 ```
 python3 -m venv tools/pipeline/.venv
@@ -90,7 +91,7 @@ The plugin build currently targets macOS. A Windows build is deferred (P0-13); i
 
 ## Data acknowledgments
 
-This project uses data from NASA/JPL Solar System Dynamics and the NAIF SPICE generic kernels, including the DE440 planetary and lunar ephemeris (Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H., 2021, AJ 161:105) the JPL satellite ephemerides, and the IAU WGCCRE 2015 rotational elements (Archinal, B. A., et al., 2018, CMDA 130:22). The stars come from the Bright Star Catalogue, 5th revised edition (Hoffleit, D., Warren Jr., W. H., 1991), retrieved through the VizieR service of CDS, Strasbourg. Saturn's ring dimensions come from the IAU WGPSN Gazetteer of Planetary Nomenclature and their optical depths from the NASA PDS Ring-Moon Systems Node. The full list is in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).
+This project uses data from NASA/JPL Solar System Dynamics and the NAIF SPICE generic kernels, including the DE440 planetary and lunar ephemeris (Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H., 2021, AJ 161:105) the JPL satellite ephemerides, and the IAU WGCCRE 2015 rotational elements (Archinal, B. A., et al., 2018, CMDA 130:22). The stars come from the Bright Star Catalogue, 5th revised edition (Hoffleit, D., Warren Jr., W. H., 1991), retrieved through the VizieR service of CDS, Strasbourg. Saturn's ring dimensions come from the IAU WGPSN Gazetteer of Planetary Nomenclature and their optical depths from the NASA PDS Ring-Moon Systems Node. The surface maps come from NASA and USGS Astrogeology mission mosaics, credited per map in [UniverseSim/Assets/UniverseSim/ATTRIBUTION.md](UniverseSim/Assets/UniverseSim/ATTRIBUTION.md). The full list is in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).
 
 ## License
 

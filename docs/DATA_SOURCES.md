@@ -136,19 +136,30 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | Form | Built into the SPICE Toolkit; the pipeline reads it with `bodc2n` from CSPICE N0067 (SpiceyPy 8.2.0). No file to pin; the toolkit version is recorded in each pack's metadata. |
 | Used by | Body names in the data pack (title-cased for display, for example "Earth Barycenter"). |
 
-### S-NAIF-MOONPA: high-precision lunar orientation (Tier 1, Phase 6 optional)
+### S-NAIF-MOONPA: high-precision lunar orientation (Tier 1)
 
 | | |
 |---|---|
-| File | `moon_pa_de440_200625.bpc` (binary PCK, 12 MB). Downloaded into `data/raw/naif/` on 2026-10-21 (size checked against the server); not yet registered in `sources.json` (P6-05). |
-| URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ |
+| Provides | The orientation of the Moon from DE440: the Euler angles of the lunar principal axes frame `MOON_PA_DE440` relative to the ICRF, and the constant rotation from it to the mean Earth/polar axis frame `MOON_ME_DE440_ME421` (aligned with DE421's ME frame). |
+| Files | `moon_pa_de440_200625.bpc` (binary PCK type 2, 12.9 MB, 1549-12-31 to 2650-01-25) and `moon_de440_250416.tf` (lunar frame kernel, the current one; it replaced `moon_de440_200625.tf`, which the PCK's comments name, and `moon_pa_de440_220930.tf`, changing only alias frame ID codes) |
+| URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ and https://naif.jpl.nasa.gov/pub/naif/generic_kernels/fk/satellites/ |
+| Underlying source | Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H. (2021). The JPL Planetary and Lunar Ephemerides DE440 and DE441. *The Astronomical Journal*, 161:105. https://doi.org/10.3847/1538-3881/abd414 (cited in both kernels' comments) |
+| Checksums | No publisher checksum list (neither directory has an `aa_checksums.txt`). Pinned on 2026-10-22: `moon_pa_de440_200625.bpc` 12,863,488 bytes, SHA-256 60cd55aa401ea2ea97360636f567554bfe4e37bb829f901b4460a455dfaf783f (identical to the copy downloaded on 2026-10-21); `moon_de440_250416.tf` 19,478 bytes, SHA-256 a47c71e9c9f33796bdafb2c9d69a7ee447b6016ecad80f71cd6f3e479f9cf768. |
+| Used by | Both packs: the Moon's body-fixed frame `MOON_ME_DE440_ME421` (section ORNT, P6-05, [ADR-0012](adr/0012-lunar-orientation-from-the-binary-pck.md)); VAL-04 reference orientations of the Moon. |
+| Notes | The frame kernel's comments put the ME and PA frames about 0.029 degrees apart, and `IAU_MOON` (the IAU model of `pck00011.tpc`) within about 0.0051 degrees of ME over 2000 to 2040; measured over the default pack's span, up to 1.06e-4 rad (ADR-0012). NAIF's server was slow on 2026-10-22: `fetch` timed out twice on the PCK before it completed. |
 
-### S-NAIF-EARTHPCK: high-precision Earth orientation (Tier 1, Phase 6 optional)
+### S-NAIF-EARTHPCK: Earth orientation, combined historical and long-term predict (Tier 1, optional)
 
 | | |
 |---|---|
-| Files | `earth_latest_high_prec.bpc` (updated frequently) and long-span combined or predict files |
-| URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ |
+| Provides | The orientation of the terrestrial frame ITRF93 (PCK class ID 3000, a frame built into SPICE) as Euler angles relative to ECLIPJ2000: precession (IAU 1976), nutation (IAU 1980) with the EOP nutation corrections, rotation through true sidereal time (UT1) and polar motion (the kernel's comments). |
+| Files | `earth_1962_260806_2126_combined.bpc` (binary PCK type 2, 31.3 MB: 61 segments of up to 1000 daily records of degree 20, 1962-01-20 to 2126-11-03; optional, used by the moons pack only) |
+| URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ (NAIF moves superseded combined files to `a_old_versions/` in that directory, as it did for the 2024 and 2025 editions; update the file's URL in `data/sources.json` when this one moves) |
+| Underlying source | The JPL Earth Orientation Parameter file `latest.long` (https://eop.jpl.nasa.gov/eop/latest.long), last datum 2026-08-06, extended by NAIF for the long-term predict (the kernel's comments). |
+| Accuracy | From the comments: below 3 microradians up to the last datum and for about 10 weeks after it; after that a low-accuracy predict, estimated at 5 to 6 milliradians, with polar motion and nutation corrections held constant and TAI - UT1R constant. Over that predict interval the comments put it 1.5 to 5.6 milliradians from the `IAU_EARTH` model. |
+| Checksums | No publisher checksum list. Pinned on 2026-10-23: 31,318,016 bytes, SHA-256 cc87ad1a495cf598800ba403763d350f087ac0b97da9fec603278a3864c6a53e (identical to a separate download the same day). |
+| Used by | The moons pack: the Earth's body-fixed frame ITRF93 over its window, 2000 to 2100 (section ORNT, P6-06, [ADR-0013](adr/0013-earth-orientation-in-the-moons-pack.md)); VAL-04 reference orientations of the Earth in that pack. The default pack keeps `IAU_EARTH`: no Earth PCK covers its span (1849 to 2150). |
+| Notes | `earth_latest_high_prec.bpc` (2000 to about three months ahead, replaced at least twice a week under the same name) cannot be pinned and was not used. |
 
 ### S-JPL-SSD-PARAMS: JPL Solar System Dynamics parameter pages (Tier 1)
 
@@ -247,11 +258,44 @@ Notes: these are HTML tables. Values from them enter only through the manual ent
 
 ## 9. Visual assets (rendering only)
 
-Textures and models are not simulation data, but their provenance and licenses are still tracked, in `UniverseSim/Assets/UniverseSim/ATTRIBUTION.md`.
+Textures and models are not simulation data, but their provenance and licenses are still tracked: the sources here and in `data/sources.json` (pinned in the lock file like every input, as optional files), and each asset in `UniverseSim/Assets/UniverseSim/ATTRIBUTION.md`, which `usim-pipeline textures` generates. The surface maps ([ADR-0014](adr/0014-surface-map-textures.md)) are listed per body in `data/catalog/textures.json`. Their sources are about 4.8 GB; `tools/scripts/fetch-texture-sources.sh` downloads and pins them.
 
-| ID | Source | URL | Notes |
-|---|---|---|---|
-| S-NASA-SVS-MOON | NASA SVS CGI Moon Kit (LRO-based color and elevation maps) | https://svs.gsfc.nasa.gov/4720 | |
-| S-USGS-ASTRO | USGS Astrogeology Science Center planetary maps | https://astrogeology.usgs.gov/ | Returned HTTP 403 to scripted requests on 2026-10-20. Retrieve manually and record the page URL in the attribution file. |
+### S-USGS-ASTRO: USGS Astrogeology global mosaics (Tier 1, visual)
 
-Other mission-derived maps (for example from NASA/JPL/Caltech mission archives) may be added the same way. Record the mission, the product and the license for each.
+| | |
+|---|---|
+| Provides | Global image mosaics of planets and moons from NASA and partner missions, as GeoTIFFs with ISIS cube labels (projection) and PDS3 labels (byte layout). |
+| Files | 15 mosaics (Mercury, Mars, Phobos, Io, Europa, Ganymede, Callisto, Enceladus, Tethys, Dione, Rhea, Iapetus, Triton, Charon, Pluto; 17 MB to 1.9 GB, about 4.6 GB in all) with their two labels, and the DLR basemap of Mimas in `Cassini_DLR_Mimas.zip`. |
+| URL | https://astrogeology.usgs.gov/search (product pages); files at https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/ (where planetarymaps.usgs.gov/mosaic/ redirects). |
+| Checksums | Each mosaic has a publisher MD5 file next to it (`<file>.md5`); the labels and the Mimas archive have none and are pinned by SHA-256. |
+| Terms | USGS Copyrights and Credits (read 2026-10-23): USGS-produced data are in the U.S. public domain; credit is requested. The products' FGDC metadata ask users to cite the authors (originators listed per map in ATTRIBUTION.md). |
+| Notes | Scripted requests worked on 2026-10-23 (they returned HTTP 403 on 2026-10-20). Conventions differ per product (longitude direction, the projection center, planetocentric or planetographic latitude, a width slightly over 360 degrees); the pipeline reads them from the ISIS labels. |
+
+### S-NASA-SVS-MOON: NASA SVS CGI Moon Kit (Tier 1, visual)
+
+| | |
+|---|---|
+| Provides | The color map of the Moon built from the LROC WAC Hapke normalized mosaic (643, 566 and 415 nm as red, green and blue, adjusted toward human vision), 2025 version. |
+| Files | `lroc_color_16bit_srgb_4k.tif` (4096 x 2048, 16-bit sRGB, 61.9 MB) |
+| URL | https://svs.gsfc.nasa.gov/4720 |
+| Terms | Public domain unless noted (SVS help page, read 2026-10-23); credit "NASA's Scientific Visualization Studio" as the page asks. |
+
+### S-NASA-EO-BMNG: Blue Marble: Next Generation (Tier 1, visual)
+
+| | |
+|---|---|
+| Provides | A cloud-free true color composite of the Earth from MODIS for each month of 2004, with shading for topography and bathymetry. The August map is used. |
+| Files | `world.topo.bathy.200408.3x5400x2700_geo.tif` (GeoTIFF, WGS 84, 19.8 MB) |
+| URL | https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/ |
+| Terms | The Blue Marble page asks anyone using or republishing it to credit "NASA Earth Observatory" (read 2026-10-23); NASA's media guidelines apply. |
+
+### S-NASA-PHOTOJOURNAL: Cassini's Best Maps of Jupiter, PIA07782 (Tier 1, visual)
+
+| | |
+|---|---|
+| Provides | A cylindrical color map of Jupiter from Cassini ISS images of 2000-12-11 and 12, in planetocentric latitude, "colors close to those the human eye would see" (the page). |
+| Files | `PIA07782.tif` (3601 x 1801, 19.5 MB) |
+| URL | https://science.nasa.gov/photojournal/cassinis-best-maps-of-jupiter-cylindrical-map/ |
+| Terms | NASA media guidelines (read 2026-10-23): generally not subject to U.S. copyright, NASA acknowledged as the source; credit NASA/JPL/Space Science Institute. |
+
+Other mission-derived maps may be added the same way. Record the mission, the product and the license for each.

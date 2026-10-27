@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v0.2 (C ABI version 3) |
+| Status | Draft v0.2 (C ABI version 4) |
 | Last updated | 2026-10-22 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md) (sections 3.4, 3.5 and 5), [SPEC.md](SPEC.md), `core/capi/include/usim/usim.h` |
 
@@ -22,7 +22,7 @@ The host never does orbital mechanics, time scale conversion, frame math or ephe
 
 ```c
 usim_simulation* sim = NULL;
-int32_t status = usim_simulation_load_file("data/packs/solar-system-1.2.0.uspack", &sim);
+int32_t status = usim_simulation_load_file("data/packs/solar-system-1.3.0.uspack", &sim);
 if (status != USIM_STATUS_OK) {
     log("cannot load the pack: %s (%s)", usim_last_error_message(), usim_status_name(status));
 }
@@ -32,7 +32,7 @@ usim_simulation_destroy(sim);
 
 - Check `usim_abi_version()` against the version your binding was written for before anything else, and compare your struct sizes with `usim_struct_size()` (section 9).
 - A file of a few hundred bytes starting with `version https://git-lfs` is a Git LFS pointer, not a pack; the loader says so (`git lfs pull`).
-- Loading reads and verifies the whole pack (SHA-256 included). It takes a fraction of a second for the default pack in a release build, and about 2.6 s for the optional moons pack (304 MB, [ADR-0010](adr/0010-moons-in-an-optional-pack.md)); do it once, not per scene change.
+- Loading reads and verifies the whole pack (SHA-256 included). It takes a fraction of a second for the default pack in a release build, and about 3 s for the optional moons pack (325 MB, [ADR-0010](adr/0010-moons-in-an-optional-pack.md); 3.0 to 5.0 s measured on 2026-10-23 on a loaded machine); do it once, not per scene change.
 - `usim_simulation_load_memory()` loads from a buffer, for platforms where files come from an archive.
 
 ## 3. The frame loop
@@ -129,7 +129,7 @@ Far bodies would still get very large coordinates (the Sun is about 1e8 units aw
 
 ## 6. Frames and axes
 
-- The core's native frame is the **ICRF**; displays use **ECLIPJ2000** (the ecliptic of J2000), which puts the planets near the XY plane. Body-fixed frames (`USIM_FRAME_BODY_FIXED` with a body) exist for bodies with a rotation model.
+- The core's native frame is the **ICRF**; displays use **ECLIPJ2000** (the ecliptic of J2000), which puts the planets near the XY plane. Body-fixed frames (`USIM_FRAME_BODY_FIXED` with a body) exist for bodies with a rotation model: IAU rotation elements, or for the Moon the DE440 binary PCK frame `MOON_ME_DE440_ME421` (ADR-0012), and with the moons pack for the Earth ITRF93 (ADR-0013). `usim_body_rotation_model` says which model a body uses, with its source id and locator; outside a binary PCK model's coverage, orientation queries fail with `USIM_STATUS_OUT_OF_COVERAGE`.
 - The core is right-handed with Z up. `request.axes` maps vectors and quaternions to the host convention (ARCHITECTURE section 5.4): Unity left-handed Y up, Godot right-handed Y up, Unreal left-handed Z up. Never swap axes by hand in the host.
 - Orientations are unit quaternions, scalar first (`w, x, y, z`), rotating the body's own axes into the display frame. Unity's `Quaternion` takes `(x, y, z, w)`.
 - `render_radii` are the radii along the body's own axes (a toward the prime meridian, b, the polar c), already mapped to host axes: scale a unit sphere by them, then rotate.
@@ -150,7 +150,7 @@ Every value the core shows has a source, and the host must show it honestly (FR-
 | `USIM_SNAPSHOT_NO_LIGHT` | No light direction (the body is the star) | Draw it unlit or emissive |
 | `usim_quantity.has_value == 0` | No source provides the value | "Unknown", never 0 |
 
-`usim_body_quantity` returns each value with its unit, uncertainty, source id, locator (file and keyword) and derivation; `usim_source_at` gives the source's title, citation and license for an info panel.
+`usim_body_quantity` returns each value with its unit, uncertainty, source id, locator (file and keyword) and derivation; `usim_body_rotation_model` returns the rotation model (`USIM_ROTATION_IAU` or `USIM_ROTATION_BINARY_PCK`, with the frame name) with its source id and locator; `usim_source_at` gives the source's title, citation and license for an info panel.
 
 ## 8. Errors, memory and threads
 
@@ -167,7 +167,7 @@ Every value the core shows has a source, and the host must show it honestly (FR-
 3. Mirror the structs field for field with sequential layout and the same types (`int32_t`, `int64_t`, `uint32_t`, `double`, pointers). Compare each size with `usim_struct_size(USIM_STRUCT_*)` at startup.
 4. Pass strings in as NUL-terminated UTF-8; read returned `const char*` as UTF-8 without freeing it.
 5. Wrap the `usim_simulation*` in your language's owned handle type (a `SafeHandle` in C#) that calls `usim_simulation_destroy`.
-6. Keep per-frame calls free of allocations on your side too: reuse the snapshot and orbit buffers.
+6. Keep per-frame calls free of allocations on your side too: reuse the snapshot and orbit buffers. Pass them without copying as well: in C#, pin the array and pass a pointer. Unity's Mono copies every element of an `[Out]` array back after each call, whatever the core wrote, which cost several milliseconds per frame for the orbit buffers.
 7. Test the binding against the CLI: the same pack, time and request give the same numbers.
 
 The Unity binding (`Runtime/Native/NativeTypes.cs`, `NativeMethods.cs`, `CoreLibrary.cs`) follows these steps; its EditMode tests check the struct sizes and fill a snapshot from the default pack.

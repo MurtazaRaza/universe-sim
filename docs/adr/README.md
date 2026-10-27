@@ -19,6 +19,10 @@ Write an ADR when a choice affects module boundaries, data formats, units or fra
 | [0009](0009-depth-and-precision-across-scales.md) | Depth and precision across scales | Accepted |
 | [0010](0010-moons-in-an-optional-pack.md) | The major moons in an optional pack, 2000 to 2100 | Accepted |
 | [0011](0011-sky-background-and-rings.md) | Star catalog for the sky background, and planetary rings | Accepted |
+| [0012](0012-lunar-orientation-from-the-binary-pck.md) | The Moon's orientation from the DE440 binary PCK | Accepted |
+| [0013](0013-earth-orientation-in-the-moons-pack.md) | The Earth's orientation from a binary PCK, in the moons pack only | Accepted |
+| [0014](0014-surface-map-textures.md) | Surface map textures from mission mosaics, reprojected by the pipeline | Accepted; plain spheres of decision 1 superseded in part by ADR-0015 |
+| [0015](0015-stylized-presentation-over-real-data.md) | A stylized presentation over real data | Accepted |
 
 ## Template
 

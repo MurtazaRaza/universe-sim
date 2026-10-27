@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Status | Active |
-| Last updated | 2026-10-22 |
-| Current phase | Phase 6: moons, rings and the starry sky done (P6-01 to P6-04, P6-08); open: P6-05, P6-06 (optional PCKs, downloaded, not registered) and P6-07 (textures). Phase 5 done except the owner's hands-on input check. |
+| Last updated | 2026-10-26 |
+| Current phase | Phase 6 done on 2026-10-26 (moons, rings, the starry sky, the Moon's and the Earth's high-precision orientation, surface maps); next: Phase 7 (small bodies). Phase 5 done except the owner's hands-on input check. |
 | Related | [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 ## How to use this plan
@@ -261,8 +261,9 @@ Met on 2026-10-21: `usim snapshot` returns all 21 bodies and `usim orbit` a full
   - 2026-10-21: Done. Orbit lines are meshes with a constant width in pixels (`Line` shader): a world-unit width covered the screen when an orbit passed the camera. Approximate orbits have their own color. Labels follow the bodies and hide behind the focus body.
 - [x] **P5-11** Scale mode toggle with a persistent on-screen indicator.
   - 2026-10-21: Done. Toggle with a persistent indicator that always shows the mode in use. Enlarged mode rule (now in the core): the star keeps its true size, and a planet and its moons are capped at 40 % of their distance.
-- [ ] **P5-12** **(deferred)** Visual assets: textures from verified sources (DATA_SOURCES.md, visual section), with `ATTRIBUTION.md`.
+- [x] **P5-12** **(deferred)** Visual assets: textures from verified sources (DATA_SOURCES.md, visual section), with `ATTRIBUTION.md`.
   - 2026-10-21: Deferred by the project owner: v1 shows untextured, Sun-lit spheres; textures move to Phase 6 (P6-07). Revisit with P6-07.
+  - 2026-10-26: Done with P6-07.
 - [x] **P5-13** Unity tests: EditMode tests for snapshot-to-transform mapping, and a PlayMode smoke test that compares a body's position with CLI output for the same time.
   - 2026-10-21: Done: 13 EditMode and 5 PlayMode tests. The PlayMode suite compares body positions with `usim state` for the same instant, checks jitter, camera transitions and limits, and saves screenshots of seven views with `USIM_SCREENSHOT_DIR`.
 - [x] **P5-14** Decide OQ-07 (Editor hot reload of the native plugin). If yes, implement a development-only loader.
@@ -289,13 +290,19 @@ Met on 2026-10-21 in automated checks: the scene loads the pack and shows every 
   - 2026-10-22: Done: the 21 moons' IAU models come from `pck00011.tpc` through the existing reader (synchronous rotation is in the kernel's PM terms). VAL-04 on the moons pack: 620 orientations of 20 moons within 1.3e-10 rad of `sxform` (the Moon is in the default pack's VAL-04).
 - [x] **P6-04** Saturn's rings and other ring systems: dimensions from a Tier 1 source, rendered as visual-only geometry.
   - 2026-10-22: Done for Saturn ([ADR-0011](adr/0011-sky-background-and-rings.md)): radii of the D, C, B and A rings, the Cassini Division and 13 gaps from the IAU WGPSN Gazetteer (Tier 1), optical depths from the PDS Ring-Moon Systems Node (Tier 2, labeled), transcribed in `data/catalog/rings.json`; pack format 1.2 (section RING), C ABI 3. Unity draws them with opacity from the slant optical depth, the planet's shadow on the rings and the rings' shadow on the planet. Other ring systems are left out until their optical depths are sourced.
-- [ ] **P6-05** Optional: high-precision lunar orientation from `moon_pa_de440_200625.bpc` (binary PCK).
+- [x] **P6-05** Optional: high-precision lunar orientation from `moon_pa_de440_200625.bpc` (binary PCK).
   - 2026-10-22: The file is downloaded into `data/raw/naif/` (size checked; the `pck` directory has no checksum list) but not registered; it needs a binary PCK reader in the pipeline and the core.
-- [ ] **P6-06** Optional: high-precision Earth orientation from `earth_latest_high_prec.bpc`.
+  - 2026-10-22: Done ([ADR-0012](adr/0012-lunar-orientation-from-the-binary-pck.md)). S-NAIF-MOONPA registered with the PCK and the current lunar frame kernel `moon_de440_250416.tf`; the Moon's body-fixed frame is now `MOON_ME_DE440_ME421` (PCK principal axes plus the frame kernel's offset, records copied bit for bit, no IAU fallback). Pack format 1.3 (section ORNT), C ABI 4 (`usim_body_rotation_model`, shown in the info panel); default pack `solar-system-1.3.0.uspack` (36.9 MB), moons pack 1.1.0. VAL-04 for the Moon: 1.3e-12 rad (default pack) and 1.7e-12 rad (moons pack) from CSPICE `sxform`; the IAU model differed from this frame by up to 1.06e-4 rad.
+- [x] **P6-06** Optional: high-precision Earth orientation from `earth_latest_high_prec.bpc`.
   - 2026-10-22: Downloaded like P6-05, not registered.
-- [ ] **P6-07** Textures for the moons with attribution.
+  - 2026-10-23: Done in the moons pack only ([ADR-0013](adr/0013-earth-orientation-in-the-moons-pack.md), chosen by the project owner). Deviation: `earth_latest_high_prec.bpc` changes twice a week under one name and cannot be pinned, so S-NAIF-EARTHPCK pins `earth_1962_260806_2126_combined.bpc` (ITRF93 relative to ECLIPJ2000, 1962 to 2126, a low-accuracy predict after 2026-08-06); no Earth PCK covers the default pack's span, which keeps `IAU_EARTH`. ORNT (format 1.3, unreleased) now allows ECLIPJ2000 segments, models without a frame kernel offset and a microsecond of coverage past the last record. Moons pack 1.2.0 (325 MB). VAL-04 for the Earth: 3.2e-13 rad from CSPICE `sxform`; `IAU_EARTH` differs from ITRF93 by up to 1.5e-3 rad before 2026-08.
+- [x] **P6-07** Textures for the moons with attribution.
+  - 2026-10-26: Implemented, waiting for its source downloads ([ADR-0014](adr/0014-surface-map-textures.md); scope chosen by the project owner on 2026-10-23: the planets and moons with a mission mosaic, 2048 x 1024). 19 maps from S-USGS-ASTRO, S-NASA-SVS-MOON, S-NASA-EO-BMNG and S-NASA-PHOTOJOURNAL in `data/catalog/textures.json` (Pluto included with Charon; no map for Venus, Saturn, Uranus, Neptune, Titan, Deimos and the Uranian moons). `usim-pipeline textures` (Pillow 12.3.0 added) reprojects each to one layout by exact area averaging from its ISIS label, GeoTIFF tags or transcribed values and writes ATTRIBUTION.md; Unity draws them on a mesh whose UVs come from the core's axes, with the credit in the info panel. Checked with six maps from local copies (Gazetteer features, the Earth seen from the Sun), then removed. Open: the sources are about 4.8 GB, deferred at the project owner's request to `tools/scripts/fetch-texture-sources.sh` on a faster network; then rebuild the main scene, run the tests, check the maps and commit them.
+  - 2026-10-26: Done. The project owner ran the script, and the 64 source files are pinned. Each of the 19 maps lines up with IAU Gazetteer features (see ADR-0014). They take 10.7 MB. Deviation: Ganymede's label rounds its pixel size, which leaves the map 1.3e-4 of a pixel short of 360 degrees, below the 1e-6 degree check. The check is now a thousandth of a pixel, and the seam stays continuous; a test covers both. The default pack's lock-file hash was updated (pack 1.3.0, same content).
 - [x] **P6-08** Sky background from a star catalog (SPEC FR-REN-09), requested by the project owner on 2026-10-22.
   - 2026-10-22: Done ([ADR-0011](adr/0011-sky-background-and-rings.md)): the 9096 stars of the Bright Star Catalogue (CDS V/50, S-CDS-BSC5) in pack format 1.2 (section STAR); the core gives directions with proper motion in the display frame and host axes (`usim_fill_stars`, allocation-free); Unity draws them as points sized and colored by a display mapping of V and B-V, with a Stars toggle. The default pack is now `solar-system-1.2.0.uspack` (33.4 MB).
+- [x] **P6-09** Rendering cost of the viewer (levels of detail, batching and other per-frame costs), requested by the project owner on 2026-10-26.
+  - 2026-10-27: Done. Measured by a new PlayMode test (`RenderingCostTests`, 1920 x 1080, moons pack, Editor): main thread 10.3 to 2.2 ms at the start view, 21.3 to 2.3 ms at the Jupiter system, 9.2 to 2.1 ms at the Earth; triangles 546k to 40k at the start view. Most of the time was the C# binding: Unity's Mono copied every element of an `[Out]` array back after each call, 16384 points per orbit line (6 to 14 ms per frame). The snapshot, star and orbit buffers are now pinned and passed as pointers (C ABI unchanged). Bodies draw a sphere of 128 down to 8 segments chosen by their size on screen (outline within 0.5 px, `SphereLods`), with a material per body instead of a property block so they stay in the SRP Batcher; mapped spheres share meshes by radii ratios and use 16-bit indices. The orbit lines are one mesh and one draw call, labels move by `translate` (no layout pass), the template's SSAO feature and the depth and opaque texture copies (read by no shader) are off, and vSync is on.
 
 ---
 
