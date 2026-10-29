@@ -20,6 +20,7 @@ Phases 0 to 6 are complete on macOS: the engine-agnostic core and the Unity view
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phases, tasks and status |
 | [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) | Registry of verified data sources |
 | [docs/API.md](docs/API.md) | Guide for host authors: frame loop, precision, time, bindings |
+| [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md) | The look of the stylized style: palette, shading and effects |
 | [docs/formats/DATA_PACK.md](docs/formats/DATA_PACK.md) | The data pack file format |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 | [CLAUDE.md](CLAUDE.md) | Rules and conventions for AI agents and contributors |

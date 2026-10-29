@@ -14,6 +14,7 @@ A universe simulation built on real, verified data. It starts with the Solar Sys
 4. [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md): the registry of allowed data sources and their tiers.
 5. [docs/adr/](docs/adr/): why the key decisions were made (ADR-0002 covers C++ and the Unity integration).
 6. [docs/API.md](docs/API.md): how hosts use the core (frame loop, precision, time, bindings).
+7. [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md): the look of the stylized style (Track A), with its palette and parameters.
 
 ## Non-negotiable rules
 

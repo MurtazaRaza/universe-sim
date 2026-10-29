@@ -63,6 +63,7 @@ Universe-Simulation/                    repository root
 │   ├── DATA_SOURCES.md                 verified source registry (human-readable)
 │   ├── adr/                            architecture decision records
 │   ├── API.md                          guide for host authors (frame loop, precision, time, bindings)
+│   ├── ART_DIRECTION.md                the look of the stylized style, with reference renders in art/
 │   └── formats/DATA_PACK.md            the data pack format, implemented by the pipeline and the core
 ├── core/                               engine-agnostic simulation (C++20, CMake)
 │   ├── CMakeLists.txt, CMakePresets.json

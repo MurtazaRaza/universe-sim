@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | Status | Active |
-| Last updated | 2026-10-26 |
-| Current phase | Phase 6 done on 2026-10-26 (moons, rings, the starry sky, the Moon's and the Earth's high-precision orientation, surface maps); next: Phase 7 (small bodies). Phase 5 done except the owner's hands-on input check. |
+| Last updated | 2026-10-27 |
+| Current phase | Phase 6 done on 2026-10-26 (moons, rings, the starry sky, the Moon's and the Earth's high-precision orientation, surface maps); next: Phase 7 (small bodies), with Track A (art direction) alongside: A-01 done (the "Adventure" look), next A-02. Phase 5 done except the owner's hands-on input check. |
 | Related | [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 ## How to use this plan
 
 - Work proceeds phase by phase. A phase is done when all its tasks are checked **and** its acceptance criteria are met.
-- Tasks have stable IDs (`P<phase>-<nn>`). Reference them in commits and notes. Do not renumber; append new tasks at the end of a phase.
+- Tasks have stable IDs (`P<phase>-<nn>`; `A-<nn>` for the art direction track and `X-<nn>` for cross-cutting tasks). Reference them in commits and notes. Do not renumber; append new tasks at the end of a phase or track.
 - When you finish a task: check its box and add a dated note under it (one or two lines on what was done and any deviation). Update "Current phase" above when a phase completes.
 - When a task requires a decision that changes [SPEC.md](SPEC.md) or [ARCHITECTURE.md](ARCHITECTURE.md), write an ADR and update those documents in the same change.
 - Tasks marked **(user)** need the user's input or action before or during the work.
@@ -31,6 +31,7 @@
 | 7 | Small bodies | Dwarf planets, asteroids, comets |
 | 8 | N-body sandbox | Hypothetical scenarios with measured drift |
 | 9 | Beyond the Solar System | Stars, exoplanets, galactic scale (outline) |
+| Track A | Art direction (alongside Phases 7 to 9) | Stylized and realistic styles, effects, artist's impressions, interaction feel |
 
 Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of Phase 5.
 
@@ -336,6 +337,42 @@ To be broken down into tasks when Phase 5 is complete.
 - **P9-03** Star rendering: magnitudes and color indices mapped to brightness and color. Sky background generated from the catalog.
 - **P9-04** Exoplanet systems from the NASA Exoplanet Archive, with uncertainties and missing parameters left missing.
 - **P9-05** Research spike on galactic and extragalactic scale data and models.
+
+---
+
+## Track A: Art direction (alongside Phases 7 to 9)
+
+**Goal:** the stylized look of SPEC section 11.1 over unchanged data, with the realistic style one click away ([ADR-0015](adr/0015-stylized-presentation-over-real-data.md)). The track runs alongside the phases and touches only the Unity host and the visual pipeline unless a task says otherwise. A-01 comes first, then A-02 to A-04, which the later tasks build on.
+
+- [x] **A-01** **(user)** Art direction brief (OQ-09): mockups of two or three candidate looks on the Earth, the Moon, Mars, Jupiter and Saturn's rings (palette, number of shading bands, outlines or none, glow strength), for the project owner to choose from. Record the choice in `docs/ART_DIRECTION.md` (palette, shading rules, the effects in priority order, the hue tolerance A-06 checks) and mark OQ-09 decided.
+  - 2026-10-27: Done. Three rounds of mockups were rendered from the viewer (`ArtDirectionMockups`, a PlayMode harness run with `USIM_MOCKUP_DIR`, shaders in `Assets/UniverseSim/Mockups/`): soft toon, then comic and painted looks, then three steps toward a polished console game. The project owner chose the middle step, "Adventure": no bands or outlines, a brighter day side, satin sheen, rims on both sides, thick atmospheres, sparkling stars and bloom. Recorded with reference renders in `docs/ART_DIRECTION.md`; hue tolerance 5 degrees (measured at most 3.4). The mockups stay as the reference until A-05 to A-09 are done.
+- [ ] **A-02** Visual style switch (FR-REN-12): a host-wide style setting (stylized by default, or realistic) that materials, shaders and effects read (a global shader keyword or property, and an event for components); a HUD toggle and a persistent style indicator beside the scale mode indicator; the choice remembered between sessions. Until the effects exist, both styles draw the current look. Tests: switching style changes no transform, snapshot value or HUD readout; the scene starts in the stylized style; the PlayMode suites (positions against the CLI, jitter, lighting, camera) run in both styles, and `USIM_SCREENSHOT_DIR` saves the views in both.
+- [ ] **A-03** Exaggeration register and the "what is exaggerated" panel (FR-REN-12, FR-REN-13): each effect component declares what it exaggerates, by how much, and whether it is active in the current view; a HUD panel lists the active entries, and the list is empty in the realistic style. A test fails if an effect component is not registered.
+- [ ] **A-04** Attribution for artistic assets (ADR-0015 decision 6): extend `data/catalog/textures.json` (or a sibling catalog) and `usim-pipeline textures` so effect textures and artist's impressions appear in the generated `ATTRIBUTION.md` with their license, and an artist's impression also with its references. Pipeline tests, and the EditMode attribution test covers the new entries. Done before any artistic asset is committed.
+- [ ] **A-05** Stylized body shading in `BodyLit` (FR-REN-07): banded diffuse light, rim light, a lifted night side and optional soft outlines, as chosen in A-01; the realistic style keeps the Lambert shading. The terminator stays where the core's light direction puts it: a PlayMode test renders the Moon at a known phase in both styles and finds the terminator in the same place within a pixel. The ring shadows keep working.
+  - 2026-10-27 (from A-01): no bands and no outlines. Instead a brighter smooth day curve with a shade-to-light tint, a satin sheen, a day rim in the surface's color, a cool night rim and a brightness cap below the bloom threshold (ART_DIRECTION.md section 3). The sun glint waits for the ocean property (A-07).
+- [ ] **A-06** Color treatment of the real surface maps (FR-REN-11, SPEC section 11.1): grading, saturation and optional posterization in the shader in the stylized style, and the maps as published in the realistic style. A test checks that each map's average hue stays within the tolerance set in A-01.
+  - 2026-10-27 (from A-01): a Kuwahara smoothing, saturation x1.6 and a luminance contrast of 0.9 that lifts shadows; no posterization. Tolerance: 5 degrees for maps with a mean chroma of 0.02 or more, and grey maps stay grey (ART_DIRECTION.md section 4).
+- [ ] **A-07** Atmosphere halos (FR-REN-13, ADR-0015 decision 4): a limb glow on bodies that have an atmosphere, brightest on the sunlit side and following the core's light direction. Which bodies have one comes from a registered source through the pipeline, never typed into host code; decide in an ADR whether it travels in a visual catalog beside `textures.json` or in the pack and the C ABI. The halo's thickness and intensity are registered exaggerations.
+  - 2026-10-27 (from A-01): the chosen look adds twilight colors at the limb (the Earth's red, Mars's blue) and a sun glint on oceans. Both imply physical properties, so the same ADR and sourcing cover them (ART_DIRECTION.md section 5).
+- [ ] **A-08** The Sun: corona glow, glare and bloom (URP post-processing). The Sun's disk keeps its true size in each scale mode, and the bloom is tuned so phases and crescents stay readable. Registered as exaggerations; off in the realistic style.
+  - 2026-10-27 (from A-01): the stylized camera also gets color adjustments, a vignette and the indigo sky. The realistic style turns off the bloom and vignette the scene still carries from the URP template (ART_DIRECTION.md section 7).
+- [ ] **A-09** Stylized stars and rings (FR-REN-09, FR-REN-10): a brighter, softer star mapping and a color and contrast treatment for the rings. Both mappings stay monotonic, checked by tests: a brighter star never looks fainter than a dimmer one, a bluer star never looks redder, and a denser ring region never looks thinner. The realistic style keeps the ADR-0011 mappings.
+  - 2026-10-27 (from A-01): larger stars with four-point sparkles on the brightest, and a sparse-to-dense ring palette (ART_DIRECTION.md section 6).
+- [ ] **A-10** Orbit lines and labels (FR-REN-06, FR-REN-13): bolder lines colored by body kind, a fade along each path that shows the direction of motion, lines that brighten near the focused body, and icons on the labels. Every line still follows the core's path, and approximate orbits stay distinguishable.
+- [ ] **A-11** **(user)** Artist's impressions (FR-REN-14) for the bodies without a verified map (Venus, Saturn, Uranus, Neptune, Titan, Deimos, the Uranian moons). The project owner chooses the bodies, the method (procedural shaders, painted maps or both) and, for painted maps, who paints them. Each impression lists its reference images or descriptions through A-04, adds no unobserved features, shows the "artist's impression" label and its references in the info panel, and appears only in the stylized style (the realistic style keeps the plain sphere). Tests: the label appears, and the realistic style draws no impression.
+- [ ] **A-12** Interaction feel (FR-REN-15): eased camera flights (refining the P5-06 transitions), hover highlight and cursor feedback on bodies and labels, selection feedback, and UI Toolkit transitions for panels and buttons. Animation never moves a body or the clock. A hands-on check by the project owner closes the task, together with the Phase 5 input check.
+- [ ] **A-13** Rendering cost with every effect on (NFR-11): extend `RenderingCostTests` to the stylized style, meet 60 frames per second at 1920 x 1080 on the development Mac in a player build, and add quality tiers that scale effects down before the frame rate drops. Record the measurements here.
+- [ ] **A-14** Comet tails (after P7-01 and P7-06): a stylized tail on each comet, pointing away from the Sun along the direction the core gives, with its length a registered exaggeration.
+- [ ] **A-15** **(user)** Decide OQ-10 (guided experiences: tours, upcoming eclipses, transits and conjunctions, challenges) and OQ-11 (sound), and break the chosen ones down into tasks here. Events are found by the core from the ephemeris and validated (for example against the CSPICE geometry finder), never computed in the host.
+
+**Acceptance criteria**
+- The viewer opens in the stylized style; one click switches to the realistic style and back, and the active style is always shown (UC-09).
+- In both styles, positions, orientations, the terminator and every displayed value are identical (automated tests).
+- The "what is exaggerated" panel lists every active exaggeration, and none in the realistic style.
+- Every artistic asset is in `ATTRIBUTION.md` with its license, every artist's impression also with its references, and every artist's impression is labeled in the viewer.
+- NFR-11 is met with every effect on.
+- The project owner approves the look and the feel hands-on.
 
 ---
 

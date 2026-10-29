@@ -56,7 +56,7 @@ In rough order (details in the [implementation plan](IMPLEMENTATION_PLAN.md)):
 3. An N-body sandbox for hypothetical scenarios, clearly labeled as such.
 4. Beyond the Solar System: nearby stars (Gaia, Hipparcos), exoplanet systems (NASA Exoplanet Archive), then galactic and extragalactic structure.
 
-The stylized art direction and the realistic style ([section 11.1](#111-art-direction)) are developed alongside these items.
+The stylized art direction and the realistic style ([section 11.1](#111-art-direction)) are developed alongside these items, as Track A of the [implementation plan](IMPLEMENTATION_PLAN.md#track-a-art-direction-alongside-phases-7-to-9).
 
 ### 3.3 Non-goals
 
@@ -253,7 +253,7 @@ Details of the registry, tiers and pipeline are in [DATA_SOURCES.md](DATA_SOURCE
 
 ### 11.1 Art direction
 
-The viewer has two visual styles (FR-REN-12). The **stylized** style is the default and is what this section describes. The **realistic** style removes every exaggeration and artist's impression, so a learner can always see the unembellished view. Both styles draw the same data.
+The viewer has two visual styles (FR-REN-12). The **stylized** style is the default and is what this section describes; its chosen look, palette and parameters are in [ART_DIRECTION.md](ART_DIRECTION.md). The **realistic** style removes every exaggeration and artist's impression, so a learner can always see the unembellished view. Both styles draw the same data.
 
 **What the art may change** (stylized style):
 
@@ -302,7 +302,7 @@ These items are not scheduled in detail, but the design must not block them:
 | OQ-06 | Should observer views show apparent (light-time and aberration corrected) positions? | Open, after v1 |
 | OQ-07 | Should the Unity Editor hot-reload the native plugin (load a uniquely named copy) so the Editor does not need a restart after each core rebuild? | Decided 2026-10-21: no; the Editor is restarted after a core rebuild (P5-14) |
 | OQ-08 | `de440s.bsp` has no segments for the centers of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto (only their system barycenters). Should v1 add the planet-center segments from the JPL satellite ephemerides (S-NAIF-SAT, trimmed into the pack), or show those planets at their system barycenter, flagged as approximate? | Decided 2026-10-21: system barycenters, flagged approximate, until Phase 6 ([ADR-0008](adr/0008-planet-positions-at-system-barycenters.md)) |
-| OQ-09 | Art direction details for the stylized style: the palette, how strong the toon look is (banding, outlines), and which effects come first. | Open, to be settled with mockups shown to the project owner when the art direction work starts |
+| OQ-09 | Art direction details for the stylized style: the palette, how strong the toon look is (banding, outlines), and which effects come first. | Decided 2026-10-27 from rendered mockups: the "Adventure" look, halfway between real and a polished console game, with no bands or outlines ([ART_DIRECTION.md](ART_DIRECTION.md)) |
 | OQ-10 | Which guided experiences should the viewer offer: tours, notable upcoming events (eclipses, transits, conjunctions, computed by the core from the ephemeris), challenges? | Open |
 | OQ-11 | Should the viewer have sound (ambient music, interface sounds)? | Open |
 
