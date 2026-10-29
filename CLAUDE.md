@@ -109,7 +109,8 @@ tools/scripts/build-core-for-unity.sh
 /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics \
   -projectPath UniverseSim -runTests -testPlatform EditMode -testResults /tmp/editmode.xml
 
-# Unity PlayMode tests (they render: no -nographics). USIM_SCREENSHOT_DIR=<dir> also saves screenshots.
+# Unity PlayMode tests (they render: no -nographics). USIM_SCREENSHOT_DIR=<dir> also saves screenshots
+# (a folder per visual style).
 /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity -batchmode \
   -projectPath UniverseSim -runTests -testPlatform PlayMode -testResults /tmp/playmode.xml
 
