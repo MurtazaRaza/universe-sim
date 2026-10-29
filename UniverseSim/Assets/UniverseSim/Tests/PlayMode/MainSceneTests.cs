@@ -16,21 +16,39 @@ namespace UniverseSim.Unity.Tests.PlayMode
 {
     /// <summary>
     /// The main scene end to end (P5-13): it loads the pack and shows the bodies, positions match the usim
-    /// CLI for the same instant, and nothing jitters at extreme zooms (P5-04). With USIM_SCREENSHOT_DIR set,
-    /// it also saves screenshots of a few views for review.
+    /// CLI for the same instant, and nothing jitters at extreme zooms (P5-04). Every test runs in both visual
+    /// styles (A-02). With USIM_SCREENSHOT_DIR set, it also saves screenshots of a few views for review, in a
+    /// folder per style.
     /// </summary>
+    [TestFixture(VisualStyle.Stylized)]
+    [TestFixture(VisualStyle.Realistic)]
     public class MainSceneTests
     {
         private const string FixedTime = "2026-10-21T12:00:00 UTC";
 
+        private readonly VisualStyle style;
+        private StylePreference preference;
         private SimulationHost host;
         private CameraRig rig;
 
+        public MainSceneTests(VisualStyle style)
+        {
+            this.style = style;
+        }
+
         private CoreSimulation Sim => host.Simulation;
+
+        [OneTimeSetUp]
+        public void KeepPreference() => preference = StylePreference.Keep();
+
+        [OneTimeTearDown]
+        public void RestorePreference() => preference.Restore();
 
         [UnitySetUp]
         public IEnumerator LoadScene()
         {
+            // The scene starts in the style under test, as in a session that remembered it.
+            VisualStyleSettings.SavePreference(style);
             SceneManager.LoadScene("Main");
             yield return null;
             yield return null;
@@ -38,6 +56,7 @@ namespace UniverseSim.Unity.Tests.PlayMode
             rig = Object.FindAnyObjectByType<CameraRig>();
             Assert.That(host, Is.Not.Null);
             Assert.That(host.Simulation, Is.Not.Null, host.LoadError);
+            Assert.That(Object.FindAnyObjectByType<VisualStyleSettings>().Style, Is.EqualTo(style));
             Sim.SetPaused(true);
             Assert.That(Sim.TryParseTime(FixedTime, out var t, out var error), error);
             Sim.SetTime(t);
@@ -56,13 +75,14 @@ namespace UniverseSim.Unity.Tests.PlayMode
 
         // Renders the camera and the HUD into a texture for one frame and saves it (batch mode has no screen,
         // and WaitForEndOfFrame never fires there).
-        private static IEnumerator Screenshot(string name)
+        private IEnumerator Screenshot(string name)
         {
-            var folder = Environment.GetEnvironmentVariable("USIM_SCREENSHOT_DIR");
-            if (string.IsNullOrEmpty(folder))
+            var root = Environment.GetEnvironmentVariable("USIM_SCREENSHOT_DIR");
+            if (string.IsNullOrEmpty(root))
             {
                 yield break;
             }
+            var folder = Path.Combine(root, style == VisualStyle.Realistic ? "realistic" : "stylized");
             var cam = Camera.main;
             var document = Object.FindAnyObjectByType<UIDocument>();
             var target = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32);

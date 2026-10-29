@@ -12,8 +12,9 @@ namespace UniverseSim.Unity
 {
     /// <summary>
     /// The heads-up display (UI Toolkit): time controls (P5-08), the body info panel (P5-09), toggles for
-    /// orbits, labels and the scale mode with a persistent indicator (P5-10, P5-11), and body labels.
-    /// It only shows what the core reports and sends user commands back (SPEC FR-REN-08).
+    /// orbits, labels, the scale mode and the visual style, each mode with a persistent indicator (P5-10, P5-11,
+    /// A-02), the "what is exaggerated" panel (A-03), and body labels. It only shows what the core reports and sends
+    /// user commands back (SPEC FR-REN-08).
     /// </summary>
     [DefaultExecutionOrder(20)]
     [RequireComponent(typeof(UIDocument))]
@@ -23,6 +24,8 @@ namespace UniverseSim.Unity
         [SerializeField] private CameraRig rig;
         [SerializeField] private OrbitLines orbitLines;
         [SerializeField] private StarField starField;
+        [SerializeField] private VisualStyleSettings style;
+        [SerializeField] private ExaggerationRegister exaggerationRegister;
         [SerializeField] private InputActionAsset actions;
         [SerializeField] private float textRefreshSeconds = 0.1f;
 
@@ -44,14 +47,20 @@ namespace UniverseSim.Unity
 
         private Camera cam;
         private VisualElement root;
-        private Label timePrimary, timeSecondary, coverageLabel, scaleIndicator, loadError, rateLabel, dateError, starCredit;
+        private Label timePrimary, timeSecondary, coverageLabel, scaleIndicator, styleIndicator, loadError, rateLabel,
+            dateError, starCredit;
         private Label infoTitle, infoKind, infoWarning;
         private ScrollView infoValues;
         private Button playPause;
         private TextField dateEntry;
         private DropdownField focusField;
-        private Toggle toggleOrbits, toggleLabels, toggleStars, toggleEnlarged, toggleFly;
+        private Toggle toggleOrbits, toggleLabels, toggleStars, toggleEnlarged, toggleRealistic, toggleFly;
         private VisualElement labelsLayer;
+        private VisualElement exaggerationsPanel, exaggerationsList;
+        private Button exaggerationsToggle;
+        private readonly List<Exaggeration> activeExaggerations = new List<Exaggeration>();
+        private readonly List<Exaggeration> shownExaggerations = new List<Exaggeration>();
+        private bool exaggerationsShownOnce;
         private readonly List<Label> labels = new List<Label>();
         // Each label sits in a zero-size anchor moved by translate, which repaints without a layout pass (left
         // and top would lay out the panel every frame); the label centers itself on the anchor in USS.
@@ -82,6 +91,7 @@ namespace UniverseSim.Unity
             timeSecondary = root.Q<Label>("time-secondary");
             coverageLabel = root.Q<Label>("coverage");
             scaleIndicator = root.Q<Label>("scale-indicator");
+            styleIndicator = root.Q<Label>("style-indicator");
             loadError = root.Q<Label>("load-error");
             rateLabel = root.Q<Label>("rate");
             dateError = root.Q<Label>("date-error");
@@ -97,8 +107,13 @@ namespace UniverseSim.Unity
             toggleLabels = root.Q<Toggle>("toggle-labels");
             toggleStars = root.Q<Toggle>("toggle-stars");
             toggleEnlarged = root.Q<Toggle>("toggle-enlarged");
+            toggleRealistic = root.Q<Toggle>("toggle-realistic");
             toggleFly = root.Q<Toggle>("toggle-fly");
             labelsLayer = root.Q<VisualElement>("labels");
+            exaggerationsPanel = root.Q<VisualElement>("exaggerations");
+            exaggerationsList = root.Q<VisualElement>("exaggerations-list");
+            exaggerationsToggle = root.Q<Button>("exaggerations-toggle");
+            exaggerationsToggle.clicked += () => exaggerationsPanel.ToggleInClassList("expanded");
 
             root.Q<Button>("slower").clicked += () => StepRate(-1);
             root.Q<Button>("faster").clicked += () => StepRate(1);
@@ -128,6 +143,8 @@ namespace UniverseSim.Unity
                 rig.EnlargedBodies = e.newValue;
                 RefreshScaleIndicator();
             });
+            toggleRealistic.RegisterValueChangedCallback(e =>
+                style.SetStyle(e.newValue ? VisualStyle.Realistic : VisualStyle.Stylized));
             toggleFly.RegisterValueChangedCallback(e => rig.SetFreeFly(e.newValue));
             focusField.RegisterValueChangedCallback(e =>
             {
@@ -140,7 +157,9 @@ namespace UniverseSim.Unity
             });
             rig.SelectionChanged += ShowBody;
             rig.FocusChanged += OnFocusChanged;
+            style.Changed += OnStyleChanged;
             RefreshScaleIndicator();
+            RefreshStyleIndicator();
         }
 
         private void OnDestroy()
@@ -154,6 +173,16 @@ namespace UniverseSim.Unity
                 rig.SelectionChanged -= ShowBody;
                 rig.FocusChanged -= OnFocusChanged;
             }
+            if (style != null)
+            {
+                style.Changed -= OnStyleChanged;
+            }
+        }
+
+        private void OnStyleChanged(VisualStyle _)
+        {
+            RefreshStyleIndicator();
+            RefreshExaggerations();
         }
 
         private CoreSimulation Sim => host.Simulation;
@@ -327,6 +356,8 @@ namespace UniverseSim.Unity
             // The indicator always shows the mode actually in use (SPEC FR-REN-02), however it was set.
             RefreshScaleIndicator();
             toggleEnlarged.SetValueWithoutNotify(rig.EnlargedBodies);
+            RefreshStyleIndicator();
+            RefreshExaggerations();
             if (rig.SelectedIndex >= 0)
             {
                 RefreshMotion();
@@ -339,6 +370,47 @@ namespace UniverseSim.Unity
                 ? $"Bodies enlarged x{rig.BodyScale.ToString("0", CultureInfo.InvariantCulture)} (distances true)"
                 : "True scale";
             scaleIndicator.EnableInClassList("enlarged", rig.EnlargedBodies);
+        }
+
+        // Like the scale mode, the style in use is always shown (SPEC FR-REN-12), however it was set.
+        private void RefreshStyleIndicator()
+        {
+            var realistic = style.Style == VisualStyle.Realistic;
+            styleIndicator.text = VisualStyleSettings.DisplayName(style.Style);
+            styleIndicator.EnableInClassList("realistic", realistic);
+            toggleRealistic.SetValueWithoutNotify(realistic);
+        }
+
+        // ---- What is exaggerated (A-03) ----
+
+        // The entries of the effects active in the current view; the list is rebuilt only when they change.
+        private void RefreshExaggerations()
+        {
+            exaggerationRegister.CollectActive(cam, activeExaggerations);
+            var same = exaggerationsShownOnce && activeExaggerations.Count == shownExaggerations.Count;
+            for (var i = 0; same && i < activeExaggerations.Count; ++i)
+            {
+                same = activeExaggerations[i].Subject == shownExaggerations[i].Subject &&
+                       activeExaggerations[i].Amount == shownExaggerations[i].Amount;
+            }
+            if (same)
+            {
+                return;
+            }
+            exaggerationsShownOnce = true;
+            shownExaggerations.Clear();
+            shownExaggerations.AddRange(activeExaggerations);
+            exaggerationsList.Clear();
+            foreach (var entry in activeExaggerations)
+            {
+                exaggerationsList.Add(MakeLabel($"{entry.Subject}: {entry.Change}", "exaggeration"));
+                exaggerationsList.Add(MakeLabel(entry.Amount, "exaggeration-amount"));
+            }
+            exaggerationsToggle.text = activeExaggerations.Count > 0
+                ? $"What is exaggerated? ({activeExaggerations.Count})"
+                : style.Style == VisualStyle.Realistic
+                    ? "Nothing is exaggerated (realistic style)"
+                    : "Nothing is exaggerated in this view";
         }
 
         // ---- Labels (P5-10) ----

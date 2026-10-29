@@ -5,14 +5,17 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UIElements;
 
 namespace UniverseSim.Unity.Editor
 {
     /// <summary>
-    /// Composes the main scene (Phase 5) from the project's assets: the simulation host, the camera rig,
-    /// orbit lines, the star field, the rings and the HUD, with their materials and panel settings. Running it again rebuilds the
-    /// same scene, so the scene file never needs hand edits. Menu: UniverseSim > Build Main Scene; batch:
+    /// Composes the main scene (Phase 5) from the project's assets: the visual style setting, the simulation
+    /// host, the camera rig, orbit lines, the star field, the rings, the style effects with their register (A-03)
+    /// and the HUD, with their materials and panel settings. Running it again rebuilds the same scene, so the
+    /// scene file never needs hand edits. Menu: UniverseSim > Build Main Scene; batch:
     /// -executeMethod UniverseSim.Unity.Editor.MainSceneBuilder.Build
     /// </summary>
     public static class MainSceneBuilder
@@ -55,8 +58,10 @@ namespace UniverseSim.Unity.Editor
             camera.fieldOfView = 50f;
             camera.allowHDR = true;
             camera.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            MakeVolumeRealistic();
 
             var simulation = new GameObject("UniverseSim");
+            var style = simulation.AddComponent<VisualStyleSettings>();
             var host = simulation.AddComponent<SimulationHost>();
             Set(host, "bodyMaterial", bodyMaterial);
             Set(host, "starMaterial", starMaterial);
@@ -73,6 +78,18 @@ namespace UniverseSim.Unity.Editor
             var rings = simulation.AddComponent<RingSystems>();
             Set(rings, "host", host);
             Set(rings, "ringMaterial", ringMaterial);
+
+            // The style effects (Track A), each listed in the register that the "what is exaggerated" panel reads.
+            var bodyShading = simulation.AddComponent<StylizedBodyShading>();
+            Set(bodyShading, "host", host);
+            Set(bodyShading, "style", style);
+            var mapTreatment = simulation.AddComponent<SurfaceMapTreatment>();
+            Set(mapTreatment, "host", host);
+            Set(mapTreatment, "style", style);
+            var stylizedCamera = simulation.AddComponent<StylizedCamera>();
+            Set(stylizedCamera, "style", style);
+            var register = simulation.AddComponent<ExaggerationRegister>();
+            SetArray(register, "effects", new Object[] { bodyShading, mapTreatment, stylizedCamera });
 
             var hud = new GameObject("HUD");
             var document = hud.AddComponent<UIDocument>();
@@ -93,12 +110,37 @@ namespace UniverseSim.Unity.Editor
             Set(controller, "rig", rig);
             Set(controller, "orbitLines", orbits);
             Set(controller, "starField", stars);
+            Set(controller, "style", style);
+            Set(controller, "exaggerationRegister", register);
             Set(controller, "actions", controls);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             Debug.Log("UniverseSim: built " + MainScenePath);
+        }
+
+        // The scene's volume is the realistic camera (A-08): the URP template's bloom and vignette are turned off and
+        // its Neutral tonemapping kept. The stylized camera adds its own volume at runtime (StylizedCamera).
+        private static void MakeVolumeRealistic()
+        {
+            foreach (var volume in Object.FindObjectsByType<Volume>(FindObjectsInactive.Include))
+            {
+                var profile = volume.sharedProfile;
+                if (profile == null)
+                {
+                    continue;
+                }
+                if (profile.TryGet<Bloom>(out var bloom))
+                {
+                    bloom.active = false;
+                }
+                if (profile.TryGet<Vignette>(out var vignette))
+                {
+                    vignette.active = false;
+                }
+                EditorUtility.SetDirty(profile);
+            }
         }
 
         private static T Load<T>(string path) where T : Object

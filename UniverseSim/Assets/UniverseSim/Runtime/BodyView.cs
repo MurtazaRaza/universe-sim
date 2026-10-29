@@ -18,6 +18,7 @@ namespace UniverseSim.Unity
         private static readonly int RingProfileId = Shader.PropertyToID("_RingProfile");
         private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int MapTreatmentId = Shader.PropertyToID("_MapTreatment");
 
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
@@ -88,6 +89,33 @@ namespace UniverseSim.Unity
         }
 
         /// <summary>
+        /// True when the body is drawn and its disc, at least <paramref name="minPixels"/> in radius, is at least
+        /// partly on the screen of <paramref name="cam"/> (for the "what is exaggerated" panel, A-03). Within two
+        /// radii of the body it always counts as shown, since it then fills much of the sky.
+        /// </summary>
+        public bool IsShown(Camera cam, float minPixels)
+        {
+            if (meshRenderer == null || !meshRenderer.enabled)
+            {
+                return false;
+            }
+            var position = transform.position;
+            var distance = Vector3.Distance(position, cam.transform.position);
+            if (distance <= 2f * MaxRenderRadius)
+            {
+                return true;
+            }
+            var p = cam.WorldToScreenPoint(position);
+            if (p.z <= 0f)
+            {
+                return false;
+            }
+            var focalPixels = 0.5f * cam.pixelHeight / Mathf.Tan(0.5f * cam.fieldOfView * Mathf.Deg2Rad);
+            var r = SphereLods.PixelRadius(MaxRenderRadius, distance, focalPixels);
+            return r >= minPixels && p.x > -r && p.x < cam.pixelWidth + r && p.y > -r && p.y < cam.pixelHeight + r;
+        }
+
+        /// <summary>
         /// Sets up the view. With a surface map, <paramref name="sphere"/> must carry the map's UV layout
         /// (<see cref="SphereMesh.CreateMapped"/>); the map then gives the surface color in place of the
         /// material's neutral base color. The view draws with its own copy of <paramref name="sharedMaterial"/>.
@@ -113,6 +141,7 @@ namespace UniverseSim.Unity
                 SurfaceMap = surfaceMapInfo;
                 material.SetTexture(BaseMapId, surfaceMap);
                 material.SetColor(BaseColorId, Color.white);
+                material.SetFloat(MapTreatmentId, 1f); // the stylized style treats mission maps (A-06)
             }
             meshRenderer.sharedMaterial = material;
         }

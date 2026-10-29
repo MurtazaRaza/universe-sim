@@ -34,6 +34,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Ambient: 0.015
+    - _MapTreatment: 0
     m_Colors:
     - _BaseColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
     - _LightDirection: {r: 0, g: 1, b: 0, a: 0}

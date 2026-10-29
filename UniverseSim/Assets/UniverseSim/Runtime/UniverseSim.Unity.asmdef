@@ -2,7 +2,9 @@
     "name": "UniverseSim.Unity",
     "rootNamespace": "UniverseSim.Unity",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

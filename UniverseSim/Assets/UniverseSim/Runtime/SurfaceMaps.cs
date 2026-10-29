@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UniverseSim.Unity.Native;
 using UnityEngine;
 
@@ -52,6 +53,10 @@ namespace UniverseSim.Unity
 
         /// <summary>Number of bodies with a map.</summary>
         public int Count => maps.Count;
+
+        /// <summary>Every map with its texture, in NAIF ID order.</summary>
+        public IEnumerable<(SurfaceMapInfo Info, Texture2D Texture)> All =>
+            maps.OrderBy(m => m.Key).Select(m => m.Value);
 
         /// <summary>
         /// The maps of a manifest whose textures are among <paramref name="textures"/> (matched by name). A

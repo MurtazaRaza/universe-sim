@@ -10,10 +10,18 @@
             </ui:VisualElement>
             <ui:VisualElement class="spacer" picking-mode="Ignore" />
             <ui:VisualElement class="status" picking-mode="Ignore">
-                <ui:Label name="scale-indicator" class="scale-indicator" text="True scale" picking-mode="Ignore" />
+                <ui:VisualElement class="indicators" picking-mode="Ignore">
+                    <ui:Label name="style-indicator" class="style-indicator" text="Stylized style" picking-mode="Ignore" />
+                    <ui:Label name="scale-indicator" class="scale-indicator" text="True scale" picking-mode="Ignore" />
+                </ui:VisualElement>
                 <ui:Label name="coverage" class="coverage" text="-" picking-mode="Ignore" />
                 <ui:Label name="load-error" class="warning" picking-mode="Ignore" />
             </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="exaggerations" class="panel exaggerations-panel">
+            <ui:Button name="exaggerations-toggle" class="exaggerations-toggle" text="What is exaggerated?" />
+            <ui:VisualElement name="exaggerations-list" class="exaggerations-list" />
         </ui:VisualElement>
 
         <ui:VisualElement name="info-panel" class="panel info-panel">
@@ -46,6 +54,7 @@
                 <ui:Toggle name="toggle-labels" label="Labels" value="true" />
                 <ui:Toggle name="toggle-stars" label="Stars" value="true" />
                 <ui:Toggle name="toggle-enlarged" label="Enlarge bodies x100" />
+                <ui:Toggle name="toggle-realistic" label="Realistic style" />
                 <ui:Toggle name="toggle-fly" label="Free fly (F)" />
                 <ui:VisualElement class="spacer" picking-mode="Ignore" />
                 <ui:Label name="star-credit" class="coverage credit" picking-mode="Ignore" />

@@ -42,9 +42,19 @@ namespace UniverseSim.Unity.Tests.PlayMode
             (ProfilerCategory.Scripts, "UniverseSim.Labels", 1e-6, " ms"),
         };
 
+        private StylePreference preference;
+
+        [OneTimeSetUp]
+        public void KeepPreference() => preference = StylePreference.Keep();
+
+        [OneTimeTearDown]
+        public void RestorePreference() => preference.Restore();
+
         [UnitySetUp]
         public IEnumerator LoadScene()
         {
+            // Measured in the default style (A-02); A-13 extends the measurements to both.
+            VisualStyleSettings.SavePreference(VisualStyle.Stylized);
             SceneManager.LoadScene("Main");
             yield return null;
             yield return null;
