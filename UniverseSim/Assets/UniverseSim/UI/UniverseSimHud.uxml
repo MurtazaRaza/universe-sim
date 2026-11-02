@@ -34,6 +34,18 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <ui:VisualElement name="ship-panel" class="panel ship-panel">
+            <ui:Label name="ship-title" class="title" text="Spaceship" />
+            <ui:Label name="ship-status" class="subtitle" text="-" />
+            <ui:Label name="ship-note" class="value-source ship-note" />
+            <ui:VisualElement class="row ship-buttons">
+                <ui:Button name="ship-travel" text="Travel (T)" />
+                <ui:Button name="ship-land" text="Descend (L)" />
+                <ui:Button name="ship-leave" text="Leave (V)" />
+            </ui:VisualElement>
+            <ui:ScrollView name="ship-facts" class="values" />
+        </ui:VisualElement>
+
         <ui:VisualElement name="bottom-bar" class="bar bottom-bar">
             <ui:VisualElement class="row time-controls">
                 <ui:Button name="slower" text="Slower" />
@@ -56,6 +68,7 @@
                 <ui:Toggle name="toggle-enlarged" label="Enlarge bodies x100" />
                 <ui:Toggle name="toggle-realistic" label="Realistic style" />
                 <ui:Toggle name="toggle-fly" label="Free fly (F)" />
+                <ui:Toggle name="toggle-ship" label="Spaceship (V)" />
                 <ui:VisualElement class="spacer" picking-mode="Ignore" />
                 <ui:Label name="star-credit" class="coverage credit" picking-mode="Ignore" />
             </ui:VisualElement>

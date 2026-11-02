@@ -10,7 +10,7 @@ namespace UniverseSim.Unity.Native
         /// ABI version this binding was written against. Must equal USIM_ABI_VERSION in
         /// core/capi/include/usim/usim.h.
         /// </summary>
-        public const uint ExpectedAbiVersion = 4;
+        public const uint ExpectedAbiVersion = 5;
 
         /// <summary>ABI version reported by the loaded native library.</summary>
         public static uint AbiVersion => NativeMethods.AbiVersion();
@@ -65,6 +65,9 @@ namespace UniverseSim.Unity.Native
             Check<UsimStar>(NativeConstants.StructStar);
             Check<UsimRing>(NativeConstants.StructRing);
             Check<UsimRotationModel>(NativeConstants.StructRotationModel);
+            Check<UsimTransferEstimate>(NativeConstants.StructTransferEstimate);
+            Check<UsimSurfaceSite>(NativeConstants.StructSurfaceSite);
+            Check<UsimDayLength>(NativeConstants.StructDayLength);
             return mismatches;
         }
     }

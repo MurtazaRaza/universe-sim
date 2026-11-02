@@ -4,11 +4,13 @@
 
 #include "usim/math/quat.hpp"
 #include "usim/math/vec3.hpp"
+#include "usim/result.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <optional>
 
 namespace usim::test {
 
@@ -59,6 +61,13 @@ inline double ulp(double x) {
 /// Largest absolute component difference between two vectors.
 inline double max_abs_difference(const math::Vec3& a, const math::Vec3& b) {
     return std::fmax(std::fabs(a.x - b.x), std::fmax(std::fabs(a.y - b.y), std::fabs(a.z - b.z)));
+}
+
+/// The error code of a failed result, or nothing on success. `CHECK(failure(r) == ErrorCode::x)` reports an
+/// unexpected success as a failed check, where `r.error()` would end the test run.
+template <typename T>
+std::optional<ErrorCode> failure(const Result<T>& result) {
+    return result.has_value() ? std::nullopt : std::optional<ErrorCode>(result.error().code);
 }
 
 } // namespace usim::test

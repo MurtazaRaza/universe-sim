@@ -140,3 +140,39 @@ TEST_CASE("usim snapshot, orientation and orbit", "[cli]") {
     REQUIRE(orbit_json.code == 0);
     CHECK(contains(orbit_json.out, R"("center":{"id":"naif:0")"));
 }
+
+TEST_CASE("usim transfer, site and day", "[cli][exploration]") {
+    // Inside the synthetic planet's ephemeris segment and orientation span (sim/test_exploration.cpp).
+    const std::string t = "2000-01-02T00:00:00 TDB";
+
+    const Output transfer = run({"transfer", "1001", "Test Moon", "--time", t});
+    CHECK(transfer.code == usim::cli::k_exit_ok);
+    CHECK(contains(transfer.out, "\"center\":{\"id\":\"naif:1000\""));
+    CHECK(contains(transfer.out, "\"transfer_time_s\":"));
+    CHECK(contains(transfer.out, "\"light_time_s\":"));
+    const Output transfer_csv = run({"transfer", "1001", "1002", "--time", t, "--format", "csv"});
+    CHECK(transfer_csv.code == usim::cli::k_exit_ok);
+    CHECK(lines(transfer_csv.out) == 2);
+    CHECK(run({"transfer", "1001"}).code == usim::cli::k_exit_usage);
+    CHECK(run({"transfer", "1001", "1001", "--time", t}).code == usim::cli::k_exit_failed);
+
+    const Output site = run({"site", "1001", "--lat", "20", "--lon", "-45", "--alt", "0.5", "--time", t});
+    CHECK(site.code == usim::cli::k_exit_ok);
+    CHECK(contains(site.out, "\"latitude_deg\":20"));
+    CHECK(contains(site.out, "\"longitude_deg\":-45"));
+    CHECK(contains(site.out, "\"altitude_km\":0.5"));
+    CHECK(contains(site.out, "\"flags\":\"sun\"")); // no star radius, no planet GM in the synthetic pack
+    const Output site_csv = run(
+        {"site", "1001", "--lat", "20", "--lon", "-45", "--time", t, "--axes", "unity", "--format", "csv"});
+    CHECK(site_csv.code == usim::cli::k_exit_ok);
+    CHECK(lines(site_csv.out) == 2);
+    CHECK(run({"site", "1001", "--lat", "20", "--time", t}).code == usim::cli::k_exit_usage);
+    CHECK(run({"site", "1001", "--lat", "north", "--lon", "0"}).code == usim::cli::k_exit_usage);
+    CHECK(run({"site", "1002", "--lat", "0", "--lon", "0", "--time", t}).code == usim::cli::k_exit_failed);
+
+    const Output day = run({"day", "1001", "--time", t});
+    CHECK(day.code == usim::cli::k_exit_ok);
+    CHECK(contains(day.out, "\"sidereal_rotation_period_s\":"));
+    CHECK(contains(day.out, "\"orbiting_body\":{\"id\":\"naif:1001\""));
+    CHECK(run({"day", "1003", "--time", t}).code == usim::cli::k_exit_failed); // no rotation model
+}

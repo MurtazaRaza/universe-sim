@@ -40,7 +40,7 @@ extern "C" {
 #endif
 
 /* Version of this binary interface. */
-#define USIM_ABI_VERSION 4u
+#define USIM_ABI_VERSION 5u
 
 /* Returns the ABI version the library was built with (USIM_ABI_VERSION of its header). */
 USIM_API uint32_t usim_abi_version(void);
@@ -134,6 +134,9 @@ typedef struct usim_frame {
 #define USIM_STRUCT_STAR 14
 #define USIM_STRUCT_RING 15
 #define USIM_STRUCT_ROTATION_MODEL 16
+#define USIM_STRUCT_TRANSFER_ESTIMATE 17
+#define USIM_STRUCT_SURFACE_SITE 18
+#define USIM_STRUCT_DAY_LENGTH 19
 
 /* The size in bytes of the struct with identifier struct_id as the library declares it, or 0 for an
  * unknown identifier. */
@@ -500,6 +503,114 @@ typedef struct usim_ring {
 /* The number of ring regions and gaps, sorted by body and inner radius, and the one at index. */
 USIM_API int32_t usim_ring_count(const usim_simulation* sim, int32_t* out_count);
 USIM_API int32_t usim_ring_at(const usim_simulation* sim, int32_t index, usim_ring* out);
+
+/* ---------------------------------------------------------------------------------------------------
+ * Exploration (ADR-0016): two-body estimates of trips between bodies, points of a body's reference surface
+ * with the Sun seen from there, and the length of a body's day. Every value is derived from the pack's
+ * ephemeris, rotation models, GM and radii (usim::sim, exploration.hpp). ABI version 5.
+ * ------------------------------------------------------------------------------------------------- */
+
+/* usim_transfer_estimate flags (usim::sim::TransferFlag). */
+#define USIM_TRANSFER_FROM_SURFACE 0x1u    /* starts at the center's surface: the destination orbits the departure */
+#define USIM_TRANSFER_TO_SURFACE 0x2u      /* ends at the center's surface: the departure orbits the destination */
+#define USIM_TRANSFER_BETWEEN_SYSTEMS 0x4u /* joins the orbits of the bodies' systems (Earth and Jupiter for Io) */
+#define USIM_TRANSFER_APPROXIMATE 0x8u     /* a state used is approximate (ADR-0008) */
+
+/* A Hohmann transfer between circular coplanar orbits around the first body the two bodies' orbit-center chains
+ * share, with radii from the pack's osculating orbits (around the star, at the system barycenter where there is
+ * one), or that body's mean radius when it is one of the two. A textbook first estimate, not a trajectory: no
+ * eccentricity, inclination, launch window, departure or arrival gravity, or final leg to a moon. */
+typedef struct usim_transfer_estimate {
+    usim_body_id center;           /* the body the transfer goes around */
+    usim_body_id departure;        /* whose orbit around center it leaves (center with USIM_TRANSFER_FROM_SURFACE) */
+    usim_body_id arrival;          /* whose orbit around center it reaches (center with USIM_TRANSFER_TO_SURFACE) */
+    double departure_radius_km;    /* r1: osculating semi-major axis, or the center's mean radius */
+    double arrival_radius_km;      /* r2 */
+    double transfer_time_s;        /* half the period of the transfer ellipse */
+    double departure_delta_v_km_s; /* from the circular orbit at r1 onto the ellipse */
+    double arrival_delta_v_km_s;   /* from the ellipse onto the circular orbit at r2 */
+    double distance_km;            /* between the two requested bodies' centers at t (geometric) */
+    double light_time_s;           /* distance_km / c */
+    uint32_t flags;                /* USIM_TRANSFER_* */
+    uint32_t reserved;
+} usim_transfer_estimate;
+
+/* The transfer estimate from body `from` to body `to` at t. Fails with USIM_STATUS_INVALID_ARGUMENT for the same
+ * body twice, USIM_STATUS_NOT_FOUND for an unknown body or a missing GM or radius, USIM_STATUS_UNSUPPORTED when
+ * the bodies share no center with a GM or an orbit is not elliptic, USIM_STATUS_OUT_OF_COVERAGE outside the data. */
+USIM_API int32_t usim_transfer_estimate_at(const usim_simulation* sim, usim_body_id from, usim_body_id to,
+                                           usim_instant t, usim_transfer_estimate* out);
+
+/* usim_surface_site flags (usim::sim::SurfaceSiteFlag). */
+#define USIM_SITE_HAS_SUN 0x1u      /* the sun_* fields and local_solar_time_h are set */
+#define USIM_SITE_HAS_SUN_SIZE 0x2u /* sun_angular_diameter_rad is set (the star has a mean radius) */
+#define USIM_SITE_HAS_GRAVITY 0x4u  /* gravity_km_s2 and escape_speed_km_s are set (the body has a GM) */
+#define USIM_SITE_APPROXIMATE 0x8u  /* the body's position is approximate (ADR-0008), and with it the Sun's direction */
+
+/* A point above a body's reference ellipsoid (its triaxial radii, else a sphere of its mean radius). Vectors are
+ * relative to the body's center, in the request's display frame and host axes. Angles are planetocentric; the
+ * altitude is measured along the direction from the center. The Sun's direction is geometric (no light time, no
+ * refraction); gravity and escape speed are GM / r^2 and sqrt(2 GM / r) at the reference surface below the site,
+ * without rotation. */
+typedef struct usim_surface_site {
+    double latitude_rad;
+    double longitude_rad;        /* east, [-pi, pi] */
+    double altitude_km;
+    double surface_radius_km;    /* center to the ellipsoid in the site's direction */
+    usim_vec3d position_km;      /* the site relative to the body's center */
+    usim_vec3d up;               /* unit: the ellipsoid's outward normal below the site */
+    usim_vec3d north;            /* unit, along the horizon toward the north pole */
+    usim_vec3d east;             /* unit, along the horizon toward the east */
+    usim_vec3d sun_direction;    /* unit, from the site toward the star's center */
+    double sun_elevation_rad;    /* above the horizon plane, negative below */
+    double sun_azimuth_rad;      /* from north toward east, [0, 2 pi) */
+    double sun_distance_km;
+    double sun_angular_diameter_rad;
+    double sunlight_ratio;       /* (1 au / sun_distance_km)^2 */
+    double local_solar_time_h;   /* true Sun: 12 at the meridian crossing, 0 to 24, increasing with the rotation */
+    double gravity_km_s2;
+    double escape_speed_km_s;
+    uint32_t flags;              /* USIM_SITE_* */
+    uint32_t reserved;
+} usim_surface_site;
+
+/* The site at planetocentric latitude and east longitude (rad) and altitude (km) of body at t. The request gives
+ * the display frame (USIM_FRAME_ICRF or USIM_FRAME_ECLIPJ2000) and the host axes; its other fields do not apply.
+ * Fails with USIM_STATUS_INVALID_ARGUMENT for bad coordinates, frame or axes, USIM_STATUS_NOT_FOUND when the body
+ * is unknown or has no rotation model or radius. */
+USIM_API int32_t usim_surface_site_at(const usim_simulation* sim, usim_body_id body, double latitude_rad,
+                                      double longitude_rad, double altitude_km,
+                                      const usim_snapshot_request* request, usim_instant t,
+                                      usim_surface_site* out);
+
+/* The site at position_host_km relative to body's center (km, the request's display frame and host axes): the
+ * inverse of usim_surface_site.position_km. Fails like usim_surface_site_at, and for a zero position. */
+USIM_API int32_t usim_surface_site_below(const usim_simulation* sim, usim_body_id body, usim_vec3d position_host_km,
+                                         const usim_snapshot_request* request, usim_instant t,
+                                         usim_surface_site* out);
+
+/* usim_day_length flags (usim::sim::DayLengthFlag). */
+#define USIM_DAY_HAS_SOLAR_DAY 0x1u      /* mean_solar_day_s and orbital_period_s are set */
+#define USIM_DAY_RETROGRADE 0x2u         /* turns against the sense of its system's orbit around the star */
+#define USIM_DAY_APPROXIMATE 0x4u        /* the orbit used is approximate (ADR-0008) */
+#define USIM_DAY_INSTANTANEOUS_RATE 0x8u /* no IAU elements: the instantaneous rate, librations included */
+
+/* How long a body's days are. The sidereal period comes from the mean rotation rate (the IAU prime meridian's
+ * secular rate); the mean solar day is 2 pi / |n_rot - n_orb| with the rotation signed by its sense relative to
+ * the orbit of the body's system around the star (osculating, two-body). */
+typedef struct usim_day_length {
+    double sidereal_rotation_period_s;
+    double mean_solar_day_s;
+    double orbital_period_s;     /* of orbiting_body around the star */
+    usim_body_id orbiting_body;  /* the body's system: its ancestor (or itself) whose primary is the star or root */
+    uint32_t flags;              /* USIM_DAY_* */
+    uint32_t reserved;
+} usim_day_length;
+
+/* The day length of body at t. Fails with USIM_STATUS_NOT_FOUND when the body is unknown or has no rotation
+ * model, USIM_STATUS_UNSUPPORTED when it does not rotate. */
+USIM_API int32_t usim_day_length_at(const usim_simulation* sim, usim_body_id body, usim_instant t,
+                                    usim_day_length* out);
 
 #ifdef __cplusplus
 } /* extern "C" */

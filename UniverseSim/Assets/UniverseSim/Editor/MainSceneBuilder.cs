@@ -13,8 +13,8 @@ namespace UniverseSim.Unity.Editor
 {
     /// <summary>
     /// Composes the main scene (Phase 5) from the project's assets: the visual style setting, the simulation
-    /// host, the camera rig, orbit lines, the star field, the rings, the style effects with their register (A-03)
-    /// and the HUD, with their materials and panel settings. Running it again rebuilds the same scene, so the
+    /// host, the camera rig, orbit lines, the star field, the rings, the style effects with their register (A-03),
+    /// the spaceship (ADR-0016) and the HUD, with their materials and panel settings. Running it again rebuilds the same scene, so the
     /// scene file never needs hand edits. Menu: UniverseSim > Build Main Scene; batch:
     /// -executeMethod UniverseSim.Unity.Editor.MainSceneBuilder.Build
     /// </summary>
@@ -34,6 +34,7 @@ namespace UniverseSim.Unity.Editor
             var lineMaterial = EnsureMaterial(Root + "/Materials/Line.mat", "UniverseSim/Line");
             var starFieldMaterial = EnsureMaterial(Root + "/Materials/StarField.mat", "UniverseSim/StarField");
             var ringMaterial = EnsureMaterial(Root + "/Materials/Rings.mat", "UniverseSim/Rings");
+            var shipMaterial = EnsureMaterial(Root + "/Materials/Ship.mat", "UniverseSim/Ship");
             var panelSettings = EnsurePanelSettings(Root + "/UI/UniverseSimPanelSettings.asset");
             var hudLayout = Load<VisualTreeAsset>(Root + "/UI/UniverseSimHud.uxml");
             var controls = Load<InputActionAsset>(Root + "/Input/UniverseSimControls.inputactions");
@@ -88,8 +89,6 @@ namespace UniverseSim.Unity.Editor
             Set(mapTreatment, "style", style);
             var stylizedCamera = simulation.AddComponent<StylizedCamera>();
             Set(stylizedCamera, "style", style);
-            var register = simulation.AddComponent<ExaggerationRegister>();
-            SetArray(register, "effects", new Object[] { bodyShading, mapTreatment, stylizedCamera });
 
             var hud = new GameObject("HUD");
             var document = hud.AddComponent<UIDocument>();
@@ -105,6 +104,18 @@ namespace UniverseSim.Unity.Editor
             Set(rig, "actions", controls);
             Set(rig, "hud", document);
 
+            // The spaceship of the stylized style (ADR-0016): a style effect like the others, listed in the register.
+            var ship = simulation.AddComponent<ShipPilot>();
+            Set(ship, "host", host);
+            Set(ship, "rig", rig);
+            Set(ship, "style", style);
+            Set(ship, "actions", controls);
+            Set(ship, "hud", document);
+            Set(ship, "shipMaterial", shipMaterial);
+
+            var register = simulation.AddComponent<ExaggerationRegister>();
+            SetArray(register, "effects", new Object[] { bodyShading, mapTreatment, stylizedCamera, ship });
+
             var controller = hud.AddComponent<HudController>();
             Set(controller, "host", host);
             Set(controller, "rig", rig);
@@ -113,6 +124,10 @@ namespace UniverseSim.Unity.Editor
             Set(controller, "style", style);
             Set(controller, "exaggerationRegister", register);
             Set(controller, "actions", controls);
+            var shipHud = hud.AddComponent<ShipHud>();
+            Set(shipHud, "host", host);
+            Set(shipHud, "rig", rig);
+            Set(shipHud, "pilot", ship);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v0.2 (C ABI version 4) |
-| Last updated | 2026-10-22 |
+| Status | Draft v0.3 (C ABI version 5) |
+| Last updated | 2026-11-02 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md) (sections 3.4, 3.5 and 5), [SPEC.md](SPEC.md), `core/capi/include/usim/usim.h` |
 
 This guide is for anyone writing a host: a program that shows or uses the simulation (the Unity project, a future Godot or Unreal host, a script). The header `usim.h` is the reference for every function; this guide explains how the pieces fit together.
@@ -102,6 +102,24 @@ usim_ring ring; usim_ring_at(sim, i, &ring);  // body_index, inner and outer rad
 - Brightness and color are yours to map; the core gives the catalog's V magnitude and B-V color index. Say in your code that the mapping is a display choice.
 - A ring lies in its body's equatorial plane: the body-fixed XY plane, which the snapshot's `orientation` maps to the display. Scale ring radii in km by the body's `render_radius / mean_radius_km` so they follow the scale mode and distance compression like the body. Show `optical_depth_source_index`'s tier: Saturn's optical depths come from a Tier 2 source.
 
+### Exploring: trips, surface sites and days (ABI version 5, ADR-0016)
+
+```c
+usim_transfer_estimate trip;
+usim_transfer_estimate_at(sim, earth, mars, now, &trip);   // Hohmann time and speed changes, distance, light time
+
+usim_surface_site site;                                    // request: display frame and host axes only
+usim_surface_site_at(sim, moon, lat_rad, lon_rad, altitude_km, &request, now, &site);
+usim_surface_site_below(sim, moon, position_host_km, &request, now, &site);   // the inverse
+
+usim_day_length day;
+usim_day_length_at(sim, mars, now, &day);                   // sidereal rotation period, mean solar day
+```
+
+- A trip estimate is a textbook first estimate, not a trajectory: a Hohmann transfer between circular orbits around the bodies' shared orbit center, sized by the osculating orbits at that moment. Its flags say when an end is a surface, when the trip joins the orbits of the bodies' systems (a moon's last leg is not included) and when a position is approximate. Show those caveats with the numbers.
+- A site's vectors are relative to the body's center in the display frame and host axes, like an offset from the snapshot center: a host that keeps a camera or an avatar relative to a body adds `position_km` to its offset, and uses `up`, `north` and `east` for its horizon. Use `usim_surface_site_below` to turn a position back into coordinates rather than doing the frame math yourself. Both calls allocate nothing, so they can run every frame.
+- The site's gravity is GM / r^2 at the reference surface without rotation, and the Sun is geometric. Neither says what the surface is: the pack does not record whether a reference surface is solid ground or a cloud-top level, nor its temperature or pressure.
+
 ## 4. Precision: the floating origin
 
 Distances in the Solar System span from meters to billions of kilometers. A single-precision float resolves about 7 digits, so absolute positions in floats would shake visibly far from the origin (SPEC NFR-02).
@@ -179,6 +197,9 @@ usim state earth --center sun --time "2026-10-21T12:00:00 UTC"
 usim snapshot --center earth --km-per-unit 1e6 --axes unity --format csv
 usim orbit mars --format csv
 usim catalog
+usim transfer earth mars --time "2026-11-02T12:00:00 UTC"
+usim site moon --lat 0 --lon 0 --axes unity
+usim day mars
 ```
 
 Every host query has a CLI equivalent with the same numbers, which makes it the oracle for host tests (P5-13).

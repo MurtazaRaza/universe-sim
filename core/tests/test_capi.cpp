@@ -3,6 +3,7 @@
 
 #include "fixtures/test_pack_expected.hpp"
 #include "usim/result.hpp"
+#include "usim/sim/exploration.hpp"
 #include "usim/sim/simulation.hpp"
 #include "usim/usim.h"
 #include "usim/version.hpp"
@@ -10,11 +11,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -64,7 +67,7 @@ usim::sim::Simulation cpp_simulation() {
 
 TEST_CASE("C ABI reports the ABI version of its header", "[capi]") {
     CHECK(usim_abi_version() == USIM_ABI_VERSION);
-    CHECK(USIM_ABI_VERSION == 4u);
+    CHECK(USIM_ABI_VERSION == 5u);
 }
 
 TEST_CASE("C ABI version string matches the core", "[capi]") {
@@ -101,6 +104,9 @@ TEST_CASE("C ABI struct sizes are reported for binding checks", "[capi]") {
     CHECK(usim_struct_size(USIM_STRUCT_STAR) == 48);
     CHECK(usim_struct_size(USIM_STRUCT_RING) == sizeof(usim_ring));
     CHECK(usim_struct_size(USIM_STRUCT_ROTATION_MODEL) == 32);
+    CHECK(usim_struct_size(USIM_STRUCT_TRANSFER_ESTIMATE) == 112);
+    CHECK(usim_struct_size(USIM_STRUCT_SURFACE_SITE) == 224);
+    CHECK(usim_struct_size(USIM_STRUCT_DAY_LENGTH) == 48);
     CHECK(usim_struct_size(0) == 0);
     CHECK(usim_struct_size(999) == 0);
 }
@@ -203,7 +209,7 @@ TEST_CASE("C ABI time conversions", "[capi]") {
     CHECK(t.days == 0);
     CHECK(t.seconds == 82800.0);
     CHECK(usim_instant_seconds_between(at(0.0), t) == 82800.0);
-    CHECK(usim_instant_make(0, 1.0 / 0.0, &t) == USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_instant_make(0, std::numeric_limits<double>::infinity(), &t) == USIM_STATUS_INVALID_ARGUMENT);
 
     REQUIRE(usim_time_from_fields(h.sim, USIM_SCALE_TDB, 2000, 1, 1, 12, 0, 0.0, &t) == USIM_STATUS_OK);
     CHECK((t.days == 0 && t.seconds == 0.0));
@@ -260,7 +266,8 @@ TEST_CASE("C ABI clock", "[capi]") {
     REQUIRE(usim_clock_get(h.sim, &c) == USIM_STATUS_OK);
     CHECK(c.limit == USIM_CLOCK_LIMIT_END);
     CHECK(usim_clock_advance(h.sim, -1.0) == USIM_STATUS_INVALID_ARGUMENT);
-    CHECK(usim_clock_set_rate(h.sim, 1.0 / 0.0) == USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_clock_set_rate(h.sim, std::numeric_limits<double>::infinity()) ==
+          USIM_STATUS_INVALID_ARGUMENT);
     CHECK(usim_clock_set_time(h.sim, usim_instant{0, -5.0}) == USIM_STATUS_INVALID_ARGUMENT);
 }
 
@@ -511,4 +518,92 @@ TEST_CASE("C ABI rotation models equal the C++ facade", "[capi]") {
     CHECK(model.kind == USIM_ROTATION_NONE);
     CHECK(usim_body_rotation_model(h.sim, count, &model) == USIM_STATUS_INVALID_ARGUMENT);
     CHECK(usim_body_rotation_model(h.sim, 0, nullptr) == USIM_STATUS_INVALID_ARGUMENT);
+}
+
+TEST_CASE("C ABI exploration values equal the C++ facade", "[capi][exploration]") {
+    Handle h;
+    const auto sim = cpp_simulation();
+    // Inside the synthetic planet's ephemeris segment and orientation span (sim/test_exploration.cpp).
+    const double t_s = 43200.0;
+    const auto t = usim::time::Instant::from_seconds_since_j2000(t_s);
+
+    usim_transfer_estimate transfer{};
+    REQUIRE(usim_transfer_estimate_at(h.sim, naif(1001), naif(1002), at(t_s), &transfer) == USIM_STATUS_OK);
+    const auto expected_transfer = usim::sim::transfer_estimate(sim, usim::catalog::BodyId::naif(1001),
+                                                                usim::catalog::BodyId::naif(1002), t);
+    REQUIRE(expected_transfer.has_value());
+    CHECK(transfer.center.value == expected_transfer.value().center.value);
+    CHECK(transfer.departure.value == 1001);
+    CHECK(transfer.arrival.value == 1002);
+    CHECK(transfer.departure_radius_km == expected_transfer.value().departure_radius_km);
+    CHECK(transfer.arrival_radius_km == expected_transfer.value().arrival_radius_km);
+    CHECK(transfer.transfer_time_s == expected_transfer.value().transfer.transfer_time_s);
+    CHECK(transfer.departure_delta_v_km_s == expected_transfer.value().transfer.departure_delta_v_km_s);
+    CHECK(transfer.arrival_delta_v_km_s == expected_transfer.value().transfer.arrival_delta_v_km_s);
+    CHECK(transfer.distance_km == expected_transfer.value().distance_km);
+    CHECK(transfer.light_time_s == expected_transfer.value().light_time_s);
+    CHECK(transfer.flags == expected_transfer.value().flags);
+    CHECK(usim_transfer_estimate_at(h.sim, naif(1001), naif(1001), at(t_s), &transfer) ==
+          USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_transfer_estimate_at(h.sim, naif(1001), naif(1002), at(t_s), nullptr) ==
+          USIM_STATUS_INVALID_ARGUMENT);
+
+    usim_snapshot_request request{};
+    request.frame = frame(USIM_FRAME_ECLIPJ2000);
+    request.axes = USIM_AXES_UNITY;
+    usim_surface_site site{};
+    REQUIRE(usim_surface_site_at(h.sim, naif(1001), 0.3, -1.2, 0.5, &request, at(t_s), &site) ==
+            USIM_STATUS_OK);
+    const auto expected_site = usim::sim::surface_site(sim, usim::catalog::BodyId::naif(1001),
+                                                       {0.3, -1.2, 0.5}, usim::frames::FrameId::eclipj2000(),
+                                                       usim::presentation::AxisConvention::unity, t);
+    REQUIRE(expected_site.has_value());
+    const auto& e = expected_site.value();
+    CHECK(site.latitude_rad == e.point.latitude_rad);
+    CHECK(site.longitude_rad == e.point.longitude_rad);
+    CHECK(site.altitude_km == e.point.altitude_km);
+    CHECK(site.surface_radius_km == e.surface_radius_km);
+    CHECK((site.position_km.x == e.position_km.x && site.position_km.y == e.position_km.y &&
+           site.position_km.z == e.position_km.z));
+    CHECK((site.up.x == e.up.x && site.north.y == e.north.y && site.east.z == e.east.z));
+    CHECK((site.sun_direction.x == e.sun_direction.x && site.sun_direction.z == e.sun_direction.z));
+    CHECK(site.sun_elevation_rad == e.sun_elevation_rad);
+    CHECK(site.sun_azimuth_rad == e.sun_azimuth_rad);
+    CHECK(site.sun_distance_km == e.sun_distance_km);
+    CHECK(site.sunlight_ratio == e.sunlight_ratio);
+    CHECK(site.local_solar_time_h == e.local_solar_time_h);
+    CHECK(site.flags == e.flags);
+
+    usim_surface_site below{};
+    REQUIRE(usim_surface_site_below(h.sim, naif(1001), site.position_km, &request, at(t_s), &below) ==
+            USIM_STATUS_OK);
+    CHECK(std::fabs(below.latitude_rad - 0.3) < 1e-13);
+    CHECK(std::fabs(below.altitude_km - 0.5) < 1e-12);
+
+    usim_snapshot_request fixed = request;
+    fixed.frame = frame(USIM_FRAME_BODY_FIXED, 1001);
+    CHECK(usim_surface_site_at(h.sim, naif(1001), 0.0, 0.0, 0.0, &fixed, at(t_s), &site) ==
+          USIM_STATUS_INVALID_ARGUMENT);
+    usim_snapshot_request bad_axes = request;
+    bad_axes.axes = 42;
+    CHECK(usim_surface_site_at(h.sim, naif(1001), 0.0, 0.0, 0.0, &bad_axes, at(t_s), &site) ==
+          USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_surface_site_at(h.sim, naif(1002), 0.0, 0.0, 0.0, &request, at(t_s), &site) ==
+          USIM_STATUS_NOT_FOUND); // no radius
+    CHECK(usim_surface_site_at(h.sim, naif(1001), 0.0, 0.0, 0.0, nullptr, at(t_s), &site) ==
+          USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_surface_site_below(h.sim, naif(1001), usim_vec3d{0.0, 0.0, 0.0}, &request, at(t_s), &site) ==
+          USIM_STATUS_INVALID_ARGUMENT);
+
+    usim_day_length day{};
+    REQUIRE(usim_day_length_at(h.sim, naif(1001), at(t_s), &day) == USIM_STATUS_OK);
+    const auto expected_day = usim::sim::day_length(sim, usim::catalog::BodyId::naif(1001), t);
+    REQUIRE(expected_day.has_value());
+    CHECK(day.sidereal_rotation_period_s == expected_day.value().sidereal_rotation_period_s);
+    CHECK(day.mean_solar_day_s == expected_day.value().mean_solar_day_s);
+    CHECK(day.orbital_period_s == expected_day.value().orbital_period_s);
+    CHECK(day.orbiting_body.value == 1001);
+    CHECK(day.flags == expected_day.value().flags);
+    CHECK(usim_day_length_at(h.sim, naif(1003), at(t_s), &day) == USIM_STATUS_NOT_FOUND);
+    CHECK(usim_day_length_at(h.sim, naif(1001), at(t_s), nullptr) == USIM_STATUS_INVALID_ARGUMENT);
 }

@@ -452,6 +452,41 @@ namespace UniverseSim.Unity.Native
             }
         }
 
+        /// <summary>
+        /// The two-body estimate of a trip from <paramref name="from"/> to <paramref name="to"/> at
+        /// <paramref name="t"/> (ADR-0016): a Hohmann transfer, the distance and the light time. False when the core
+        /// cannot estimate it; <paramref name="error"/> then holds the core's reason.
+        /// </summary>
+        public bool TryTransferEstimate(UsimBodyId from, UsimBodyId to, UsimInstant t, out UsimTransferEstimate estimate,
+                                        out string error)
+        {
+            var status = NativeMethods.TransferEstimateAt(Pointer, from, to, t, out estimate);
+            error = status == (int)Status.Ok ? string.Empty : CoreLibrary.LastErrorMessage;
+            return status == (int)Status.Ok;
+        }
+
+        /// <summary>
+        /// The site at planetocentric latitude and east longitude (rad) and altitude (km) of <paramref name="body"/>,
+        /// in the request's display frame and host axes (ADR-0016). No managed allocation.
+        /// </summary>
+        public bool TrySurfaceSite(UsimBodyId body, double latitudeRad, double longitudeRad, double altitudeKm,
+                                   ref UsimSnapshotRequest request, UsimInstant t, out UsimSurfaceSite site) =>
+            NativeMethods.SurfaceSiteAt(Pointer, body, latitudeRad, longitudeRad, altitudeKm, ref request, t, out site) ==
+            (int)Status.Ok;
+
+        /// <summary>
+        /// The site at <paramref name="positionHostKm"/> relative to <paramref name="body"/>'s center (km, the
+        /// request's display frame and host axes): its coordinates, horizon, Sun and gravity. No managed allocation.
+        /// </summary>
+        public bool TrySurfaceSiteBelow(UsimBodyId body, Double3 positionHostKm, ref UsimSnapshotRequest request,
+                                        UsimInstant t, out UsimSurfaceSite site) =>
+            NativeMethods.SurfaceSiteBelow(Pointer, body, positionHostKm.ToUsim(), ref request, t, out site) ==
+            (int)Status.Ok;
+
+        /// <summary>The sidereal rotation period and mean solar day of <paramref name="body"/> (ADR-0016).</summary>
+        public bool TryDayLength(UsimBodyId body, UsimInstant t, out UsimDayLength day) =>
+            NativeMethods.DayLengthAt(Pointer, body, t, out day) == (int)Status.Ok;
+
         /// <summary>A vector from the host's axes to the core's (the inverse of the snapshot's mapping).</summary>
         public static UsimVec3d AxesFromHost(int axes, UsimVec3d host)
         {

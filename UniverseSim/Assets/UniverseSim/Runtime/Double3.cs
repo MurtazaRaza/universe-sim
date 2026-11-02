@@ -24,6 +24,10 @@ namespace UniverseSim.Unity
         public static Double3 operator +(Double3 a, Double3 b) => new Double3(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
         public static Double3 operator -(Double3 a, Double3 b) => new Double3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
         public static Double3 operator *(Double3 a, double s) => new Double3(a.X * s, a.Y * s, a.Z * s);
+        public static Double3 operator -(Double3 a) => new Double3(-a.X, -a.Y, -a.Z);
+
+        /// <summary>The dot product with <paramref name="b"/>.</summary>
+        public double Dot(Double3 b) => X * b.X + Y * b.Y + Z * b.Z;
 
         public double Length => Math.Sqrt(X * X + Y * Y + Z * Z);
 

@@ -14,12 +14,15 @@ add_library(usim_core STATIC
     frames/pck_orientation.cpp
     math/chebyshev.cpp
     math/quat.cpp
+    orbits/two_body.cpp
     presentation/axis_convention.cpp
     presentation/view.cpp
     result.cpp
+    sim/exploration.cpp
     sim/orbit_path.cpp
     sim/simulation.cpp
     sim/simulation_clock.cpp
+    surface/ellipsoid.cpp
     time/calendar.cpp
     time/iso8601.cpp
     time/time_scales.cpp

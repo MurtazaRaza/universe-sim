@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Status | Active |
-| Last updated | 2026-10-27 |
-| Current phase | Phase 6 done on 2026-10-26 (moons, rings, the starry sky, the Moon's and the Earth's high-precision orientation, surface maps); next: Phase 7 (small bodies), with Track A (art direction) alongside: A-01 to A-03, A-05, A-06 and the camera part of A-08 done; next A-04 and A-07. Phase 5 done except the owner's hands-on input check. |
+| Last updated | 2026-11-02 |
+| Current phase | Phase 6 done on 2026-10-26 (moons, rings, the starry sky, the Moon's and the Earth's high-precision orientation, surface maps); next: Phase 7 (small bodies), with Track A (art direction) alongside: A-01 to A-03, A-05, A-06 and the camera part of A-08 done; next A-04 and A-07. Track B (spaceship): B-01 to B-03 done on 2026-11-02; next B-04 and the owner's hands-on check (B-05). Phase 5 done except the owner's hands-on input check. Windows supported since 2026-11-02 (P0-13). |
 | Related | [SPEC.md](SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 ## How to use this plan
@@ -32,6 +32,7 @@
 | 8 | N-body sandbox | Hypothetical scenarios with measured drift |
 | 9 | Beyond the Solar System | Stars, exoplanets, galactic scale (outline) |
 | Track A | Art direction (alongside Phases 7 to 9) | Stylized and realistic styles, effects, artist's impressions, interaction feel |
+| Track B | Spaceship (stylized style) | A fictional craft to travel between bodies and hover over surfaces, with the core's trip estimates and surface values |
 
 Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of Phase 5.
 
@@ -65,8 +66,9 @@ Version 1 (the Solar System MVP in SPEC section 3.1) is complete at the end of P
   - 2026-10-20: Deferred by the project owner; CI is not needed yet. Until then, run the commands in CLAUDE.md locally before declaring a task done.
 - [x] **P0-12** Fill in the commands in `CLAUDE.md` and `README.md`.
   - 2026-10-20: Done.
-- [ ] **P0-13** **(deferred)** Windows plugin: a Windows x64 build of `universesim.dll`, a Windows branch in `NativePluginImportSettings`, and the build script extended to produce it.
+- [x] **P0-13** **(deferred)** Windows plugin: a Windows x64 build of `universesim.dll`, a Windows branch in `NativePluginImportSettings`, and the build script extended to produce it.
   - 2026-10-20: Deferred; development happens on macOS, and Windows is needed only to run the viewer on Windows. No Windows machine is required to do this work: the DLL can be cross-compiled on macOS (for example with mingw-w64 from Homebrew, or clang-cl with the Windows SDK), and its exports can be checked there. Only the final check, Unity on Windows loading the DLL, needs Windows. Revisit when a Windows build is wanted.
+  - 2026-11-02: Done on Windows 11 with MSVC 19.50 (Visual Studio 2026), requested by the project owner. First MSVC build: fixed `const auto*` on a `std::array` iterator (`iso8601.cpp`), constant `1.0 / 0.0` in tests, unreachable code after `FAIL` (C4702), and `std::getenv` deprecation (C4996: `_CRT_SECURE_NO_WARNINGS` for MSVC). CMake rejects MSVC before 19.30, which contracts multiply-adds under `/fp:precise`. `Result<void>` now holds `std::optional<Error>`: its empty string allocated under MSVC's debug iterators, one allocation per frame. Tests copy the DLL beside them (no rpath on Windows). New: preset `unity-windows`, `enter-vs-dev-shell.ps1`, `build-core-for-unity.ps1` (the `.sh` calls it from Git Bash; checks for x64), the `.dll` import branch with its EditMode test, and `usim.exe` in the PlayMode CLI lookup. The DLL depends only on `KERNEL32.dll`. Results: `ctest` dev 199 and release 201 pass, with the two moons-pack tests skipped (no moons pack on this machine); snapshot 15.1 us (budget 100). Unity 6000.5.1f1 EditMode 26 pass, 1 skipped (macOS plugin). PlayMode 24 pass, 3 skipped (moons pack, mockup harness), positions matching `usim.exe`. Not done: `asan` (not available with MSVC) and the data pipeline on Windows.
 - [x] **P0-14** Sanitizer preset (`asan`: AddressSanitizer and UndefinedBehaviorSanitizer) for local runs and later CI.
   - 2026-10-20: Done. Tests pass under `ctest --preset asan`.
 - [x] **P0-15** Python 3.12 or newer for the Phase 2 pipeline.
@@ -378,6 +380,23 @@ To be broken down into tasks when Phase 5 is complete.
 - Every artistic asset is in `ATTRIBUTION.md` with its license, every artist's impression also with its references, and every artist's impression is labeled in the viewer.
 - NFR-11 is met with every effect on.
 - The project owner approves the look and the feel hands-on.
+
+---
+
+## Track B: Spaceship (stylized style)
+
+**Goal:** in the stylized style, a spaceship that carries the camera from body to body and down over their surfaces, so a learner gets a feel for distances, travel times and what each place is like, with every value from the core (SPEC UC-10, FR-SIM-11, FR-REN-16, [ADR-0016](adr/0016-spaceship-and-exploration-values.md)). Requested by the project owner on 2026-11-02, who chose fast flight with real facts, hovering with real conditions and the sky, and an original model.
+
+- [x] **B-01** Decision and documents: ADR-0016, SPEC (UC-10, FR-SIM-11, FR-REN-16, the non-goal on fictional bodies), ARCHITECTURE, API.
+  - 2026-11-02: Done.
+- [x] **B-02** Core exploration values: `usim::orbits` (osculating semi-major axis, period, Hohmann transfer), `usim::surface` (reference ellipsoid, planetocentric points and their inverse, local horizon) and `usim/sim/exploration.hpp` (transfer estimate, surface site, day length); C ABI version 5 with C# bindings; CLI commands `transfer`, `site` and `day`.
+  - 2026-11-02: Done. Unit tests on synthetic values, the C ABI against the C++ facade, and validation on the default pack. The mean solar day matches the Sun's hour angle followed over whole orbits within 1.2e-6 (Mercury), 4.7e-6 (Venus), 5.2e-8 (Earth), 1.1e-5 (Moon) and 6.4e-10 (Mars); threshold 5e-5. Deviation from the first version: the instantaneous rotation rate gave 4.4e-4 for Mercury and 9.6e-5 for the Moon (their forced librations), so the period uses the IAU mean rate (W1 + 2 W2 d), and only bodies without IAU elements use the instantaneous rate (flagged).
+- [x] **B-03** Unity: `ShipPilot` (flight relative to the nearest body, trips of 4 to 14 s, descent to and hovering over a surface site, the camera rig's new `ICameraPilot`), `ShipHud` (toggle and panel), `ShipMesh` and the `Ship` shader, the V, T and L keys, listed in the exaggeration register; EditMode and PlayMode tests (`ShipTests`, with screenshots in a `ship` folder).
+  - 2026-11-02: Done. Hovering, not landing: until B-04 the ship never shows itself on a surface whose kind is not in the data. The model is code, so it needs no ATTRIBUTION.md entry (A-04 still applies to any modeled ship). On Windows: `ctest` dev 223 and release 225 pass (2 moons-pack skips); Unity EditMode 31 pass (1 skip, the macOS plugin) and PlayMode 28 pass (3 skips: the moons pack, the mockup harness), including the 4 `ShipTests`. The mesh and the panel were checked in screenshots near the Earth, flying to the Moon and Mars, and hovering over the Moon and Mars.
+- [ ] **B-04** Sourced surface conditions: which reference surfaces are solid and which are pressure levels (the IAU report, Archinal et al. 2018, gives the giant planets' radii at 1 bar), and mean surface temperature and pressure (Tier 1 where it exists, else S-NSSDC-FACT as a labeled Tier 2 input). Through the pipeline into the pack (a format change) and the C ABI; then the ship touches down on solid surfaces and stops at the cloud tops of the others, and the panel shows the values with their sources. Needs the data pipeline (macOS, or the pipeline set up on Windows).
+- [ ] **B-05** **(user)** Hands-on check of the ship by the project owner: flight speeds, the chase camera, trip durations, the hover height and the panel. Together with the A-12 and Phase 5 input checks.
+- [ ] **B-06** The sky at a surface site: an atmosphere's daytime sky and twilight for bodies a registered source shows to have one (with A-07).
+- [ ] **B-07** **(deferred)** Terrain relief from elevation models (for example LOLA for the Moon and MOLA for Mars) and real transfer trajectories (a Lambert solver over the Phase 7 propagator). Not chosen by the project owner on 2026-11-02; revisit if wanted.
 
 ---
 

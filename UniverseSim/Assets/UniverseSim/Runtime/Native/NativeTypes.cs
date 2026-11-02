@@ -201,6 +201,67 @@ namespace UniverseSim.Unity.Native
         public IntPtr Locator;
     }
 
+    /// <summary>
+    /// usim_transfer_estimate (ABI 5, ADR-0016): a two-body Hohmann estimate of a trip between two bodies, with the
+    /// straight-line distance and light time. km, s, km/s.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct UsimTransferEstimate
+    {
+        public UsimBodyId Center;
+        public UsimBodyId Departure;
+        public UsimBodyId Arrival;
+        public double DepartureRadiusKm;
+        public double ArrivalRadiusKm;
+        public double TransferTimeS;
+        public double DepartureDeltaVKmS;
+        public double ArrivalDeltaVKmS;
+        public double DistanceKm;
+        public double LightTimeS;
+        public uint Flags; // NativeConstants.Transfer*
+        public uint Reserved;
+    }
+
+    /// <summary>
+    /// usim_surface_site (ABI 5, ADR-0016): a point above a body's reference ellipsoid with its horizon, the Sun
+    /// seen from there and the gravity below it. Vectors relative to the body's center, display frame, host axes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct UsimSurfaceSite
+    {
+        public double LatitudeRad;
+        public double LongitudeRad;
+        public double AltitudeKm;
+        public double SurfaceRadiusKm;
+        public UsimVec3d PositionKm;
+        public UsimVec3d Up;
+        public UsimVec3d North;
+        public UsimVec3d East;
+        public UsimVec3d SunDirection;
+        public double SunElevationRad;
+        public double SunAzimuthRad;
+        public double SunDistanceKm;
+        public double SunAngularDiameterRad;
+        public double SunlightRatio;
+        public double LocalSolarTimeH;
+        public double GravityKmS2;
+        public double EscapeSpeedKmS;
+        public uint Flags; // NativeConstants.Site*
+        public uint Reserved;
+    }
+
+    /// <summary>usim_day_length (ABI 5, ADR-0016): sidereal rotation period and mean solar day, s.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct UsimDayLength
+    {
+        public double SiderealRotationPeriodS;
+        public double MeanSolarDayS;
+        public double OrbitalPeriodS;
+        public UsimBodyId OrbitingBody;
+        public uint Flags; // NativeConstants.Day*
+        public uint Reserved;
+    }
+
     /// <summary>The constants of usim.h that bindings need.</summary>
     public static class NativeConstants
     {
@@ -226,6 +287,9 @@ namespace UniverseSim.Unity.Native
         public const int StructStar = 14;
         public const int StructRing = 15;
         public const int StructRotationModel = 16;
+        public const int StructTransferEstimate = 17;
+        public const int StructSurfaceSite = 18;
+        public const int StructDayLength = 19;
 
         public const uint BodyHasEphemeris = 0x1;
         public const uint BodyApproximate = 0x2;
@@ -278,5 +342,20 @@ namespace UniverseSim.Unity.Native
         public const int RotationNone = 0;
         public const int RotationIau = 1;
         public const int RotationBinaryPck = 2;
+
+        public const uint TransferFromSurface = 0x1;
+        public const uint TransferToSurface = 0x2;
+        public const uint TransferBetweenSystems = 0x4;
+        public const uint TransferApproximate = 0x8;
+
+        public const uint SiteHasSun = 0x1;
+        public const uint SiteHasSunSize = 0x2;
+        public const uint SiteHasGravity = 0x4;
+        public const uint SiteApproximate = 0x8;
+
+        public const uint DayHasSolarDay = 0x1;
+        public const uint DayRetrograde = 0x2;
+        public const uint DayApproximate = 0x4;
+        public const uint DayInstantaneousRate = 0x8;
     }
 }

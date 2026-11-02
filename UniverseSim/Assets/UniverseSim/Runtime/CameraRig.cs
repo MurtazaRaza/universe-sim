@@ -7,6 +7,23 @@ using UnityEngine.UIElements;
 namespace UniverseSim.Unity
 {
     /// <summary>
+    /// Something that drives the camera instead of its own controls: the spaceship (ADR-0016). It hands the rig a
+    /// pose each frame; positions stay relative to a body center in double precision, as the rig keeps them.
+    /// </summary>
+    public interface ICameraPilot
+    {
+        /// <summary>
+        /// The pose for this frame: the body the view is centered on (catalog index), the camera's offset from its
+        /// center (km, host axes, ECLIPJ2000), the camera's rotation and the km per render unit (about the distance
+        /// to the nearest surface, so that it sits one unit away). False hands the camera back to the rig.
+        /// </summary>
+        bool TryGetPose(out int focusIndex, out Double3 offsetKm, out Quaternion rotation, out double kmPerRenderUnit);
+
+        /// <summary>The user asked to focus a body (double-click, Enter, the focus list) while piloting.</summary>
+        void RequestFocus(int index);
+    }
+
+    /// <summary>
     /// The camera (P5-04 to P5-06). It focuses on and orbits a body, zooms logarithmically from near the
     /// surface to the whole system, flies freely, and moves smoothly between bodies.
     ///
@@ -74,6 +91,20 @@ namespace UniverseSim.Unity
 
         /// <summary>The camera's offset from the focus center, km, host axes.</summary>
         public Double3 OffsetKm { get; private set; }
+
+        /// <summary>
+        /// The driver of the camera, or null when the rig's own controls drive it (orbit, zoom, free fly). While a
+        /// pilot gives a pose, the rig only picks and selects bodies and forwards focus requests to it.
+        /// </summary>
+        public ICameraPilot Pilot { get; set; }
+
+        /// <summary>True when the pilot drove the camera this frame.</summary>
+        public bool Piloted { get; private set; }
+
+        private int pilotFocus;
+        private Double3 pilotOffsetKm;
+        private Quaternion pilotRotation = Quaternion.identity;
+        private double pilotKmPerUnit = 1.0;
 
         /// <summary>Raised when the selection changes (the HUD shows the body).</summary>
         public event Action<int> SelectionChanged;
@@ -162,8 +193,36 @@ namespace UniverseSim.Unity
             {
                 return;
             }
+            UpdatePilot();
             HandleInput();
             UpdateRequest();
+        }
+
+        // Takes this frame's pose from the pilot, or gives the rig back its controls where the pilot left the camera.
+        private void UpdatePilot()
+        {
+            var wasPiloted = Piloted;
+            Piloted = Pilot != null &&
+                      Pilot.TryGetPose(out pilotFocus, out pilotOffsetKm, out pilotRotation, out pilotKmPerUnit) &&
+                      pilotFocus >= 0 && pilotFocus < Sim.Bodies.Count;
+            if (Piloted)
+            {
+                transitioning = false;
+                FreeFly = false;
+                if (pilotFocus != FocusIndex)
+                {
+                    FocusIndex = pilotFocus;
+                    FocusChanged?.Invoke(FocusIndex);
+                }
+            }
+            else if (wasPiloted)
+            {
+                // Orbit the focus from where the pilot left the camera.
+                var direction = OffsetKm.Normalized;
+                distanceKm = Math.Max(OffsetKm.Length, MinDistanceKm());
+                yaw = Math.Atan2(direction.X, direction.Z);
+                pitch = Math.Clamp(Math.Asin(Math.Clamp(direction.Y, -1.0, 1.0)), -1.55, 1.55);
+            }
         }
 
         private bool PointerOverUi(Vector2 screen)
@@ -193,7 +252,7 @@ namespace UniverseSim.Unity
                 dragging = false;
             }
             var delta = look.ReadValue<Vector2>();
-            if (dragging)
+            if (dragging && !Piloted)
             {
                 dragTravel += delta.magnitude;
                 if (FreeFly)
@@ -209,7 +268,7 @@ namespace UniverseSim.Unity
             }
 
             var scroll = zoom.ReadValue<float>();
-            if (!overUi && Mathf.Abs(scroll) > 0f && !FreeFly)
+            if (!overUi && Mathf.Abs(scroll) > 0f && !FreeFly && !Piloted)
             {
                 // Mouse wheels report large steps, keys report +-1 per frame: scale keys by time.
                 var amount = Mathf.Abs(scroll) > 2f ? scroll * zoomPerScrollUnit : scroll * 2f * dt;
@@ -243,12 +302,12 @@ namespace UniverseSim.Unity
             {
                 StepFocus(-1);
             }
-            if (toggleFly.WasPressedThisFrame())
+            if (toggleFly.WasPressedThisFrame() && !Piloted)
             {
                 SetFreeFly(!FreeFly);
             }
 
-            if (FreeFly)
+            if (FreeFly && !Piloted)
             {
                 var input = move.ReadValue<Vector2>();
                 var vertical = moveVertical.ReadValue<float>();
@@ -331,10 +390,22 @@ namespace UniverseSim.Unity
             SelectionChanged?.Invoke(index);
         }
 
-        /// <summary>Moves the camera to <paramref name="index"/> and orbits it from then on.</summary>
+        /// <summary>
+        /// Moves the camera to <paramref name="index"/> and orbits it from then on. While piloted, the request goes to
+        /// the pilot instead.
+        /// </summary>
         public void Focus(int index)
         {
-            if (Sim == null || index < 0 || index >= host.Views.Count || index == FocusIndex)
+            if (Sim == null || index < 0 || index >= host.Views.Count)
+            {
+                return;
+            }
+            if (Piloted && Pilot != null)
+            {
+                Pilot.RequestFocus(index);
+                return;
+            }
+            if (index == FocusIndex)
             {
                 return;
             }
@@ -420,7 +491,14 @@ namespace UniverseSim.Unity
                 return;
             }
             Quaternion rotation;
-            if (transitioning)
+            var altitude = 0.0;
+            if (Piloted)
+            {
+                OffsetKm = pilotOffsetKm;
+                rotation = pilotRotation;
+                altitude = Math.Max(pilotKmPerUnit, minAltitudeKm);
+            }
+            else if (transitioning)
             {
                 // Straight toward the new focus, distance interpolated on a log scale, eased in and out.
                 var s = Mathf.Clamp01((Time.unscaledTime - transitionStart) / transitionSeconds);
@@ -452,7 +530,10 @@ namespace UniverseSim.Unity
                 rotation = Quaternion.LookRotation(-direction.ToVector3(), Vector3.up);
             }
 
-            var altitude = Math.Max(OffsetKm.Length - FocusRadiusKm(), minAltitudeKm);
+            if (!Piloted)
+            {
+                altitude = Math.Max(OffsetKm.Length - FocusRadiusKm(), minAltitudeKm);
+            }
             var request = host.Request;
             request.Center = Sim.Bodies[FocusIndex].Id;
             request.Frame = UsimFrame.EclipJ2000;

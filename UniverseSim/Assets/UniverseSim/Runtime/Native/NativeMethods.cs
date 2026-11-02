@@ -160,5 +160,23 @@ namespace UniverseSim.Unity.Native
         internal static extern int OrbitPath(IntPtr simulation, UsimBodyId body, UsimBodyId orbitCenter,
                                              ref UsimSnapshotRequest request, IntPtr positions, int capacity,
                                              out int count, out uint flags);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_transfer_estimate_at")]
+        internal static extern int TransferEstimateAt(IntPtr simulation, UsimBodyId from, UsimBodyId to, UsimInstant t,
+                                                      out UsimTransferEstimate estimate);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_surface_site_at")]
+        internal static extern int SurfaceSiteAt(IntPtr simulation, UsimBodyId body, double latitudeRad,
+                                                 double longitudeRad, double altitudeKm,
+                                                 ref UsimSnapshotRequest request, UsimInstant t,
+                                                 out UsimSurfaceSite site);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_surface_site_below")]
+        internal static extern int SurfaceSiteBelow(IntPtr simulation, UsimBodyId body, UsimVec3d positionHostKm,
+                                                    ref UsimSnapshotRequest request, UsimInstant t,
+                                                    out UsimSurfaceSite site);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_day_length_at")]
+        internal static extern int DayLengthAt(IntPtr simulation, UsimBodyId body, UsimInstant t, out UsimDayLength day);
     }
 }

@@ -152,6 +152,34 @@
     padding: 6px;
 }
 
+/* A fixed height, so the list of facts scrolls inside it rather than spilling over the bottom bar. */
+.ship-panel {
+    left: 12px;
+    right: auto;
+    top: auto;
+    bottom: 132px;
+    width: 400px;
+    height: 46%;
+    max-height: none;
+    overflow: hidden;
+    border-left-color: rgb(255, 140, 90);
+}
+
+.ship-panel .values {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+}
+
+.ship-buttons {
+    flex-wrap: wrap;
+}
+
+.ship-note {
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+
 .exaggerations-toggle {
     -unity-text-align: middle-left;
     margin: 0;

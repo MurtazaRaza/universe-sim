@@ -9,7 +9,7 @@ An educational simulation of the universe: physically accurate underneath, built
 
 ## Status
 
-Phases 0 to 6 are complete on macOS: the engine-agnostic core and the Unity viewer (v1). A reproducible Python pipeline builds the data pack from pinned NAIF kernels. The core evaluates the DE440 ephemeris (within 1 mm of NASA's CSPICE toolkit and within 10 m of JPL Horizons), orients bodies with the IAU rotation models (the Moon with DE440's high-precision lunar orientation), runs the simulation clock, samples orbit paths and fills per-frame snapshots in a few microseconds. It is exposed through a C ABI and the `usim` command line. The Unity viewer shows the Solar System at the current time with time controls, focus and zoom from 1 km above a surface to the whole system, orbit lines, labels, an info panel with sources, and a scale mode switch. Phase 6 adds the 9,096 naked-eye stars of the Bright Star Catalogue as the sky, Saturn's rings, and, in an optional pack built from the JPL satellite ephemerides, the planet centers and 21 major moons from 2000 to 2100, with the Earth oriented by NAIF's Earth orientation file. Surface maps of 19 planets and moons, reprojected from NASA and USGS mission mosaics, cover their spheres; rebuilding them needs their sources (`tools/scripts/fetch-texture-sources.sh`, about 4.8 GB). See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+Phases 0 to 6 are complete on macOS, and the core and viewer also build, pass their tests and run on Windows (x64): the engine-agnostic core and the Unity viewer (v1). A reproducible Python pipeline builds the data pack from pinned NAIF kernels. The core evaluates the DE440 ephemeris (within 1 mm of NASA's CSPICE toolkit and within 10 m of JPL Horizons), orients bodies with the IAU rotation models (the Moon with DE440's high-precision lunar orientation), runs the simulation clock, samples orbit paths and fills per-frame snapshots in a few microseconds. It is exposed through a C ABI and the `usim` command line. The Unity viewer shows the Solar System at the current time with time controls, focus and zoom from 1 km above a surface to the whole system, orbit lines, labels, an info panel with sources, and a scale mode switch. Phase 6 adds the 9,096 naked-eye stars of the Bright Star Catalogue as the sky, Saturn's rings, and, in an optional pack built from the JPL satellite ephemerides, the planet centers and 21 major moons from 2000 to 2100, with the Earth oriented by NAIF's Earth orientation file. Surface maps of 19 planets and moons, reprojected from NASA and USGS mission mosaics, cover their spheres; rebuilding them needs their sources (`tools/scripts/fetch-texture-sources.sh`, about 4.8 GB). See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## Documentation
 
@@ -38,11 +38,13 @@ UniverseSim/   Unity 6 project (rendering layer)
 ## Prerequisites
 
 - Git with Git LFS (`git lfs install` once per machine)
-- CMake 3.25 or newer, Ninja, and a C++20 compiler (Apple Clang from Xcode on macOS)
+- CMake 3.25 or newer, Ninja, and a C++20 compiler (Apple Clang from Xcode on macOS; MSVC from Visual Studio 2022 or newer on Windows)
 - Unity 6000.5.1f1 (URP)
 - Python 3.12 or newer, only to rebuild data or reference files. The repository pins 3.12.8 in `.python-version` for pyenv users.
 
 On macOS with Homebrew: `brew install git-lfs cmake ninja`.
+
+On Windows: Visual Studio 2022 or newer with the "Desktop development with C++" workload, which includes CMake and Ninja, and Git for Windows (Git Bash and Git LFS). Run the core commands below in PowerShell after `. tools/scripts/enter-vs-dev-shell.ps1`, which sets up the compiler. Build the plugin with `powershell -ExecutionPolicy Bypass -File tools/scripts/build-core-for-unity.ps1`, with the Unity Editor closed, since Windows locks a loaded DLL. The data pipeline has not been tried on Windows yet.
 
 ## Getting started
 
@@ -54,13 +56,16 @@ cmake --build --preset dev
 ctest --preset dev
 cd ..
 
-# 2. Build the native plugin and copy it into the Unity project
+# 2. Build the native plugin and copy it into the Unity project (on Windows: the .ps1 script, see above)
 tools/scripts/build-core-for-unity.sh
 
 # 3. Open UniverseSim/ in Unity 6000.5.1f1, open Assets/UniverseSim/Scenes/Main.unity and press Play.
 #    Drag to orbit, scroll to zoom, click a body to select it, double-click (or Enter) to focus it,
 #    comma and period to step through bodies, F to fly (WASD, Q/E, Shift), Space to pause,
 #    [ and ] to change the rate.
+#    In the stylized style, V takes out the spaceship: W/S thrust, A/D turn, Q/E pitch, drag to steer,
+#    T flies to the selected body (with the real distance, light time and a transfer estimate), and
+#    L descends to hover over the surface below (its Sun, gravity and day) or lifts off.
 ```
 
 Query the simulation from the command line (JSON by default, `--format csv` for tables):
@@ -69,6 +74,8 @@ Query the simulation from the command line (JSON by default, `--format csv` for 
 core/build/dev/apps/usim-cli/usim state earth --center sun --time "2026-10-21T12:00:00 UTC"
 core/build/dev/apps/usim-cli/usim snapshot --center earth --km-per-unit 1e6 --format csv
 core/build/dev/apps/usim-cli/usim orbit mars
+core/build/dev/apps/usim-cli/usim transfer earth mars    # a Hohmann estimate of the trip, and the light time
+core/build/dev/apps/usim-cli/usim site moon --lat 0 --lon 0
 core/build/dev/apps/usim-cli/usim --help
 ```
 
@@ -88,7 +95,7 @@ tools/pipeline/usim-pipeline fetch --optional
 tools/pipeline/usim-pipeline build --pack solar-system-moons
 ```
 
-The plugin build currently targets macOS. A Windows build is deferred (P0-13); it can be cross-compiled on macOS when needed.
+The plugin builds for macOS (universal arm64 and x86_64) and Windows (x64).
 
 ## Data acknowledgments
 

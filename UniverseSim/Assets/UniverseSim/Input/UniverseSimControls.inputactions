@@ -139,6 +139,33 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleShip",
+                    "type": "Button",
+                    "id": "5b2f6c1e-8a3d-4e7b-9c41-2d6f0a8b3e15",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Travel",
+                    "type": "Button",
+                    "id": "8e4a1d27-3c5b-4f90-a6e2-71b9c0d4f382",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Land",
+                    "type": "Button",
+                    "id": "c37d9e05-6f12-48a4-b5d8-0e9a2b71c6f4",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -491,6 +518,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "Boost",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1f6e8b30-9d4c-4a27-8e53-c2b07a9d1e64",
+                    "path": "<Keyboard>/v",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleShip",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a9c2d4e7-5b18-4f3a-b6d0-3e81f5c7a290",
+                    "path": "<Keyboard>/t",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Travel",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e0b5a713-2c69-4d8e-9f14-6a3d8c2b7f51",
+                    "path": "<Keyboard>/l",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Land",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

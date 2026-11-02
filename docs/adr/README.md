@@ -23,6 +23,7 @@ Write an ADR when a choice affects module boundaries, data formats, units or fra
 | [0013](0013-earth-orientation-in-the-moons-pack.md) | The Earth's orientation from a binary PCK, in the moons pack only | Accepted |
 | [0014](0014-surface-map-textures.md) | Surface map textures from mission mosaics, reprojected by the pipeline | Accepted; plain spheres of decision 1 superseded in part by ADR-0015 |
 | [0015](0015-stylized-presentation-over-real-data.md) | A stylized presentation over real data | Accepted |
+| [0016](0016-spaceship-and-exploration-values.md) | A spaceship in the stylized style, with exploration values from the core | Accepted |
 
 ## Template
 

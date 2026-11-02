@@ -4,6 +4,7 @@
 // converts exceptions to USIM_STATUS_INTERNAL), validate every pointer argument, and pass only C types.
 
 #include "usim/result.hpp"
+#include "usim/sim/exploration.hpp"
 #include "usim/sim/orbit_path.hpp"
 #include "usim/sim/simulation.hpp"
 #include "usim/usim.h"
@@ -66,7 +67,20 @@ static_assert(USIM_ID_NAMESPACE_HR == static_cast<std::int32_t>(usim::catalog::I
 static_assert(USIM_STAR_HAS_COLOR == usim::sim::star_has_color);
 static_assert(USIM_ROTATION_NONE == static_cast<std::int32_t>(usim::sim::RotationModelKind::none));
 static_assert(USIM_ROTATION_IAU == static_cast<std::int32_t>(usim::sim::RotationModelKind::iau));
-static_assert(USIM_ROTATION_BINARY_PCK == static_cast<std::int32_t>(usim::sim::RotationModelKind::binary_pck));
+static_assert(USIM_ROTATION_BINARY_PCK ==
+              static_cast<std::int32_t>(usim::sim::RotationModelKind::binary_pck));
+static_assert(USIM_TRANSFER_FROM_SURFACE == usim::sim::transfer_from_surface);
+static_assert(USIM_TRANSFER_TO_SURFACE == usim::sim::transfer_to_surface);
+static_assert(USIM_TRANSFER_BETWEEN_SYSTEMS == usim::sim::transfer_between_systems);
+static_assert(USIM_TRANSFER_APPROXIMATE == usim::sim::transfer_approximate);
+static_assert(USIM_SITE_HAS_SUN == usim::sim::site_has_sun);
+static_assert(USIM_SITE_HAS_SUN_SIZE == usim::sim::site_has_sun_size);
+static_assert(USIM_SITE_HAS_GRAVITY == usim::sim::site_has_gravity);
+static_assert(USIM_SITE_APPROXIMATE == usim::sim::site_approximate);
+static_assert(USIM_DAY_HAS_SOLAR_DAY == usim::sim::day_has_solar_day);
+static_assert(USIM_DAY_RETROGRADE == usim::sim::day_retrograde);
+static_assert(USIM_DAY_APPROXIMATE == usim::sim::day_approximate);
+static_assert(USIM_DAY_INSTANTANEOUS_RATE == usim::sim::day_instantaneous_rate);
 
 struct usim_simulation {
     usim_simulation(usim::sim::Simulation s)
@@ -262,6 +276,12 @@ USIM_API uint32_t usim_struct_size(int32_t struct_id) {
         return sizeof(usim_ring);
     case USIM_STRUCT_ROTATION_MODEL:
         return sizeof(usim_rotation_model);
+    case USIM_STRUCT_TRANSFER_ESTIMATE:
+        return sizeof(usim_transfer_estimate);
+    case USIM_STRUCT_SURFACE_SITE:
+        return sizeof(usim_surface_site);
+    case USIM_STRUCT_DAY_LENGTH:
+        return sizeof(usim_day_length);
     default:
         return 0;
     }
@@ -912,4 +932,165 @@ USIM_API int32_t usim_ring_at(const usim_simulation* sim, int32_t index, usim_ri
             ring.radii_source.locator.c_str(),
             depth ? depth->source.locator.c_str() : ""};
     return USIM_STATUS_OK;
+}
+
+// Exploration (ADR-0016). ABI version 5.
+
+namespace {
+
+usim_transfer_estimate to_c(const usim::sim::TransferEstimate& e) noexcept {
+    return {to_c(e.center),
+            to_c(e.departure),
+            to_c(e.arrival),
+            e.departure_radius_km,
+            e.arrival_radius_km,
+            e.transfer.transfer_time_s,
+            e.transfer.departure_delta_v_km_s,
+            e.transfer.arrival_delta_v_km_s,
+            e.distance_km,
+            e.light_time_s,
+            e.flags,
+            0};
+}
+
+usim_surface_site to_c(const usim::sim::SurfaceSite& s) noexcept {
+    return {s.point.latitude_rad,
+            s.point.longitude_rad,
+            s.point.altitude_km,
+            s.surface_radius_km,
+            to_c(s.position_km),
+            to_c(s.up),
+            to_c(s.north),
+            to_c(s.east),
+            to_c(s.sun_direction),
+            s.sun_elevation_rad,
+            s.sun_azimuth_rad,
+            s.sun_distance_km,
+            s.sun_angular_diameter_rad,
+            s.sunlight_ratio,
+            s.local_solar_time_h,
+            s.gravity_km_s2,
+            s.escape_speed_km_s,
+            s.flags,
+            0};
+}
+
+// The display frame and axes of a site request, or an error status (with its message recorded).
+struct SiteView {
+    usim::frames::FrameId frame = usim::frames::FrameId::icrf();
+    usim::presentation::AxisConvention axes = usim::presentation::AxisConvention::core;
+};
+
+std::optional<SiteView> site_view(const usim_snapshot_request& request, std::int32_t& status) noexcept {
+    const std::optional<usim::frames::FrameId> frame = from_c(request.frame);
+    if (!frame || !frame->is_inertial()) {
+        status = invalid("a site's display frame must be USIM_FRAME_ICRF or USIM_FRAME_ECLIPJ2000");
+        return std::nullopt;
+    }
+    if (request.axes < USIM_AXES_CORE || request.axes > USIM_AXES_UNREAL) {
+        status = invalid("unknown axis convention");
+        return std::nullopt;
+    }
+    return SiteView{*frame, static_cast<usim::presentation::AxisConvention>(request.axes)};
+}
+
+} // namespace
+
+USIM_API int32_t usim_transfer_estimate_at(const usim_simulation* sim, usim_body_id from, usim_body_id to,
+                                           usim_instant t, usim_transfer_estimate* out) {
+    return guarded([&] {
+        if (sim == nullptr || out == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : "out");
+        }
+        const auto instant = from_c(t);
+        if (!instant) {
+            return invalid("the instant is not normalized");
+        }
+        const auto estimate = usim::sim::transfer_estimate(sim->sim, from_c(from), from_c(to), *instant);
+        if (!estimate) {
+            return fail(estimate.error());
+        }
+        *out = to_c(estimate.value());
+        return static_cast<std::int32_t>(USIM_STATUS_OK);
+    });
+}
+
+USIM_API int32_t usim_surface_site_at(const usim_simulation* sim, usim_body_id body, double latitude_rad,
+                                      double longitude_rad, double altitude_km,
+                                      const usim_snapshot_request* request, usim_instant t,
+                                      usim_surface_site* out) {
+    return guarded([&] {
+        if (sim == nullptr || request == nullptr || out == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : request == nullptr ? "request" : "out");
+        }
+        std::int32_t status = USIM_STATUS_OK;
+        const auto view = site_view(*request, status);
+        if (!view) {
+            return status;
+        }
+        const auto instant = from_c(t);
+        if (!instant) {
+            return invalid("the instant is not normalized");
+        }
+        const auto site =
+            usim::sim::surface_site(sim->sim, from_c(body), {latitude_rad, longitude_rad, altitude_km},
+                                    view->frame, view->axes, *instant);
+        if (!site) {
+            return fail(site.error());
+        }
+        *out = to_c(site.value());
+        return static_cast<std::int32_t>(USIM_STATUS_OK);
+    });
+}
+
+USIM_API int32_t usim_surface_site_below(const usim_simulation* sim, usim_body_id body,
+                                         usim_vec3d position_host_km, const usim_snapshot_request* request,
+                                         usim_instant t, usim_surface_site* out) {
+    return guarded([&] {
+        if (sim == nullptr || request == nullptr || out == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : request == nullptr ? "request" : "out");
+        }
+        std::int32_t status = USIM_STATUS_OK;
+        const auto view = site_view(*request, status);
+        if (!view) {
+            return status;
+        }
+        const auto instant = from_c(t);
+        if (!instant) {
+            return invalid("the instant is not normalized");
+        }
+        const usim::math::Vec3 position{position_host_km.x, position_host_km.y, position_host_km.z};
+        const auto site = usim::sim::surface_site_below(sim->sim, from_c(body), position, view->frame,
+                                                        view->axes, *instant);
+        if (!site) {
+            return fail(site.error());
+        }
+        *out = to_c(site.value());
+        return static_cast<std::int32_t>(USIM_STATUS_OK);
+    });
+}
+
+USIM_API int32_t usim_day_length_at(const usim_simulation* sim, usim_body_id body, usim_instant t,
+                                    usim_day_length* out) {
+    return guarded([&] {
+        if (sim == nullptr || out == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : "out");
+        }
+        const auto instant = from_c(t);
+        if (!instant) {
+            return invalid("the instant is not normalized");
+        }
+        const auto day = usim::sim::day_length(sim->sim, from_c(body), *instant);
+        if (!day) {
+            return fail(day.error());
+        }
+        const auto& d = day.value();
+        *out = {d.sidereal_rotation_period_s,
+                d.mean_solar_day_s,
+                d.orbital_period_s,
+                to_c(d.orbiting_body),
+                d.flags,
+                0};
+        return static_cast<std::int32_t>(USIM_STATUS_OK);
+    });
 }

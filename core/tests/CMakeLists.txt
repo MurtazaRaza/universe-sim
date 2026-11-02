@@ -9,6 +9,16 @@ FetchContent_Declare(Catch2
     SYSTEM)
 FetchContent_MakeAvailable(Catch2)
 
+# Windows has no rpath: an executable that links the universesim DLL finds it only in its own directory (or on
+# PATH), so the DLL is copied there after each build.
+function(usim_copy_runtime_dlls target)
+    if(WIN32)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${target}> $<TARGET_FILE_DIR:${target}>
+            COMMAND_EXPAND_LISTS)
+    endif()
+endfunction()
+
 add_executable(usim_core_tests
     catalog/test_catalog.cpp
     catalog/test_sky.cpp
@@ -23,11 +33,14 @@ add_executable(usim_core_tests
     math/test_chebyshev.cpp
     math/test_quat.cpp
     math/test_vec_mat.cpp
+    orbits/test_two_body.cpp
     presentation/test_axis_convention.cpp
     presentation/test_view.cpp
+    sim/test_exploration.cpp
     sim/test_orbit_path.cpp
     sim/test_simulation.cpp
     sim/test_simulation_clock.cpp
+    surface/test_ellipsoid.cpp
     test_constants.cpp
     test_result.cpp
     test_version.cpp
@@ -46,6 +59,7 @@ target_compile_definitions(usim_core_tests PRIVATE USIM_TEST_FIXTURES_DIR="${CMA
 if(TARGET usim::capi)
     target_sources(usim_core_tests PRIVATE test_capi.cpp)
     target_link_libraries(usim_core_tests PRIVATE usim::capi)
+    usim_copy_runtime_dlls(usim_core_tests)
 endif()
 
 usim_set_compiler_options(usim_core_tests)
@@ -56,6 +70,7 @@ set(USIM_DATA_DIR "${PROJECT_SOURCE_DIR}/../data" CACHE PATH "Repository data di
 
 add_executable(usim_validation_tests
     validation/test_enlarged_bodies.cpp
+    validation/test_exploration.cpp
     validation/test_orbit_paths.cpp
     validation/test_pack_kernel_values.cpp
     validation/test_val01_spk.cpp
@@ -67,6 +82,7 @@ target_link_libraries(usim_validation_tests PRIVATE usim::core Catch2::Catch2Wit
 if(TARGET usim::capi)
     target_sources(usim_validation_tests PRIVATE validation/test_capi_default_pack.cpp)
     target_link_libraries(usim_validation_tests PRIVATE usim::capi)
+    usim_copy_runtime_dlls(usim_validation_tests)
 endif()
 target_include_directories(usim_validation_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(usim_validation_tests PRIVATE USIM_DATA_DIR="${USIM_DATA_DIR}")

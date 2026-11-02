@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v0.6 |
-| Last updated | 2026-10-27 |
+| Status | Draft v0.7 |
+| Last updated | 2026-11-02 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 This document defines **what** the project is and the requirements it must meet. How the system is structured is in [ARCHITECTURE.md](ARCHITECTURE.md). The order of work is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Decisions and their rationale are recorded as ADRs in [adr/](adr/).
@@ -63,7 +63,7 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 - **Not a game physics simulation.** Unity physics (PhysX, rigidbodies) is never used for orbital motion.
 - **Not photorealism.** The default look is stylized. The realistic style shows imagery as its sources publish it, but cinematic or photographic rendering is not a goal in itself.
 - **Not a replacement for SPICE in mission-critical work.** Accuracy is high and validated, but the project is for exploration, education and research-grade visualization.
-- **No fictional bodies in the baseline.** Hypothetical changes exist only in the sandbox mode and are always labeled.
+- **No fictional bodies in the baseline.** Hypothetical changes exist only in the sandbox mode and are always labeled. The stylized style's spaceship (FR-REN-16) is not a body: it is the viewer's avatar, outside the catalog, it changes nothing the core computes, and it is listed as fictional.
 - **No apparent positions in v1.** The core returns geometric states. Light-time and aberration corrections for observer views are a later addition (see [Open questions](#13-open-questions)).
 
 ## 4. Users and use cases
@@ -81,6 +81,7 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 | UC-07 | Without a renderer, query the state of any body at any time (CLI or scripting). |
 | UC-08 | (Later) Run a sandbox scenario, such as changing a mass or adding a body, and watch the system evolve. |
 | UC-09 | Switch between the stylized and realistic styles, and see what the stylized look exaggerates in the current view. |
+| UC-10 | In the stylized style, take a spaceship from body to body to get a feel for the distances and travel times, and go down over a body's surface to see its sky, gravity and day. |
 
 ## 5. Functional requirements
 
@@ -98,6 +99,7 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 | FR-SIM-08 | Convert between the TDB, TT, TAI and UTC time scales, and format dates in the Gregorian and Julian calendars. |
 | FR-SIM-09 | Transform between ICRF, ECLIPJ2000 and body-fixed frames. |
 | FR-SIM-10 | Provide engine-agnostic presentation math: re-center positions on a double-precision view origin, apply scale modes, and map axes to a host's coordinate convention. |
+| FR-SIM-11 | Provide values for exploring, derived from the pack's ephemeris, rotation models, GM and radii: a two-body (Hohmann) estimate of a trip between two bodies with their distance and light time; a point of a body's reference ellipsoid with its horizon, the Sun seen from there, local solar time, gravity and escape speed; and a body's sidereal rotation period and mean solar day. Each value states its definition and simplifications. Added 2026-11-02 ([ADR-0016](adr/0016-spaceship-and-exploration-values.md)). |
 
 ### 5.2 Data
 
@@ -130,6 +132,7 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 | FR-REN-13 | Exaggerated effects (for example glow, bloom, atmosphere halos, a larger solar corona, brighter stars, bolder orbit lines) follow the rules of [section 11.1](#111-art-direction). Each is documented where it is implemented, with what it exaggerates and by how much, and is listed in the "what is exaggerated" panel. Added 2026-10-27. |
 | FR-REN-14 | Artist's impressions for bodies without a verified global map: painted or procedural looks based on real imagery or published descriptions, credited with their references in the attribution file, labeled "artist's impression" in the info panel, and shown only in the stylized style. They never add features that have not been observed. Added 2026-10-27 ([ADR-0015](adr/0015-stylized-presentation-over-real-data.md)). |
 | FR-REN-15 | Interaction that invites play: eased camera flights between bodies, hover and selection feedback, and responsive UI motion. Animation is presentation only; the clock and every position still come from the core (FR-REN-08). Added 2026-10-27. |
+| FR-REN-16 | A spaceship in the stylized style: a fictional craft that carries the camera, flies near any body, travels to another in seconds, and hovers over a point of a body's surface. While it is out, a panel shows the core's values (FR-SIM-11) for the trip or the point below, and names what is not yet in the data. It is listed as fictional and its flights as compressed in the "what is exaggerated" panel. It moves nothing the core computes, and it is not available in the realistic style. Added 2026-11-02 ([ADR-0016](adr/0016-spaceship-and-exploration-values.md)). |
 
 ### 5.4 Headless host
 
@@ -266,6 +269,7 @@ The viewer has two visual styles (FR-REN-12). The **stylized** style is the defa
 | Lines and labels | Bolder, colored or animated orbit lines, icons, trails along the true path | Orbit lines that brighten near the focused body |
 | Bodies without a map | A labeled artist's impression (FR-REN-14) | Saturn's banding painted from Cassini images |
 | Motion and UI | Eased camera flights, transitions, playful UI animation (FR-REN-15) | A short flight to a planet with a slow start and a soft landing |
+| Spaceship | A fictional craft carrying the camera, its flights compressed in time and labeled so (FR-REN-16) | A flight from the Earth to Mars in fourteen seconds, with the core's 259-day transfer estimate beside it |
 
 **What the art may never change** (in either style):
 

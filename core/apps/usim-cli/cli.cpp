@@ -2,6 +2,7 @@
 
 #include "cli.hpp"
 
+#include "usim/sim/exploration.hpp"
 #include "usim/sim/simulation.hpp"
 #include "usim/version.hpp"
 
@@ -11,10 +12,13 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <map>
+#include <numbers>
 #include <optional>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace usim::cli {
@@ -35,6 +39,9 @@ Commands:
   orientation BODY                    Rotation from BODY's body-fixed frame to --frame
   snapshot                            Every body in render coordinates, as a host receives them
   orbit BODY                          One revolution of BODY around --center (default: its usual center)
+  transfer FROM TO                    Two-body estimate of a trip: a Hohmann transfer and the light time
+  site BODY --lat L --lon L           A point of BODY's reference surface: horizon, the Sun there, gravity
+  day BODY                            BODY's sidereal rotation period and mean solar day
 
 BODY and --center take a NAIF ID (399) or a catalog name ("Earth", "mars barycenter").
 
@@ -50,6 +57,8 @@ Options:
   --km-per-unit K   snapshot: kilometers per render unit (default 1)
   --axes A          snapshot: core (default), unity, godot or unreal
   --enlarge F       snapshot: multiply radii by F (enlarged-bodies scale mode)
+  --lat D, --lon D  site: planetocentric latitude and east longitude, degrees
+  --alt KM          site: altitude above the reference ellipsoid (default 0); also uses --frame and --axes
 
 Times are TDB unless a scale says otherwise. Lengths are km, velocities km/s.
 )";
@@ -139,7 +148,8 @@ private:
 };
 
 constexpr std::string_view k_value_options[] = {"--pack",   "--format",      "--time", "--frame",
-                                                "--center", "--km-per-unit", "--axes", "--enlarge"};
+                                                "--center", "--km-per-unit", "--axes", "--enlarge",
+                                                "--lat",    "--lon",         "--alt"};
 
 std::optional<Options> parse_args(std::span<const std::string> args, std::string& problem) {
     Options options;
@@ -598,6 +608,171 @@ Result<void> cmd_orbit(const Context& c) {
 
 } // namespace
 
+// The exploration commands (ADR-0016). Angles are degrees here, at the user's boundary; the core works in
+// radians.
+
+constexpr double k_degrees_per_radian = 180.0 / std::numbers::pi;
+
+std::string flag_names(std::uint32_t flags,
+                       std::initializer_list<std::pair<std::uint32_t, const char*>> names) {
+    std::string out;
+    for (const auto& [bit, name] : names) {
+        if ((flags & bit) != 0) {
+            out += (out.empty() ? "" : "|") + std::string(name);
+        }
+    }
+    return out;
+}
+
+Result<void> cmd_transfer(const Context& c) {
+    if (c.options.positional.size() != 2) {
+        throw UsageError("the transfer command takes FROM and TO");
+    }
+    const Result<catalog::BodyId> from = resolve_body(c.sim, c.options.positional[0]);
+    const Result<catalog::BodyId> to = resolve_body(c.sim, c.options.positional[1]);
+    const Result<time::Instant> t = resolve_time(c.sim, c.options);
+    if (!from || !to || !t) {
+        return !from ? from.error() : (!to ? to.error() : t.error());
+    }
+    const Result<sim::TransferEstimate> estimate =
+        sim::transfer_estimate(c.sim, from.value(), to.value(), t.value());
+    if (!estimate) {
+        return estimate.error();
+    }
+    const sim::TransferEstimate& e = estimate.value();
+    const std::string flags = flag_names(e.flags, {{sim::transfer_from_surface, "from-surface"},
+                                                   {sim::transfer_to_surface, "to-surface"},
+                                                   {sim::transfer_between_systems, "between-systems"},
+                                                   {sim::transfer_approximate, "approximate"}});
+    if (c.csv) {
+        c.out
+            << "from,to,tdb,tdb_seconds,center,departure,arrival,departure_radius_km,arrival_radius_km,"
+               "transfer_time_s,departure_delta_v_km_s,arrival_delta_v_km_s,distance_km,light_time_s,flags\n"
+            << catalog::to_string(from.value()) << ',' << catalog::to_string(to.value()) << ','
+            << tdb_text(c, t.value()) << ',' << number(t.value().seconds_since_j2000()) << ','
+            << catalog::to_string(e.center) << ',' << catalog::to_string(e.departure) << ','
+            << catalog::to_string(e.arrival) << ',' << number(e.departure_radius_km) << ','
+            << number(e.arrival_radius_km) << ',' << number(e.transfer.transfer_time_s) << ','
+            << number(e.transfer.departure_delta_v_km_s) << ',' << number(e.transfer.arrival_delta_v_km_s)
+            << ',' << number(e.distance_km) << ',' << number(e.light_time_s) << ',' << flags << '\n';
+    } else {
+        c.out << "{\"from\":" << json_body(c, from.value()) << ",\"to\":" << json_body(c, to.value())
+              << ",\"time\":" << json_time(c, t.value()) << ",\"center\":" << json_body(c, e.center)
+              << ",\"departure\":" << json_body(c, e.departure) << ",\"arrival\":" << json_body(c, e.arrival)
+              << ",\"departure_radius_km\":" << number(e.departure_radius_km)
+              << ",\"arrival_radius_km\":" << number(e.arrival_radius_km)
+              << ",\"transfer_time_s\":" << number(e.transfer.transfer_time_s)
+              << ",\"departure_delta_v_km_s\":" << number(e.transfer.departure_delta_v_km_s)
+              << ",\"arrival_delta_v_km_s\":" << number(e.transfer.arrival_delta_v_km_s)
+              << ",\"distance_km\":" << number(e.distance_km)
+              << ",\"light_time_s\":" << number(e.light_time_s) << ",\"flags\":" << json_string(flags)
+              << "}\n";
+    }
+    return {};
+}
+
+Result<void> cmd_site(const Context& c) {
+    const Result<catalog::BodyId> body = one_body(c);
+    const Result<frames::FrameId> frame = resolve_frame(c.sim, c.options);
+    const Result<time::Instant> t = resolve_time(c.sim, c.options);
+    if (!body || !frame || !t) {
+        return !body ? body.error() : (!frame ? frame.error() : t.error());
+    }
+    if (!c.options.get("--lat") || !c.options.get("--lon")) {
+        throw UsageError("the site command needs --lat and --lon (degrees)");
+    }
+    const surface::PlanetocentricPoint point{parse_number(c.options, "--lat", 0.0) / k_degrees_per_radian,
+                                             parse_number(c.options, "--lon", 0.0) / k_degrees_per_radian,
+                                             parse_number(c.options, "--alt", 0.0)};
+    const Result<presentation::AxisConvention> resolved_axes = resolve_axes(c.options);
+    if (!resolved_axes) {
+        return resolved_axes.error();
+    }
+    const presentation::AxisConvention axes = resolved_axes.value();
+    const Result<sim::SurfaceSite> site =
+        sim::surface_site(c.sim, body.value(), point, frame.value(), axes, t.value());
+    if (!site) {
+        return site.error();
+    }
+    const sim::SurfaceSite& s = site.value();
+    const std::string flags = flag_names(s.flags, {{sim::site_has_sun, "sun"},
+                                                   {sim::site_has_sun_size, "sun-size"},
+                                                   {sim::site_has_gravity, "gravity"},
+                                                   {sim::site_approximate, "approximate"}});
+    const auto deg = [](double rad) { return number(rad * k_degrees_per_radian); };
+    if (c.csv) {
+        c.out
+            << "body,tdb,tdb_seconds,latitude_deg,longitude_deg,altitude_km,surface_radius_km,x_km,y_km,z_km,"
+               "sun_elevation_deg,sun_azimuth_deg,sun_distance_km,sun_angular_diameter_deg,sunlight_ratio,"
+               "local_solar_time_h,gravity_km_s2,escape_speed_km_s,flags\n"
+            << catalog::to_string(body.value()) << ',' << tdb_text(c, t.value()) << ','
+            << number(t.value().seconds_since_j2000()) << ',' << deg(s.point.latitude_rad) << ','
+            << deg(s.point.longitude_rad) << ',' << number(s.point.altitude_km) << ','
+            << number(s.surface_radius_km) << ',' << number(s.position_km.x) << ',' << number(s.position_km.y)
+            << ',' << number(s.position_km.z) << ',' << deg(s.sun_elevation_rad) << ','
+            << deg(s.sun_azimuth_rad) << ',' << number(s.sun_distance_km) << ','
+            << deg(s.sun_angular_diameter_rad) << ',' << number(s.sunlight_ratio) << ','
+            << number(s.local_solar_time_h) << ',' << number(s.gravity_km_s2) << ','
+            << number(s.escape_speed_km_s) << ',' << flags << '\n';
+    } else {
+        c.out << "{\"body\":" << json_body(c, body.value()) << ",\"time\":" << json_time(c, t.value())
+              << ",\"frame\":" << json_string(frames::to_string(frame.value()))
+              << ",\"axes\":" << json_string(presentation::to_string(axes))
+              << ",\"latitude_deg\":" << deg(s.point.latitude_rad)
+              << ",\"longitude_deg\":" << deg(s.point.longitude_rad)
+              << ",\"altitude_km\":" << number(s.point.altitude_km)
+              << ",\"surface_radius_km\":" << number(s.surface_radius_km)
+              << ",\"position_km\":" << json_vector(s.position_km) << ",\"up\":" << json_vector(s.up)
+              << ",\"north\":" << json_vector(s.north) << ",\"east\":" << json_vector(s.east)
+              << ",\"sun_direction\":" << json_vector(s.sun_direction)
+              << ",\"sun_elevation_deg\":" << deg(s.sun_elevation_rad)
+              << ",\"sun_azimuth_deg\":" << deg(s.sun_azimuth_rad)
+              << ",\"sun_distance_km\":" << number(s.sun_distance_km)
+              << ",\"sun_angular_diameter_deg\":" << deg(s.sun_angular_diameter_rad)
+              << ",\"sunlight_ratio\":" << number(s.sunlight_ratio)
+              << ",\"local_solar_time_h\":" << number(s.local_solar_time_h)
+              << ",\"gravity_km_s2\":" << number(s.gravity_km_s2)
+              << ",\"escape_speed_km_s\":" << number(s.escape_speed_km_s)
+              << ",\"flags\":" << json_string(flags) << "}\n";
+    }
+    return {};
+}
+
+Result<void> cmd_day(const Context& c) {
+    const Result<catalog::BodyId> body = one_body(c);
+    const Result<time::Instant> t = resolve_time(c.sim, c.options);
+    if (!body || !t) {
+        return !body ? body.error() : t.error();
+    }
+    const Result<sim::DayLength> day = sim::day_length(c.sim, body.value(), t.value());
+    if (!day) {
+        return day.error();
+    }
+    const sim::DayLength& d = day.value();
+    const std::string flags = flag_names(d.flags, {{sim::day_has_solar_day, "solar-day"},
+                                                   {sim::day_retrograde, "retrograde"},
+                                                   {sim::day_approximate, "approximate"},
+                                                   {sim::day_instantaneous_rate, "instantaneous-rate"}});
+    const std::string orbiting = d.orbiting_body.is_valid() ? catalog::to_string(d.orbiting_body) : "";
+    if (c.csv) {
+        c.out << "body,tdb,tdb_seconds,sidereal_rotation_period_s,mean_solar_day_s,orbital_period_s,orbiting_"
+                 "body,"
+                 "flags\n"
+              << catalog::to_string(body.value()) << ',' << tdb_text(c, t.value()) << ','
+              << number(t.value().seconds_since_j2000()) << ',' << number(d.sidereal_rotation_period_s) << ','
+              << number(d.mean_solar_day_s) << ',' << number(d.orbital_period_s) << ',' << orbiting << ','
+              << flags << '\n';
+    } else {
+        c.out << "{\"body\":" << json_body(c, body.value()) << ",\"time\":" << json_time(c, t.value())
+              << ",\"sidereal_rotation_period_s\":" << number(d.sidereal_rotation_period_s)
+              << ",\"mean_solar_day_s\":" << number(d.mean_solar_day_s)
+              << ",\"orbital_period_s\":" << number(d.orbital_period_s) << ",\"orbiting_body\":"
+              << (d.orbiting_body.is_valid() ? json_body(c, d.orbiting_body) : std::string("null"))
+              << ",\"flags\":" << json_string(flags) << "}\n";
+    }
+    return {};
+}
+
 int run(std::span<const std::string> args, std::ostream& out, std::ostream& err) {
     if (args.empty() || (args.size() == 1 && (args[0] == "--help" || args[0] == "-h"))) {
         out << k_usage;
@@ -609,8 +784,8 @@ int run(std::span<const std::string> args, std::ostream& out, std::ostream& err)
     }
     std::string problem;
     const std::optional<Options> options = parse_args(args, problem);
-    constexpr std::string_view k_commands[] = {"catalog",     "coverage", "state",
-                                               "orientation", "snapshot", "orbit"};
+    constexpr std::string_view k_commands[] = {"catalog", "coverage", "state", "orientation", "snapshot",
+                                               "orbit",   "transfer", "site",  "day"};
     if (!options ||
         std::find(std::begin(k_commands), std::end(k_commands), options->command) == std::end(k_commands)) {
         err << "usim: " << (options ? "unknown command \"" + options->command + "\"" : problem) << "\n\n"
@@ -645,6 +820,12 @@ int run(std::span<const std::string> args, std::ostream& out, std::ostream& err)
             result = cmd_state(context);
         } else if (command == "orientation") {
             result = cmd_orientation(context);
+        } else if (command == "transfer") {
+            result = cmd_transfer(context);
+        } else if (command == "site") {
+            result = cmd_site(context);
+        } else if (command == "day") {
+            result = cmd_day(context);
         } else if (command == "snapshot") {
             result = cmd_snapshot(context, simulation);
         } else {
