@@ -70,14 +70,15 @@ void rehash(std::vector<std::byte>& bytes) {
 std::size_t section_entry(const std::vector<std::byte>& bytes, std::string_view id) {
     std::uint32_t count = 0;
     std::memcpy(&count, bytes.data() + 20, 4);
-    for (std::size_t i = 0; i < count; ++i) {
-        const std::size_t at = 128 + i * 32;
-        if (std::string_view(reinterpret_cast<const char*>(bytes.data()) + at, 4) == id) {
-            return at;
-        }
+    std::size_t i = 0;
+    while (i < count &&
+           std::string_view(reinterpret_cast<const char*>(bytes.data()) + 128 + i * 32, 4) != id) {
+        ++i;
     }
-    FAIL("no section " << id);
-    return 0;
+    if (i == count) {
+        FAIL("no section " << id);
+    }
+    return 128 + i * 32;
 }
 
 ErrorCode parse_error_code(const std::vector<std::byte>& bytes) {

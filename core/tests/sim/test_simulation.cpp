@@ -111,13 +111,14 @@ TEST_CASE("rotation models name the binary PCK frame or the IAU elements, with t
     const Simulation sim = make_simulation();
     const auto index_of = [&](std::int64_t id) {
         const auto bodies = sim.catalog().bodies();
-        for (std::size_t i = 0; i < bodies.size(); ++i) {
-            if (bodies[i].id == naif(id)) {
-                return i;
-            }
+        std::size_t i = 0;
+        while (i < bodies.size() && bodies[i].id != naif(id)) {
+            ++i;
         }
-        FAIL("no body " << id);
-        return std::size_t{0};
+        if (i == bodies.size()) {
+            FAIL("no body " << id);
+        }
+        return i;
     };
     const auto& star = sim.rotation_model(index_of(1000));
     CHECK(star.kind == usim::sim::RotationModelKind::iau);

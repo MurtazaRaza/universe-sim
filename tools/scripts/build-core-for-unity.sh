@@ -20,8 +20,14 @@ case "$(uname -s)" in
         library="universesim.dylib"
         dest_dir="$plugins_dir/macOS"
         ;;
+    MINGW*|MSYS*|CYGWIN*)
+        # Windows (Git Bash): the build needs the Visual Studio developer environment, which the
+        # PowerShell script sets up.
+        exec powershell.exe -NoProfile -ExecutionPolicy Bypass \
+            -File "$(cygpath -w "$repo_root/tools/scripts/build-core-for-unity.ps1")"
+        ;;
     *)
-        echo "error: this script supports macOS only so far (IMPLEMENTATION_PLAN P0-13 adds Windows)." >&2
+        echo "error: this script supports macOS and Windows so far." >&2
         exit 1
         ;;
 esac

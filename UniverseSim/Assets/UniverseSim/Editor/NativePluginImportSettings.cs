@@ -75,6 +75,33 @@ namespace UniverseSim.Unity.Editor
                 return true;
             }
 
+            // x64 DLL built by the unity-windows CMake preset. The Editor and the 64-bit player load it; the
+            // 32-bit player (StandaloneWindows) has no build of the core.
+            if (path.EndsWith(".dll"))
+            {
+                var upToDate =
+                    !importer.GetCompatibleWithAnyPlatform() &&
+                    importer.GetCompatibleWithEditor() &&
+                    importer.GetEditorData("OS") == "Windows" &&
+                    importer.GetEditorData("CPU") == "x86_64" &&
+                    importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64) &&
+                    importer.GetPlatformData(BuildTarget.StandaloneWindows64, "CPU") == "x86_64" &&
+                    !importer.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows);
+                if (upToDate)
+                {
+                    return false;
+                }
+
+                importer.SetCompatibleWithAnyPlatform(false);
+                importer.SetCompatibleWithEditor(true);
+                importer.SetEditorData("OS", "Windows");
+                importer.SetEditorData("CPU", "x86_64");
+                importer.SetCompatibleWithPlatform(BuildTarget.StandaloneWindows64, true);
+                importer.SetPlatformData(BuildTarget.StandaloneWindows64, "CPU", "x86_64");
+                importer.SetCompatibleWithPlatform(BuildTarget.StandaloneWindows, false);
+                return true;
+            }
+
             return false;
         }
     }

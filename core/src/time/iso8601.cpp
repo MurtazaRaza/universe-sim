@@ -158,9 +158,11 @@ Result<ScaledDateTime> parse_iso8601(std::string_view text) {
         scale = TimeScale::utc;
     } else if (p.accept(' ')) {
         const std::string_view name = p.rest();
-        constexpr std::array<TimeScale, 4> k_scales{TimeScale::tdb, TimeScale::tt, TimeScale::tai, TimeScale::utc};
-        const auto* match = std::find_if(k_scales.begin(), k_scales.end(),
-                                         [&](TimeScale s) { return name == to_string(s); });
+        constexpr std::array<TimeScale, 4> k_scales{TimeScale::tdb, TimeScale::tt, TimeScale::tai,
+                                                    TimeScale::utc};
+        // `auto`, not `const auto*`: std::array iterators are pointers on some standard libraries only.
+        const auto match =
+            std::find_if(k_scales.begin(), k_scales.end(), [&](TimeScale s) { return name == to_string(s); });
         if (match == k_scales.end()) {
             return p.error("expected a time scale (TDB, TT, TAI or UTC)");
         }

@@ -29,13 +29,14 @@ TEST_CASE("enlarged bodies keep the star true and planetary systems apart", "[va
 
     const auto index = [&](std::int64_t id) {
         const auto bodies = sim.catalog().bodies();
-        for (std::size_t i = 0; i < bodies.size(); ++i) {
-            if (bodies[i].id == BodyId::naif(id)) {
-                return i;
-            }
+        std::size_t i = 0;
+        while (i < bodies.size() && bodies[i].id != BodyId::naif(id)) {
+            ++i;
         }
-        FAIL("no body " << id);
-        return std::size_t{0};
+        if (i == bodies.size()) {
+            FAIL("no body " << id);
+        }
+        return i;
     };
     const std::size_t sun = index(10);
     const std::size_t earth = index(399);

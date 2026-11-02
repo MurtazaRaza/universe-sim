@@ -45,13 +45,27 @@
         "USIM_BUILD_TESTS": "OFF",
         "USIM_BUILD_CLI": "OFF"
       }
+    },
+    {
+      "name": "unity-windows",
+      "displayName": "Unity native plugin for Windows (Release, x64)",
+      "description": "MSVC from Visual Studio 2022 or newer, x64. Run in a Visual Studio developer shell (tools/scripts/enter-vs-dev-shell.ps1).",
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "architecture": { "value": "x64", "strategy": "external" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "USIM_BUILD_TESTS": "OFF",
+        "USIM_BUILD_CLI": "OFF"
+      }
     }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
     { "name": "release", "configurePreset": "release" },
     { "name": "asan", "configurePreset": "asan" },
-    { "name": "unity-macos", "configurePreset": "unity-macos" }
+    { "name": "unity-macos", "configurePreset": "unity-macos" },
+    { "name": "unity-windows", "configurePreset": "unity-windows" }
   ],
   "testPresets": [
     {

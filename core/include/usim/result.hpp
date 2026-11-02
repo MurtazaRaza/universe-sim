@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -132,25 +133,26 @@ public:
     Result() noexcept = default;
 
     /// A failed result.
-    Result(Error error) : error_(std::move(error)), has_error_(true) {}
+    Result(Error error) : error_(std::move(error)) {}
 
     /// True on success.
-    [[nodiscard]] bool has_value() const noexcept { return !has_error_; }
+    [[nodiscard]] bool has_value() const noexcept { return !error_.has_value(); }
 
     /// Same as has_value().
     [[nodiscard]] explicit operator bool() const noexcept { return has_value(); }
 
     /// The error. Precondition: !has_value().
     [[nodiscard]] const Error& error() const& {
-        if (!has_error_) {
+        if (!error_) {
             detail::bad_result_access();
         }
-        return error_;
+        return *error_;
     }
 
 private:
-    Error error_{ErrorCode::internal, {}};
-    bool has_error_ = false;
+    // Empty on success, so a successful result constructs no std::string: under MSVC's debug iterator checks
+    // even an empty string allocates, which the per-frame path must not do (SPEC NFR-03).
+    std::optional<Error> error_;
 };
 
 /// Convenience for building a failed Result: `return make_error(ErrorCode::not_found, "...");`

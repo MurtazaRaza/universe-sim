@@ -280,10 +280,13 @@ namespace UniverseSim.Unity.Tests.PlayMode
             // Release first: the optional moons pack (300 MB) loads in seconds there, much slower in dev.
             foreach (var preset in new[] { "release", "dev" })
             {
-                var path = Path.Combine(root, "core", "build", preset, "apps", "usim-cli", "usim");
-                if (File.Exists(path))
+                foreach (var name in new[] { "usim", "usim.exe" })
                 {
-                    return path;
+                    var path = Path.Combine(root, "core", "build", preset, "apps", "usim-cli", name);
+                    if (File.Exists(path))
+                    {
+                        return path;
+                    }
                 }
             }
             return null;
