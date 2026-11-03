@@ -24,6 +24,9 @@ Write an ADR when a choice affects module boundaries, data formats, units or fra
 | [0014](0014-surface-map-textures.md) | Surface map textures from mission mosaics, reprojected by the pipeline | Accepted; plain spheres of decision 1 superseded in part by ADR-0015 |
 | [0015](0015-stylized-presentation-over-real-data.md) | A stylized presentation over real data | Accepted |
 | [0016](0016-spaceship-and-exploration-values.md) | A spaceship in the stylized style, with exploration values from the core | Accepted |
+| [0017](0017-surface-conditions.md) | Surface conditions and the kind of reference surface | Accepted |
+| [0018](0018-atmospheres-and-sky-cues.md) | Atmospheres, sky colors and the sky at a surface site | Accepted |
+| [0019](0019-play-start-facts-logbook-time-and-sound.md) | Play: a ship-first start, facts in human terms, a logbook, time controls and sound | Accepted |
 
 ## Template
 

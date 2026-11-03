@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft v0.7 |
-| Last updated | 2026-11-02 |
+| Last updated | 2026-11-03 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [DATA_SOURCES.md](DATA_SOURCES.md), [adr/](adr/) |
 
 This document defines **what** the project is and the requirements it must meet. How the system is structured is in [ARCHITECTURE.md](ARCHITECTURE.md). The order of work is in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Decisions and their rationale are recorded as ADRs in [adr/](adr/).
@@ -99,7 +99,7 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 | FR-SIM-08 | Convert between the TDB, TT, TAI and UTC time scales, and format dates in the Gregorian and Julian calendars. |
 | FR-SIM-09 | Transform between ICRF, ECLIPJ2000 and body-fixed frames. |
 | FR-SIM-10 | Provide engine-agnostic presentation math: re-center positions on a double-precision view origin, apply scale modes, and map axes to a host's coordinate convention. |
-| FR-SIM-11 | Provide values for exploring, derived from the pack's ephemeris, rotation models, GM and radii: a two-body (Hohmann) estimate of a trip between two bodies with their distance and light time; a point of a body's reference ellipsoid with its horizon, the Sun seen from there, local solar time, gravity and escape speed; and a body's sidereal rotation period and mean solar day. Each value states its definition and simplifications. Added 2026-11-02 ([ADR-0016](adr/0016-spaceship-and-exploration-values.md)). |
+| FR-SIM-11 | Provide values for exploring, derived from the pack's ephemeris, rotation models, GM and radii: a two-body (Hohmann) estimate of a trip between two bodies with their distance and light time; a point of a body's reference ellipsoid with its horizon, the Sun seen from there, local solar time, gravity and escape speed; and a body's sidereal rotation period and mean solar day. Each value states its definition and simplifications. With them, a body's surface conditions from the pack, with their sources: whether its reference surface is solid ground or a pressure level in its atmosphere, its mean temperature, its surface pressure, and whether it has an atmosphere. Added 2026-11-02 ([ADR-0016](adr/0016-spaceship-and-exploration-values.md); surface conditions: [ADR-0017](adr/0017-surface-conditions.md); atmospheres: [ADR-0018](adr/0018-atmospheres-and-sky-cues.md)). |
 
 ### 5.2 Data
 
@@ -132,7 +132,10 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 | FR-REN-13 | Exaggerated effects (for example glow, bloom, atmosphere halos, a larger solar corona, brighter stars, bolder orbit lines) follow the rules of [section 11.1](#111-art-direction). Each is documented where it is implemented, with what it exaggerates and by how much, and is listed in the "what is exaggerated" panel. Added 2026-10-27. |
 | FR-REN-14 | Artist's impressions for bodies without a verified global map: painted or procedural looks based on real imagery or published descriptions, credited with their references in the attribution file, labeled "artist's impression" in the info panel, and shown only in the stylized style. They never add features that have not been observed. Added 2026-10-27 ([ADR-0015](adr/0015-stylized-presentation-over-real-data.md)). |
 | FR-REN-15 | Interaction that invites play: eased camera flights between bodies, hover and selection feedback, and responsive UI motion. Animation is presentation only; the clock and every position still come from the core (FR-REN-08). Added 2026-10-27. |
-| FR-REN-16 | A spaceship in the stylized style: a fictional craft that carries the camera, flies near any body, travels to another in seconds, and hovers over a point of a body's surface. While it is out, a panel shows the core's values (FR-SIM-11) for the trip or the point below, and names what is not yet in the data. It is listed as fictional and its flights as compressed in the "what is exaggerated" panel. It moves nothing the core computes, and it is not available in the realistic style. Added 2026-11-02 ([ADR-0016](adr/0016-spaceship-and-exploration-values.md)). |
+| FR-REN-16 | A spaceship in the stylized style: a fictional craft that carries the camera, flies near any body, travels to another in seconds, and goes down over a point of a body's surface: it lands where the reference surface is solid ground, stops above it where it is a pressure level, and hovers where the data does not say. While it is out, a panel shows the core's values (FR-SIM-11) for the trip or the point below, and names what is not yet in the data. Near the ground of a body with an atmosphere, the sky brightens by day and takes the hues registered sources give for that sky and its twilight, with the sources in the panel ([ADR-0018](adr/0018-atmospheres-and-sky-cues.md)). It is listed as fictional and its flights as compressed in the "what is exaggerated" panel. It moves nothing the core computes, and it is not available in the realistic style. Added 2026-11-02 ([ADR-0016](adr/0016-spaceship-and-exploration-values.md)). Since 2026-11-03 the viewer starts in the ship near the Earth, the mouse steers it without a button held, and streaks and a slightly wider view show its speed, listed as exaggerated ([ADR-0019](adr/0019-play-start-facts-logbook-time-and-sound.md)). |
+| FR-REN-17 | An explorer's logbook of goals (reaching places, landing, watching events such as an Earthrise or a sunset on another world, traveling in time), each checked from the viewer's position, the ship's state and the clock against core values only, with progress kept outside the simulation and a short notice when a goal is reached. The info panel leads with what a body is like in human terms (size, weight, day, year, temperature, sunlight, a real trip), from core values by ratios and unit conversions only, with the sourced values and citations below. Added 2026-11-03 ([ADR-0019](adr/0019-play-start-facts-logbook-time-and-sound.md)). |
+| FR-REN-18 | Sound: ambient music, an engine that follows the ship's pace, and interface sounds, synthesized at run time (no audio files) and switchable (all sound, and the music alone), remembered between runs. Sound reads the viewer's state and changes nothing. Added 2026-11-03 ([ADR-0019](adr/0019-play-start-facts-logbook-time-and-sound.md)). |
+| FR-REN-19 | Time controls that invite play: a throttle over the rate presets (reverse and forward), a timeline over the pack's coverage, and a key held to rush time; jump-to-date stays available. Instants are computed by the core. Added 2026-11-03 ([ADR-0019](adr/0019-play-start-facts-logbook-time-and-sound.md)). |
 
 ### 5.4 Headless host
 
@@ -154,7 +157,7 @@ The stylized art direction and the realistic style ([section 11.1](#111-art-dire
 | NFR-08 | Platforms | Desktop first: macOS (Apple Silicon) and Windows. Other targets are an open question. |
 | NFR-09 | Documentation | Every public core API member has a `///` doc comment that states units, frame and time scale wherever they apply. The C ABI header and the C# bindings document their members the same way. |
 | NFR-10 | Licensing | Every redistributed dataset and asset has its license or terms recorded in the source registry or an attribution file. |
-| NFR-11 | Responsiveness | The viewer stays smooth with every effect of the stylized style on: a target of 60 frames per second at 1920 x 1080 on the development Mac (Apple Silicon). Effects scale down before the frame rate does. Added 2026-10-27. |
+| NFR-11 | Responsiveness | The viewer stays smooth with every effect of the stylized style on: a target of 60 frames per second at 1920 x 1080 on the development machine (since 2026-11-02 a Windows 11 laptop with an Intel Core i7-13700H and an NVIDIA GeForce RTX 4060 Laptop GPU; before that an Apple Silicon Mac). Effects scale down before the frame rate does. Added 2026-10-27. Met on 2026-11-02 (A-13): above 420 frames per second in a player build with every effect on (ART_DIRECTION.md section 13). |
 
 ## 7. Domain conventions
 
@@ -169,6 +172,8 @@ These conventions are binding for all code. The rationale is in [ADR-0003](adr/0
 | Velocity | km/s |
 | Angle | radian |
 | Gravitational parameter | GM in km^3/s^2 |
+| Temperature | kelvin (K) |
+| Pressure | pascal (Pa) |
 | Mass | Not stored as a primary value. Where shown, mass is derived as GM / G and flagged as derived, because GM is known far more precisely than G. |
 
 Display units (au, light-years, degrees, calendar dates) are applied only in presentation code.
@@ -270,6 +275,7 @@ The viewer has two visual styles (FR-REN-12). The **stylized** style is the defa
 | Bodies without a map | A labeled artist's impression (FR-REN-14) | Saturn's banding painted from Cassini images |
 | Motion and UI | Eased camera flights, transitions, playful UI animation (FR-REN-15) | A short flight to a planet with a slow start and a soft landing |
 | Spaceship | A fictional craft carrying the camera, its flights compressed in time and labeled so (FR-REN-16) | A flight from the Earth to Mars in fourteen seconds, with the core's 259-day transfer estimate beside it |
+| Speed cues and sound | Streaks and a wider view at the ship's speed, labeled as exaggerated; synthesized music, engine and interface sounds (FR-REN-16, FR-REN-18) | Streaks rushing past mid-trip, an engine that rises as the ship boosts |
 
 **What the art may never change** (in either style):
 
@@ -307,8 +313,8 @@ These items are not scheduled in detail, but the design must not block them:
 | OQ-07 | Should the Unity Editor hot-reload the native plugin (load a uniquely named copy) so the Editor does not need a restart after each core rebuild? | Decided 2026-10-21: no; the Editor is restarted after a core rebuild (P5-14) |
 | OQ-08 | `de440s.bsp` has no segments for the centers of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto (only their system barycenters). Should v1 add the planet-center segments from the JPL satellite ephemerides (S-NAIF-SAT, trimmed into the pack), or show those planets at their system barycenter, flagged as approximate? | Decided 2026-10-21: system barycenters, flagged approximate, until Phase 6 ([ADR-0008](adr/0008-planet-positions-at-system-barycenters.md)) |
 | OQ-09 | Art direction details for the stylized style: the palette, how strong the toon look is (banding, outlines), and which effects come first. | Decided 2026-10-27 from rendered mockups: the "Adventure" look, halfway between real and a polished console game, with no bands or outlines ([ART_DIRECTION.md](ART_DIRECTION.md)) |
-| OQ-10 | Which guided experiences should the viewer offer: tours, notable upcoming events (eclipses, transits, conjunctions, computed by the core from the ephemeris), challenges? | Open |
-| OQ-11 | Should the viewer have sound (ambient music, interface sounds)? | Open |
+| OQ-10 | Which guided experiences should the viewer offer: tours, notable upcoming events (eclipses, transits, conjunctions, computed by the core from the ephemeris), challenges? | Decided 2026-11-02: an explorer's logbook of goals now, guided tours later; upcoming events not chosen ([ADR-0019](adr/0019-play-start-facts-logbook-time-and-sound.md)) |
+| OQ-11 | Should the viewer have sound (ambient music, interface sounds)? | Decided 2026-11-02: music, the ship's engine and interface sounds, synthesized at run time ([ADR-0019](adr/0019-play-start-facts-logbook-time-and-sound.md)) |
 
 ## 14. Glossary
 

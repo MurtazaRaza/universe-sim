@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | Format 1.3, implemented |
-| Last updated | 2026-10-22 |
+| Status | Format 1.4, implemented |
+| Last updated | 2026-11-02 |
 | Writer | `tools/pipeline/usim_pipeline/pack/binary.py` (Python) |
 | Readers | `core/src/data/data_pack.cpp` (C++, `usim::data::DataPack`); `binary.py` (Python, for `usim-pipeline info`) |
-| Related | [ARCHITECTURE.md section 3.7](../ARCHITECTURE.md#37-data-pack-format-v1), [ADR-0005](../adr/0005-data-provenance-and-storage.md), [ADR-0006](../adr/0006-default-pack-window-and-storage.md), [ADR-0007](../adr/0007-text-kernel-values.md), [ADR-0008](../adr/0008-planet-positions-at-system-barycenters.md), [ADR-0011](../adr/0011-sky-background-and-rings.md), [ADR-0012](../adr/0012-lunar-orientation-from-the-binary-pck.md) |
+| Related | [ARCHITECTURE.md section 3.7](../ARCHITECTURE.md#37-data-pack-format-v1), [ADR-0005](../adr/0005-data-provenance-and-storage.md), [ADR-0006](../adr/0006-default-pack-window-and-storage.md), [ADR-0007](../adr/0007-text-kernel-values.md), [ADR-0008](../adr/0008-planet-positions-at-system-barycenters.md), [ADR-0011](../adr/0011-sky-background-and-rings.md), [ADR-0012](../adr/0012-lunar-orientation-from-the-binary-pck.md), [ADR-0017](../adr/0017-surface-conditions.md) |
 
 A data pack (`.uspack`) is the only data the core reads at runtime. The pipeline writes it from verified sources; the core reads it without parsing any other format. Two independent implementations follow this document, and the round-trip fixture (`core/tests/fixtures/test_pack_v1.uspack`) keeps them consistent. Change this document first, then both implementations.
 
@@ -24,8 +24,8 @@ A data pack (`.uspack`) is the only data the core reads at runtime. The pipeline
 |---|---|
 | Id namespace (`usim::catalog::IdNamespace`) | 1 naif, 2 gaia-dr3, 3 hip, 4 hr (Bright Star Catalogue, Harvard Revised number). 0 means "none" where a field allows it. |
 | Body kind (`usim::catalog::BodyKind`) | 0 barycenter, 1 star, 2 planet, 3 dwarf planet, 4 moon, 5 asteroid, 6 comet, 7 spacecraft, 8 star system, 9 galaxy |
-| Unit (`usim::catalog::Unit`) | 0 none, 1 km, 2 s, 3 km/s, 4 rad, 5 rad/s, 6 km^3/s^2 |
-| Field | 1 gm (unit 6), 2 mean_radius (1), 3 radius_a (1), 4 radius_b (1), 5 radius_c (1) |
+| Unit (`usim::catalog::Unit`) | 0 none, 1 km, 2 s, 3 km/s, 4 rad, 5 rad/s, 6 km^3/s^2, 7 K (kelvin, format 1.4), 8 Pa (pascal, format 1.4) |
+| Field | In QNTY: 1 gm (unit 6), 2 mean_radius (1), 3 radius_a (1), 4 radius_b (1), 5 radius_c (1). In SURF (format 1.4): 6 mean_temperature (7), 7 surface_pressure (8), 8 reference_pressure (8) |
 | Frame (`usim::frames::FrameKind`) | 0 ICRF, 1 ECLIPJ2000 |
 | Angle unit (`usim::frames::AngleUnit`) | 0 radians, 1 degrees, 2 arcseconds |
 
@@ -43,7 +43,7 @@ offset 128    section table: section_count entries of 32 bytes
 |---|---|---|---|
 | 0 | u8[8] | magic | `USIMPACK` |
 | 8 | u16 | format_major | 1 |
-| 10 | u16 | format_minor | 3 |
+| 10 | u16 | format_minor | 4 |
 | 12 | u32 | endian_marker | 0x01020304 (bytes 04 03 02 01) |
 | 16 | u32 | header_size | 128 |
 | 20 | u32 | section_count | |
@@ -72,7 +72,7 @@ Sections must lie inside the file and must not overlap. Ids are unique.
 
 ## 3. Sections
 
-The ten sections of format 1.0 are required. Format 1.1 adds APPX, format 1.2 adds STAR and RING, and format 1.3 adds ORNT; all four are optional: a pack without APPX has no approximate positions, without STAR no star catalog, without RING no rings, without ORNT no binary PCK orientation models (its bodies use their IAU models). The writer stores the sections in the order META, SRCS, FILE, BODY, QNTY, ROTN, TIME, EPHS, APPX, STAR, RING, ORNT, STRS, EPHD (it omits STAR, RING and ORNT when they are empty); readers use the table and do not depend on the order. Most sections start with an 8-byte count header (`u32 count, u32 second`), followed by `count` fixed-size records.
+The ten sections of format 1.0 are required. Format 1.1 adds APPX, format 1.2 adds STAR and RING, format 1.3 adds ORNT and format 1.4 adds SURF; all five are optional: a pack without APPX has no approximate positions, without STAR no star catalog, without RING no rings, without ORNT no binary PCK orientation models (its bodies use their IAU models), without SURF no surface conditions. The writer stores the sections in the order META, SRCS, FILE, BODY, QNTY, ROTN, TIME, EPHS, APPX, STAR, RING, ORNT, SURF, STRS, EPHD (it omits STAR, RING, ORNT and SURF when they are empty); readers use the table and do not depend on the order. Most sections start with an 8-byte count header (`u32 count, u32 second`), followed by `count` fixed-size records.
 
 ### META: metadata
 
@@ -138,7 +138,7 @@ Header `u32 count, u32 reserved`, then records of 40 bytes, in catalog display o
 
 ### QNTY: quantities
 
-Header `u32 count, u32 reserved`, then records of 56 bytes, sorted by (body index, field). At most one record per (body, field). A field without a record is missing: the source does not provide it (SPEC FR-DATA-05).
+Header `u32 count, u32 reserved`, then records of 56 bytes, sorted by (body index, field). At most one record per (body, field). A field without a record is missing: the source does not provide it (SPEC FR-DATA-05). QNTY holds fields 1 to 5 only; the surface fields are in SURF.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -348,6 +348,20 @@ An empty offset locator means the model has no offset: the frame name equals the
 
 Constraints: at most one model per body; segments in model order (each model's first segment equals the sum of the counts before it, and every segment belongs to a model); `record_size = 2 + 3 (degree + 1)`; `init <= start < end <= init + record_count * interval`, the last within a microsecond (trimming sets init to the original init plus a whole number of intervals; with an interval that is not a whole number of seconds, as in the Earth's PCKs, the kept records can end a rounding error before the coverage the PCK file gives, where the next segment starts; the last record is used there); every record's RADIUS is positive and [MID - RADIUS, MID + RADIUS] contains the instants it is used for (within a microsecond); finite values; non-empty frame names; a model without an offset as described above.
 
+### SURF: surface conditions (format 1.4)
+
+The conditions at a body's reference surface, the ellipsoid of its radii ([ADR-0017](../adr/0017-surface-conditions.md)). Header `u32 count, u32 reserved`, then records of 56 bytes with the layout of QNTY records, sorted by (body index, field), at most one per (body, field). Fields:
+
+| Code | Field | Unit | Meaning |
+|---|---|---|---|
+| 6 | mean_temperature | 7 (K) | Mean temperature at the reference surface, averaged over the body: over the solid surface, or at the reference pressure level of a body without one. |
+| 7 | surface_pressure | 8 (Pa) | Atmospheric pressure at the solid surface. |
+| 8 | reference_pressure | 8 (Pa) | The pressure level the body's reference radii refer to, for a body whose reference surface is a level in its atmosphere. |
+
+The kind of a body's reference surface follows from these records: a pressure level with a reference pressure, solid with a surface pressure, unknown with neither.
+
+Constraints: only fields 6 to 8; a body has at most one of surface_pressure and reference_pressure; mean_temperature > 0, surface_pressure >= 0, reference_pressure > 0; the QNTY constraints on units, sources and uncertainties.
+
 ## 4. Validation
 
 A reader rejects (`data_format` unless noted):
@@ -357,7 +371,7 @@ A reader rejects (`data_format` unless noted):
 - a header or file size that does not match, or a content hash mismatch;
 - a section out of bounds, misaligned, overlapping or duplicated, or a missing required section;
 - a string reference out of bounds or invalid UTF-8; an index out of range; an unknown code;
-- a quantity with the wrong unit for its field, a duplicate (body, field), or a negative or non-finite uncertainty;
+- a quantity with the wrong unit for its field, a field outside its section's range (QNTY 1 to 5, SURF 6 to 8), a duplicate (body, field), or a negative or non-finite uncertainty; surface conditions that break the SURF constraints;
 - a rotation record that breaks the ROTN constraints;
 - TT - TAI other than 32.184 s, or an invalid leap second table;
 - a segment that breaks the EPHS constraints, or a non-finite value;
@@ -373,4 +387,4 @@ The pipeline's writer applies the same checks before writing (`check_content`).
 
 ## 6. Size
 
-The default pack (`solar-system-1.3.0.uspack`, de440s.bsp untrimmed, with the star catalog and the lunar orientation) is 36,877,232 bytes (36.9 MB); the ephemeris records are almost all of it (the 9,096 stars take about 0.7 MB, the lunar orientation records 3.5 MB: 13,700 records of 32 values over the ephemeris span). Trimming to a window shrinks it roughly in proportion to the window's length. The optional moons pack (`solar-system-moons-1.2.0.uspack`, 2000 to 2100) is 324,810,176 bytes (325 MB), almost all of it the satellite records; the Earth's orientation takes 19.0 MB of it (36,527 daily records of 65 values in 38 segments).
+The default pack (`solar-system-1.4.0.uspack`, de440s.bsp untrimmed, with the star catalog, the lunar orientation and the surface conditions) is 36,885,408 bytes (36.9 MB; SURF and its strings add 8 KB); the ephemeris records are almost all of it (the 9,096 stars take about 0.7 MB, the lunar orientation records 3.5 MB: 13,700 records of 32 values over the ephemeris span). Trimming to a window shrinks it roughly in proportion to the window's length. The optional moons pack (`solar-system-moons-1.2.0.uspack`, 2000 to 2100; 1.3.0 with SURF when it is next built) is 324,810,176 bytes (325 MB), almost all of it the satellite records; the Earth's orientation takes 19.0 MB of it (36,527 daily records of 65 values in 38 segments).

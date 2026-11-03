@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Active |
-| Last updated | 2026-10-22 |
+| Last updated | 2026-11-02 |
 | Related | [SPEC.md section 10](SPEC.md#10-data-provenance), [ADR-0005](adr/0005-data-provenance-and-storage.md) |
 
 This is the human-readable registry of the sources the simulation may use. The machine-readable counterparts are `data/sources.json` (declared sources and files) and `data/sources.lock.json` (exact files, sizes, checksums and retrieval dates), maintained by `tools/pipeline/usim-pipeline fetch`. Keep the three consistent: a source is added here and to `sources.json` in the same change.
@@ -24,6 +24,7 @@ This is the human-readable registry of the sources the simulation may use. The m
 
 - Every downloaded file is pinned in `data/sources.lock.json` by URL, size, SHA-256 and retrieval timestamp.
 - Where the publisher provides checksums, the pipeline verifies them too. NAIF provides MD5 lists in `aa_checksums.txt` in each kernel directory.
+- A file may list mirrors in `data/sources.json`: other servers that hold byte-identical copies of the publisher's file. `fetch` tries them in order only when the file's own URL cannot be downloaded and the lock already pins the file, and a mirror's copy must match the pin exactly, so the data, the source and the pack stay the same. New pins and re-pins always come from the publisher's URL. A mirror is not a new source: the source entry, its tier and its citation do not change.
 - API responses used as reference data (Horizons, SBDB) are saved with the full request parameters, the API version string and the retrieval timestamp.
 - Each source records its terms of use. Check the terms before redistributing any data (for example inside a release build).
 
@@ -100,7 +101,7 @@ The URLs in this section and the next were checked as reachable on 2026-10-20.
 | URL | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/ |
 | Underlying source | Archinal, B. A., et al. (2018). Report of the IAU Working Group on Cartographic Coordinates and Rotational Elements: 2015. *Celestial Mechanics and Dynamical Astronomy*, 130:22. https://doi.org/10.1007/s10569-017-9805-5 (cited in the kernel header) |
 | Checksums | No publisher checksum list (the `pck` directory has no `aa_checksums.txt`; checked 2026-10-20). Pinned: 131,226 bytes, SHA-256 3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1, retrieved 2026-10-20. |
-| Used by | The default data pack: triaxial radii (and the derived mean radius) and IAU rotation elements of the v1 bodies; VAL-04 reference orientations. |
+| Used by | The default data pack: triaxial radii (and the derived mean radius) and IAU rotation elements of the v1 bodies; VAL-04 reference orientations; Neptune's reference pressure, from the comment "(Values are for the 1 bar pressure level.)" above `BODY899_RADII` (transcribed in `data/catalog/manual/surface-conditions.json`, ADR-0017). |
 | Notes | The kernel's comments record body-specific caveats (for example bodies for which the IAU report no longer gives rotational elements). Read them when building the catalog. Its Mars system phase angles are quadratic (`BODY4_MAX_PHASE_DEGREE = 2`), which CSPICE supports from N0067; `pck00011_n0066.tpc` is the variant for older toolkits. The NAIF `aareadme.txt` erratum: the constant 12.711923222 in angle M5 (line 1294) should be 12.71192322; NAIF states the effect on Phobos is at round-off level, and the pack keeps the file's value. CSPICE reads 9 of its 2896 numeric values one ulp away from their text ([ADR-0007](adr/0007-text-kernel-values.md)). |
 
 ### S-NAIF-GM440: gravitational parameters (Tier 1)
@@ -230,8 +231,13 @@ Notes: these are HTML tables. Values from them enter only through the manual ent
 
 | | |
 |---|---|
-| URL | https://nssdc.gsfc.nasa.gov/planetary/factsheet/ |
-| Use | Sanity checks and descriptive text. Not a simulation input. |
+| URL | https://nssdc.gsfc.nasa.gov/planetary/factsheet/ (the metric comparison table), `planetfact_notes.html` (its notes), and one sheet per planet (`jupiterfact.html` and so on) |
+| Use | Sanity checks and descriptive text. Since 2026-11-02 also a labeled Tier 2 input, for surface conditions only ([ADR-0017](adr/0017-surface-conditions.md)): no Tier 1 source available to the pipeline gives them. |
+| Provides | From the comparison table: Mean Temperature (C) for Mercury to Neptune, the Moon and Pluto, and Surface Pressure (bars) for the six bodies the notes call terrestrial (Mercury, Venus, Earth, the Moon, Mars, Pluto); the giants' pressures are "Unknown*". From the Jupiter, Saturn and Uranus sheets: their radii are at the 1 bar level ("Equatorial radius (1 bar level) (km)", the pack's IAU radii). |
+| Form | HTML pages; values enter through `data/catalog/manual/surface-conditions.json` (transcribed 2026-11-02, each value as the text of its cell with its unit, converted to K and Pa by the pipeline). |
+| Terms | NASA web content; NASA should be acknowledged as the source (NASA Images and Media Usage Guidelines). |
+| Used by | The default and moons packs, section SURF (format 1.4): mean temperature, surface pressure and the 1 bar reference pressure of Jupiter, Saturn and Uranus. |
+| Notes | Mean temperature is "the average temperature over the whole planet's surface (or for the gas giants at the one bar level)" and "not representative of any given region" (the notes). Each giant's own sheet gives a "Temperature at 1 bar" that differs from the table by up to 2 degrees (Jupiter: 165 K, -108 C, against -110 C); the table is used for all ten bodies alike. The IAU 2015 report (Archinal et al. 2018), the Tier 1 source for the giants' 1 bar level, should replace the sheets for that value once transcribed from a copy (its publisher refuses automated downloads). |
 
 ## 7. Sky background
 
@@ -241,6 +247,7 @@ Notes: these are HTML tables. Values from them enter only through the manual ent
 |---|---|
 | Provides | 9110 entries (9096 stars, to about V 6.5): J2000 positions (FK5), proper motions, V magnitudes, B-V and other colors, spectral types, designations. |
 | URL | https://cdsarc.cds.unistra.fr/ftp/V/50/ (CDS catalog V/50) |
+| Mirror | https://vizier.cfa.harvard.edu/ftp/cats/V/50/, the VizieR mirror at the Center for Astrophysics, Harvard and Smithsonian (listed in VizieR's mirrors page). Both files there matched the pins byte for byte on 2026-11-02, when CDS could not be reached from the Windows development machine (section 2). |
 | Citation | Hoffleit, D., Warren Jr., W. H. (1991). *The Bright Star Catalogue*, 5th Revised Ed. (Preliminary Version). Astronomical Data Center, NSSDC/ADC. Retrieved through VizieR, CDS, Strasbourg (DOI 10.26093/cds/vizier). |
 | Checksums | No publisher checksum list. Pinned: `ReadMe` 11,571 bytes, SHA-256 44fd9c73e2eecad0beb47bdfa3f01c60fd43f93d6964198e31fcd48732de5b33; `catalog.gz` 573,921 bytes, SHA-256 3dc44b1e90be8fbe5bcc7656032560f51275f985c7e3f783c9028e1838ec7bed; retrieved 2026-10-21. |
 | Terms | CDS VizieR rules of usage (https://cds.unistra.fr/vizier-org/licences_vizier.html, read 2026-10-22): free of use in a scientific context with the authors and publication cited; an acknowledgement of VizieR is appreciated; commercial use depends on the data origin. The ReadMe states no copyright. |
@@ -299,3 +306,44 @@ Textures and models are not simulation data, but their provenance and licenses a
 | Terms | NASA media guidelines (read 2026-10-23): generally not subject to U.S. copyright, NASA acknowledged as the source; credit NASA/JPL/Space Science Institute. |
 
 Other mission-derived maps may be added the same way. Record the mission, the product and the license for each.
+
+## 10. Sky cues (rendering only)
+
+Qualitative colors of skies and twilight that the stylized style draws (A-07, B-06, [ADR-0018](adr/0018-atmospheres-and-sky-cues.md)). They enter through `data/catalog/sky-cues.json`, each as a hue from a fixed vocabulary with the source's sentence that states it, and `usim-pipeline sky-cues` writes them to `UniverseSim/Assets/UniverseSim/Data/SkyCues.json`, where the ship and info panels cite them. Whether a body has an atmosphere at all is not a cue: the core derives it from the pack's surface conditions (S-NSSDC-FACT and S-NAIF-PCK11, ADR-0017). These sources have no files to pin: only short quotations are kept, with the page and the date read.
+
+### S-NASA-PJ-SKIES: Mars Pathfinder sky images on NASA Photojournal (Tier 1)
+
+| | |
+|---|---|
+| Provides | PIA01547, "True Color of Mars - Pathfinder Sol 24 at 4 PM" (added 1999-06-22): "The brownish gray sky as it would be seen by an observer on Mars in this four-frame, true color mosaic taken on sol 24 (at approximately 1610 LST)." PIA00917, "Color Variations in the Sky at Sunset" (added 1997-08-28): "The blue color only becomes apparent near sunrise and sunset, when the light has to pass through the largest amount of dust." |
+| URL | https://science.nasa.gov/photojournal/true-color-of-mars-pathfinder-sol-24-at-4-pm and https://science.nasa.gov/photojournal/color-variations-in-the-sky-at-sunset (the photojournal.jpl.nasa.gov catalog pages redirect there), read 2026-11-02 |
+| Credit | NASA/JPL |
+| Used by | Mars's `daytime_sky` (brownish gray) and `twilight` (blue) cues. |
+| Notes | Curiosity saw the same blue sunset (PIA19400, NASA/JPL-Caltech/MSSS/Texas A&M Univ.). PIA00917 also says the dust "absorbs blue light, giving the sky its red color"; the cue keeps PIA01547's true color words. |
+
+### S-NASA-EO-ISS: astronaut photographs on NASA Earth Observatory (Tier 1)
+
+| | |
+|---|---|
+| Provides | "Sundown and Lights Up Over the U.S. Northeast" (Image of the Day 2024-05-12, astronaut photograph ISS070-E-76065 of 2024-01-17): "As the Sun dips below the curvature of Earth, the varying layers of the atmosphere appear as different hues in this oblique photograph of Earth's limb." and "The troposphere, the lowest layer of the atmosphere, appears red and yellow." |
+| URL | https://science.nasa.gov/earth/earth-observatory/sundown-and-lights-up-over-the-us-northeast-152802, read 2026-11-02 |
+| Credit | ISS Crew Earth Observations Facility and the Earth Science and Remote Sensing Unit, NASA Johnson Space Center; caption by Wilfredo García López (Jacobs-JETS II Contract at NASA-JSC) |
+| Used by | The Earth's `twilight` cue (red and yellow). |
+
+### S-PIETERS-1986: The color of the surface of Venus (Tier 1, peer reviewed)
+
+| | |
+|---|---|
+| Provides | The abstract: "Multispectral images of the basaltic surface of Venus obtained by Venera 13 were processed to remove the effects of orange-colored incident radiation resulting from interactions with the thick Venusian atmosphere." |
+| Citation | Pieters, C. M., Head, J. W., Patterson, W., Pratt, S., Garvin, J. (1986). The color of the surface of Venus. *Science*, 234, 1986-12-12. |
+| URL | https://ntrs.nasa.gov/citations/19870039592 (NASA Technical Reports Server record with the abstract, read 2026-11-02; it gives no pages or DOI, so none are recorded here) |
+| Used by | Venus's `daytime_sky` cue (orange: the daylight at the surface). |
+
+### S-NASA-SPACEPLACE: "Why Is the Sky Blue?" (Tier 2)
+
+| | |
+|---|---|
+| Provides | "This is why we see a blue sky most of the time." |
+| URL | https://spaceplace.nasa.gov/blue-sky/en/ (page last updated 2026-07-31), read 2026-11-02 |
+| Used by | The Earth's `daytime_sky` cue (blue), labeled Tier 2 in the panels: no Tier 1 statement of the daytime sky's color was found in an accessible form. |
+| Notes | The same page describes Mars's sky ("During the daytime, the Martian sky takes on an orange or reddish color.") from Mars Pathfinder images; the Tier 1 captions above are used instead. |

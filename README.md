@@ -9,7 +9,7 @@ An educational simulation of the universe: physically accurate underneath, built
 
 ## Status
 
-Phases 0 to 6 are complete on macOS, and the core and viewer also build, pass their tests and run on Windows (x64): the engine-agnostic core and the Unity viewer (v1). A reproducible Python pipeline builds the data pack from pinned NAIF kernels. The core evaluates the DE440 ephemeris (within 1 mm of NASA's CSPICE toolkit and within 10 m of JPL Horizons), orients bodies with the IAU rotation models (the Moon with DE440's high-precision lunar orientation), runs the simulation clock, samples orbit paths and fills per-frame snapshots in a few microseconds. It is exposed through a C ABI and the `usim` command line. The Unity viewer shows the Solar System at the current time with time controls, focus and zoom from 1 km above a surface to the whole system, orbit lines, labels, an info panel with sources, and a scale mode switch. Phase 6 adds the 9,096 naked-eye stars of the Bright Star Catalogue as the sky, Saturn's rings, and, in an optional pack built from the JPL satellite ephemerides, the planet centers and 21 major moons from 2000 to 2100, with the Earth oriented by NAIF's Earth orientation file. Surface maps of 19 planets and moons, reprojected from NASA and USGS mission mosaics, cover their spheres; rebuilding them needs their sources (`tools/scripts/fetch-texture-sources.sh`, about 4.8 GB). See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+Phases 0 to 6 are complete, first on macOS; since 2026-11-02 development happens on Windows (x64), where the core and viewer build, pass their tests and run: the engine-agnostic core and the Unity viewer (v1). A reproducible Python pipeline builds the data pack from pinned NAIF kernels. The core evaluates the DE440 ephemeris (within 1 mm of NASA's CSPICE toolkit and within 10 m of JPL Horizons), orients bodies with the IAU rotation models (the Moon with DE440's high-precision lunar orientation), runs the simulation clock, samples orbit paths and fills per-frame snapshots in a few microseconds. It is exposed through a C ABI and the `usim` command line. The Unity viewer shows the Solar System at the current time with time controls, focus and zoom from 1 km above a surface to the whole system, orbit lines, labels, an info panel with sources, and a scale mode switch. Phase 6 adds the 9,096 naked-eye stars of the Bright Star Catalogue as the sky, Saturn's rings, and, in an optional pack built from the JPL satellite ephemerides, the planet centers and 21 major moons from 2000 to 2100, with the Earth oriented by NAIF's Earth orientation file. Surface maps of 19 planets and moons, reprojected from NASA and USGS mission mosaics, cover their spheres; rebuilding them needs their sources (`tools/scripts/fetch-texture-sources.sh`, about 4.8 GB). The viewer opens in the stylized style (brighter shading, graded maps, bloom, a glowing Sun, sparkling stars, colored rings, orbit lines that fade behind each body, icons on the labels, and atmosphere halos on the bodies whose sourced surface conditions show an atmosphere), lists every exaggeration in a "what is exaggerated" panel, and switches to the realistic style in one click. It starts in a spaceship near the Earth, leads the info panel with what each world is like in human terms, keeps a logbook of goals to reach, and plays synthesized music and sound ([ADR-0019](docs/adr/0019-play-start-facts-logbook-time-and-sound.md)). See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## Documentation
 
@@ -62,10 +62,13 @@ tools/scripts/build-core-for-unity.sh
 # 3. Open UniverseSim/ in Unity 6000.5.1f1, open Assets/UniverseSim/Scenes/Main.unity and press Play.
 #    Drag to orbit, scroll to zoom, click a body to select it, double-click (or Enter) to focus it,
 #    comma and period to step through bodies, F to fly (WASD, Q/E, Shift), Space to pause,
-#    [ and ] to change the rate.
-#    In the stylized style, V takes out the spaceship: W/S thrust, A/D turn, Q/E pitch, drag to steer,
+#    [ and ] (or the Speed slider) to change the rate, the Timeline slider to move through the years,
+#    Tab held to rush time, Set date to type a date, J for the logbook of goals, M to mute.
+#    In the stylized style the viewer starts in the spaceship near the Earth: W/S thrust, Shift boosts,
+#    move the mouse away from the center to steer (or A/D turn, Q/E pitch, drag), V puts it away,
 #    T flies to the selected body (with the real distance, light time and a transfer estimate), and
-#    L descends to hover over the surface below (its Sun, gravity and day) or lifts off.
+#    L lands on solid ground, stops above a giant planet's 1 bar level, or lifts off; the panel shows the
+#    Sun, gravity, day, temperature, pressure and atmosphere there, and the sky takes its sourced colors.
 ```
 
 Query the simulation from the command line (JSON by default, `--format csv` for tables):
@@ -81,7 +84,7 @@ core/build/dev/apps/usim-cli/usim --help
 
 In the default pack, Mars to Pluto are shown at their system barycenters and flagged approximate, because the default ephemeris file has no planet-center data for them ([ADR-0008](docs/adr/0008-planet-positions-at-system-barycenters.md)). The optional moons pack has the real centers and the moons; the viewer uses it when it has been built ([ADR-0010](docs/adr/0010-moons-in-an-optional-pack.md)).
 
-The default data pack (`data/packs/solar-system-1.3.0.uspack`) is committed through Git LFS, so a clone has data without running the pipeline. To rebuild data from the sources:
+The default data pack (`data/packs/solar-system-1.4.0.uspack`) is committed through Git LFS, so a clone has data without running the pipeline. To rebuild data from the sources:
 
 ```
 python3 -m venv tools/pipeline/.venv

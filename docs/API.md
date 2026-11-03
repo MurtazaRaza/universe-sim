@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v0.3 (C ABI version 5) |
+| Status | Draft v0.5 (C ABI version 7) |
 | Last updated | 2026-11-02 |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md) (sections 3.4, 3.5 and 5), [SPEC.md](SPEC.md), `core/capi/include/usim/usim.h` |
 
@@ -22,7 +22,7 @@ The host never does orbital mechanics, time scale conversion, frame math or ephe
 
 ```c
 usim_simulation* sim = NULL;
-int32_t status = usim_simulation_load_file("data/packs/solar-system-1.3.0.uspack", &sim);
+int32_t status = usim_simulation_load_file("data/packs/solar-system-1.4.0.uspack", &sim);
 if (status != USIM_STATUS_OK) {
     log("cannot load the pack: %s (%s)", usim_last_error_message(), usim_status_name(status));
 }
@@ -118,7 +118,32 @@ usim_day_length_at(sim, mars, now, &day);                   // sidereal rotation
 
 - A trip estimate is a textbook first estimate, not a trajectory: a Hohmann transfer between circular orbits around the bodies' shared orbit center, sized by the osculating orbits at that moment. Its flags say when an end is a surface, when the trip joins the orbits of the bodies' systems (a moon's last leg is not included) and when a position is approximate. Show those caveats with the numbers.
 - A site's vectors are relative to the body's center in the display frame and host axes, like an offset from the snapshot center: a host that keeps a camera or an avatar relative to a body adds `position_km` to its offset, and uses `up`, `north` and `east` for its horizon. Use `usim_surface_site_below` to turn a position back into coordinates rather than doing the frame math yourself. Both calls allocate nothing, so they can run every frame.
-- The site's gravity is GM / r^2 at the reference surface without rotation, and the Sun is geometric. Neither says what the surface is: the pack does not record whether a reference surface is solid ground or a cloud-top level, nor its temperature or pressure.
+- The site's gravity is GM / r^2 at the reference surface without rotation, and the Sun is geometric.
+
+### Surface conditions (ABI version 6, ADR-0017)
+
+```c
+int32_t kind;
+usim_body_surface_kind(sim, mars, &kind);                  // USIM_SURFACE_SOLID, _PRESSURE_LEVEL or _UNKNOWN
+
+usim_quantity q;
+usim_body_quantity(sim, mars, USIM_FIELD_MEAN_TEMPERATURE, &q);    // K, averaged over the reference surface
+usim_body_quantity(sim, mars, USIM_FIELD_SURFACE_PRESSURE, &q);    // Pa, at the solid surface
+usim_body_quantity(sim, jupiter, USIM_FIELD_REFERENCE_PRESSURE, &q); // Pa, the level the radii refer to
+```
+
+- The kind says what a site at altitude 0 is: solid ground, a level in the atmosphere with no solid ground there (the giant planets' 1 bar level), or unknown. It follows from which of the two pressures the body has, so it has their sources. With an unknown kind, do not show a vehicle standing on the surface.
+- These values come partly from a Tier 2 compilation (the NASA fact sheets); show each value's source and its tier, as for the rings. The mean temperature is an average over the whole body, not the temperature at a site. Convert to degrees Celsius or bars only for display.
+
+### Atmospheres (ABI version 7, ADR-0018)
+
+```c
+int32_t atmosphere;
+usim_body_atmosphere(sim, mars, &atmosphere);   // USIM_ATMOSPHERE_PRESENT, _NONE or _UNKNOWN
+```
+
+- Present means a positive surface pressure, or a reference surface that is a pressure level in the atmosphere; none means a surface pressure of zero at the source's precision (an exosphere far thinner may exist). The pressures' sources are those of the property. Draw an effect that implies an atmosphere (a halo, a daytime sky) only where it is present.
+- The colors of a sky are not in the pack: they are qualitative cues in the Unity project's `Data/SkyCues.json`, written by `usim-pipeline sky-cues` from `data/catalog/sky-cues.json` with their sources. Another host can read the same catalog.
 
 ## 4. Precision: the floating origin
 
