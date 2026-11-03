@@ -86,6 +86,103 @@ namespace UniverseSim.Unity
 
         private static double Square(double x) => x * x;
 
+        /// <summary>
+        /// Where the drawn sphere meets the ray from its center along <paramref name="direction"/> (mesh-local axes,
+        /// any length), as a fraction of the unit sphere's radius: 1 at a vertex, less inside a facet. The mesh is the
+        /// one <see cref="Create"/> or, with <paramref name="mapped"/>, <see cref="CreateMapped"/> builds with
+        /// <paramref name="segments"/> around and half as many rings (<see cref="SphereLods"/>). Scaling the mesh by
+        /// a body's radii keeps the fraction along each ray, so the drawn ground lies (1 - fraction) times the
+        /// reference surface's distance from the center below it (ADR-0017). Display geometry only.
+        /// </summary>
+        public static double DrawnRadiusFraction(Double3 direction, int segments, bool mapped, int axes)
+        {
+            var rings = segments / 2;
+            var p = direction.Normalized;
+            // The point's grid coordinates, in rings from the north pole and segments around, and the vertex at
+            // grid coordinates (r, s), with the same formulas as the mesh builders.
+            double ringCoordinate, segmentCoordinate;
+            Func<int, int, Double3> vertex;
+            if (mapped)
+            {
+                var axisX = Double3.From(CoreSimulation.AxesToHost(axes, new UsimVec3d { X = 1.0 }));
+                var axisY = Double3.From(CoreSimulation.AxesToHost(axes, new UsimVec3d { Y = 1.0 }));
+                var axisZ = Double3.From(CoreSimulation.AxesToHost(axes, new UsimVec3d { Z = 1.0 }));
+                var psi = Math.Asin(Math.Clamp(p.Dot(axisZ), -1.0, 1.0));
+                var mu = Math.Atan2(p.Dot(axisY), p.Dot(axisX));
+                ringCoordinate = (Math.PI / 2 - psi) / (Math.PI / rings);
+                segmentCoordinate = (mu + Math.PI) / (2.0 * Math.PI / segments);
+                vertex = (r, s) =>
+                {
+                    var vPsi = Math.PI / 2 - Math.PI * r / rings;
+                    var vMu = -Math.PI + 2.0 * Math.PI * s / segments;
+                    return axisX * (Math.Cos(vPsi) * Math.Cos(vMu)) + axisY * (Math.Cos(vPsi) * Math.Sin(vMu)) +
+                           axisZ * Math.Sin(vPsi);
+                };
+            }
+            else
+            {
+                var polar = Math.Acos(Math.Clamp(p.Y, -1.0, 1.0));
+                var azimuth = Math.Atan2(p.Z, p.X);
+                if (azimuth < 0.0)
+                {
+                    azimuth += 2.0 * Math.PI;
+                }
+                ringCoordinate = polar / (Math.PI / rings);
+                segmentCoordinate = azimuth / (2.0 * Math.PI / segments);
+                vertex = (r, s) =>
+                {
+                    var vPolar = Math.PI * r / rings;
+                    var vAzimuth = 2.0 * Math.PI * s / segments;
+                    return new Double3(Math.Sin(vPolar) * Math.Cos(vAzimuth), Math.Cos(vPolar),
+                                       Math.Sin(vPolar) * Math.Sin(vAzimuth));
+                };
+            }
+            // The drawn sphere is convex with its center inside, so the ray leaves it where it first crosses a facet's
+            // plane: the smallest distance d / (n . p) over the facets it faces (n . p > 0). The facet it leaves by is
+            // in the grid cell of the direction or a neighboring one (an edge between rings is a chord, and the plane
+            // through it and the center bends away from the ring's latitude), so the 3 x 3 cells around it suffice.
+            var r0 = Math.Clamp((int)Math.Floor(ringCoordinate), 0, rings - 1);
+            var s0 = (int)Math.Floor(segmentCoordinate);
+            var fraction = double.PositiveInfinity;
+            for (var r = Math.Max(r0 - 1, 0); r <= Math.Min(r0 + 1, rings - 1); ++r)
+            {
+                for (var s = s0 - 1; s <= s0 + 1; ++s)
+                {
+                    // The quad's two triangles as Triangles() orders them: (a, a + 1, b) and (a + 1, b + 1, b). The
+                    // vertex formulas are periodic in s, so neighbors across the seam need no wrapping.
+                    var a = vertex(r, s);
+                    var a1 = vertex(r, s + 1);
+                    var b = vertex(r + 1, s);
+                    var b1 = vertex(r + 1, s + 1);
+                    fraction = Math.Min(fraction, ExitAlong(p, a, a1, b));
+                    fraction = Math.Min(fraction, ExitAlong(p, a1, b1, b));
+                }
+            }
+            return double.IsInfinity(fraction) ? 1.0 : Math.Min(1.0, fraction);
+        }
+
+        // Where the ray from the center along unit `p` crosses the plane of triangle (v0, v1, v2), in units of the
+        // radius; infinity for a degenerate triangle (at a pole) or a plane the ray does not face.
+        private static double ExitAlong(Double3 p, Double3 v0, Double3 v1, Double3 v2)
+        {
+            var normal = Cross(v1 - v0, v2 - v0);
+            if (normal.Length < 1e-12)
+            {
+                return double.PositiveInfinity;
+            }
+            var distance = normal.Dot(v0);
+            if (distance < 0.0)
+            {
+                normal = -normal; // outward, so the center is on the inner side
+                distance = -distance;
+            }
+            var along = normal.Dot(p);
+            return along > 1e-12 ? distance / along : double.PositiveInfinity;
+        }
+
+        private static Double3 Cross(Double3 u, Double3 v) =>
+            new Double3(u.Y * v.Z - u.Z * v.Y, u.Z * v.X - u.X * v.Z, u.X * v.Y - u.Y * v.X);
+
         // 16-bit indices while they can address every vertex (all the levels of SphereLods), which halves the
         // index buffer.
         private static IndexFormat IndexFormatFor(int vertexCount) =>

@@ -38,6 +38,103 @@
     color: rgb(255, 230, 150);
 }
 
+/* Interaction feel (A-12, docs/ART_DIRECTION.md section 12): a hovered label brightens and grows a little. */
+.body-label {
+    transition-property: color, scale;
+    transition-duration: 0.15s, 0.15s;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+
+.body-label.hovered {
+    color: rgb(255, 255, 255);
+    scale: 1.08 1.08;
+}
+
+/* Rings around the hovered and the selected body, sized and moved by the HUD (translate, so no layout). A new
+   selection starts its ring large and clear ("entering") and the transition draws it in. */
+.rings {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.body-ring {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    transition-property: scale, opacity;
+    transition-duration: 0.35s, 0.35s;
+    transition-timing-function: ease-out-back, ease-out-cubic;
+}
+
+.body-ring--hover {
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgba(255, 255, 255, 0.6);
+    border-right-color: rgba(255, 255, 255, 0.6);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    border-bottom-color: rgba(255, 255, 255, 0.6);
+}
+
+.body-ring--selected {
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: rgb(255, 230, 150);
+    border-right-color: rgb(255, 230, 150);
+    border-top-color: rgb(255, 230, 150);
+    border-bottom-color: rgb(255, 230, 150);
+}
+
+.body-ring.entering {
+    scale: 1.8 1.8;
+    opacity: 0;
+    transition-duration: 0s, 0s;
+}
+
+/* Label icons for the kind of body (A-10): hidden unless the labels layer has the "stylized" class
+   (StylizedLabels), between the body and its name. The colors are the stylized orbit lines' (StylizedOrbitLines)
+   and the Sun's icon color, from docs/ART_DIRECTION.md section 8. */
+.body-icon {
+    position: absolute;
+    left: 4px;
+    top: -6px;
+    width: 12px;
+    height: 12px;
+    display: none;
+}
+
+.labels.stylized .body-icon {
+    display: flex;
+}
+
+.labels.stylized .body-label {
+    padding-left: 19px;
+}
+
+.body-icon--star {
+    color: rgb(255, 214, 102);
+}
+
+.body-icon--planet {
+    color: rgb(102, 184, 255);
+}
+
+.body-icon--dwarfplanet {
+    color: rgb(199, 153, 255);
+}
+
+.body-icon--moon {
+    color: rgb(102, 235, 204);
+}
+
 .bar {
     position: absolute;
     left: 0;
@@ -128,6 +225,9 @@
 }
 
 .panel {
+    transition-property: opacity, translate;
+    transition-duration: 0.25s, 0.25s;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
     position: absolute;
     right: 12px;
     top: 84px;
@@ -143,6 +243,13 @@
     border-right-color: rgb(50, 60, 80);
     border-top-color: rgb(50, 60, 80);
     border-bottom-color: rgb(50, 60, 80);
+}
+
+/* A panel whose content changes (a new selection) slides in a little and fades up (A-12). */
+.panel.entering {
+    opacity: 0.35;
+    translate: 12px 0;
+    transition-duration: 0s, 0s;
 }
 
 .exaggerations-panel {
@@ -242,12 +349,20 @@
     padding-right: 10px;
 }
 
+.unity-button {
+    transition-property: background-color, scale;
+    transition-duration: 0.12s, 0.12s;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+
 .unity-button:hover {
     background-color: rgb(55, 72, 104);
+    scale: 1.03 1.03;
 }
 
 .unity-button:active {
     background-color: rgb(75, 95, 135);
+    scale: 0.97 0.97;
 }
 
 .unity-base-field__label {
@@ -273,6 +388,13 @@
 
 .unity-toggle__checkmark {
     -unity-background-image-tint-color: rgb(150, 220, 160);
+    transition-property: background-color, scale;
+    transition-duration: 0.12s, 0.12s;
+}
+
+.unity-toggle:hover .unity-toggle__checkmark {
+    background-color: rgb(32, 42, 62);
+    scale: 1.08 1.08;
 }
 
 .unity-base-popup-field__text {
@@ -281,4 +403,243 @@
 
 .unity-scroller {
     opacity: 0.6;
+}
+
+/* ---- Play (ADR-0019) ---- */
+
+.row {
+    flex-wrap: wrap;
+}
+
+/* Time controls: the throttle over the rate presets and the timeline over the coverage. */
+.rate-slider {
+    width: 260px;
+    margin-left: 10px;
+}
+
+.timeline {
+    flex-grow: 1;
+    min-width: 220px;
+    max-width: 520px;
+    margin-left: 18px;
+}
+
+.hint {
+    font-size: 11px;
+    color: rgb(120, 130, 150);
+    margin-left: 10px;
+}
+
+.date-row {
+    display: none;
+}
+
+.date-row.open {
+    display: flex;
+}
+
+.unity-base-slider__tracker {
+    background-color: rgb(20, 26, 40);
+    border-left-color: rgb(70, 85, 110);
+    border-right-color: rgb(70, 85, 110);
+    border-top-color: rgb(70, 85, 110);
+    border-bottom-color: rgb(70, 85, 110);
+}
+
+.unity-base-slider__dragger {
+    background-color: rgb(150, 220, 160);
+    border-left-color: rgb(70, 85, 110);
+    border-right-color: rgb(70, 85, 110);
+    border-top-color: rgb(70, 85, 110);
+    border-bottom-color: rgb(70, 85, 110);
+}
+
+/* The info panel: what it's like first, the data folded below. */
+.section-title {
+    -unity-font-style: bold;
+    color: rgb(175, 185, 255);
+    margin-top: 2px;
+}
+
+.fact-title {
+    color: rgb(150, 160, 180);
+    margin-top: 5px;
+    font-size: 11px;
+}
+
+.fact {
+    white-space: normal;
+    font-size: 14px;
+}
+
+.data-foldout {
+    margin-top: 10px;
+}
+
+.data-foldout .unity-foldout__text {
+    -unity-font-style: bold;
+    color: rgb(175, 185, 255);
+}
+
+/* The logbook. */
+.logbook-toggle {
+    margin-right: 16px;
+    align-self: center;
+    background-color: rgb(52, 46, 30);
+    border-left-color: rgb(150, 120, 60);
+    border-right-color: rgb(150, 120, 60);
+    border-top-color: rgb(150, 120, 60);
+    border-bottom-color: rgb(150, 120, 60);
+}
+
+.logbook-panel {
+    left: 12px;
+    right: auto;
+    top: 130px;
+    width: 380px;
+    max-height: 55%;
+    border-left-color: rgb(230, 190, 100);
+}
+
+.goal {
+    margin-top: 5px;
+}
+
+.goal-title {
+    white-space: normal;
+}
+
+.goal--done .goal-title {
+    color: rgb(150, 220, 160);
+}
+
+.goal-hint {
+    font-size: 11px;
+    color: rgb(120, 130, 150);
+    white-space: normal;
+}
+
+/* Toasts under the top bar: in from above and transparent, out the same way. */
+.toasts {
+    position: absolute;
+    top: 74px;
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+.toast {
+    margin-top: 6px;
+    padding: 8px 14px;
+    max-width: 560px;
+    background-color: rgba(18, 24, 40, 0.9);
+    border-left-width: 3px;
+    border-left-color: rgb(230, 190, 100);
+    opacity: 0;
+    translate: 0 -10px;
+    transition-property: opacity, translate;
+    transition-duration: 0.35s, 0.35s;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+
+.toast--shown {
+    opacity: 1;
+    translate: 0 0;
+}
+
+.toast-title {
+    -unity-font-style: bold;
+    color: rgb(230, 190, 100);
+}
+
+.toast-text {
+    white-space: normal;
+}
+
+/* The arrival banner: the body's name large in the upper part of the view. */
+.arrival {
+    position: absolute;
+    top: 22%;
+    left: 0;
+    right: 0;
+    align-items: center;
+    opacity: 0;
+    scale: 0.96 0.96;
+    transition-property: opacity, scale;
+    transition-duration: 0.6s, 0.6s;
+    transition-timing-function: ease-out-cubic, ease-out-cubic;
+}
+
+.arrival--shown {
+    opacity: 1;
+    scale: 1 1;
+}
+
+.arrival-title {
+    font-size: 44px;
+    -unity-font-style: bold;
+    color: rgb(240, 244, 255);
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.6);
+}
+
+.arrival-subtitle {
+    font-size: 16px;
+    color: rgb(200, 208, 255);
+    margin-bottom: 2px;
+    padding: 2px 10px;
+    background-color: rgba(10, 14, 24, 0.7);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.arrival-fact {
+    margin-top: 6px;
+    font-size: 15px;
+    max-width: 640px;
+    white-space: normal;
+    -unity-text-align: upper-center;
+    color: rgb(225, 230, 240);
+    padding: 4px 12px;
+    background-color: rgba(10, 14, 24, 0.7);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+/* The mouse steering's reticle: a faint ring for the dead zone and a dot toward the pointer. */
+.steer {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+.steer-center {
+    position: absolute;
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgba(200, 215, 255, 0.35);
+    border-right-color: rgba(200, 215, 255, 0.35);
+    border-top-color: rgba(200, 215, 255, 0.35);
+    border-bottom-color: rgba(200, 215, 255, 0.35);
+}
+
+.steer-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background-color: rgb(200, 215, 255);
+    opacity: 0;
 }

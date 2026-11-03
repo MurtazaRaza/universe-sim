@@ -248,6 +248,106 @@ namespace UniverseSim.Unity.Tests.PlayMode
             }
         }
 
+        // Mean luminance of the pixels within `half` pixels of `center` (a square), clipped to the image.
+        private static float MeanAround(Color[] pixels, Vector3 center, int half)
+        {
+            var sum = 0.0;
+            var count = 0;
+            for (var y = Math.Max(0, (int)center.y - half); y <= Math.Min(Height - 1, (int)center.y + half); ++y)
+            {
+                for (var x = Math.Max(0, (int)center.x - half); x <= Math.Min(Width - 1, (int)center.x + half); ++x)
+                {
+                    sum += Luminance(pixels[y * Width + x]);
+                    ++count;
+                }
+            }
+            return count > 0 ? (float)(sum / count) : 0f;
+        }
+
+        // Mean luminance of the Moon's pixels whose surface point has n.l above `from` and below `to`.
+        private static float MeanOnMoon(Camera cam, BodyView view, Color[] pixels, float from, float to)
+        {
+            var sum = 0.0;
+            var count = 0;
+            for (var y = 0; y < Height; y += 2)
+            {
+                for (var x = 0; x < Width; x += 2)
+                {
+                    var ndl = NdotL(cam, view, x, y);
+                    if (ndl != null && ndl.Value > from && ndl.Value < to)
+                    {
+                        sum += Luminance(pixels[y * Width + x]);
+                        ++count;
+                    }
+                }
+            }
+            return count > 0 ? (float)(sum / count) : float.NaN;
+        }
+
+        [UnityTest]
+        public IEnumerator ACrescentStaysReadableUnderTheBloomWithTheSunInView()
+        {
+            // A thin crescent with the Sun 30 degrees away in the same view (A-08): with every effect and the full
+            // post-processing, the Sun's glow and the bloom must neither move the terminator nor wash the night side
+            // up toward the crescent. The same view with only the bloom off shows what the bloom itself does.
+            yield return ShowWhiteMoon(150.0);
+            var cam = Camera.main;
+            var view = host.Views[Index(301)];
+            var sunPoint = cam.WorldToScreenPoint(host.Views[Index(10)].transform.position);
+            Assert.That(sunPoint.z > 0f && sunPoint.x >= 0f && sunPoint.x < Width && sunPoint.y >= 0f &&
+                        sunPoint.y < Height, $"the Sun is in the view ({sunPoint})");
+            var lines = new Dictionary<VisualStyle, List<(int Expected, int Measured)>>();
+            var contrast = new Dictionary<VisualStyle, (float Crescent, float Night)>();
+            Color[] stylizedPixels = null;
+            foreach (var style in new[] { VisualStyle.Realistic, VisualStyle.Stylized })
+            {
+                settings.SetStyle(style);
+                var pixels = new Color[1][];
+                yield return Render(pixels);
+                stylizedPixels = pixels[0];
+                lines[style] = Terminator(cam, view, pixels[0], Rise[style]);
+                // From three radii the visible crescent reaches n.l of about 0.18 (cos(150 - 70.5 degrees)).
+                contrast[style] = (MeanOnMoon(cam, view, pixels[0], 0.05f, 1f), MeanOnMoon(cam, view, pixels[0], -1f, -0.3f));
+            }
+            // The same stylized view with only the bloom off: what the bloom itself adds.
+            var bloom = Object.FindAnyObjectByType<StylizedCamera>().Volume.sharedProfile.components
+                .OfType<UnityEngine.Rendering.Universal.Bloom>().First();
+            bloom.active = false;
+            var unbloomed = new Color[1][];
+            yield return Render(unbloomed);
+            bloom.active = true;
+            var (crescentNoBloom, nightNoBloom) = (MeanOnMoon(cam, view, unbloomed[0], 0.05f, 1f),
+                                                   MeanOnMoon(cam, view, unbloomed[0], -1f, -0.3f));
+            // Around the Sun the bloom shows, so turning it off did take it away.
+            var aroundSun = MeanAround(stylizedPixels, sunPoint, 40);
+            var aroundSunNoBloom = MeanAround(unbloomed[0], sunPoint, 40);
+            var stylized = lines[VisualStyle.Stylized];
+            var (crescent, night) = contrast[VisualStyle.Stylized];
+            var all = string.Join(", ", stylized.Select(r => $"{r.Expected}/{r.Measured}"));
+            var summary = $"stylized crescent {crescent:0.000}, night side {night:0.000} (bloom off: " +
+                          $"{crescentNoBloom:0.000}, {nightNoBloom:0.000}; around the Sun {aroundSun:0.000}, bloom " +
+                          $"off {aroundSunNoBloom:0.000}); realistic crescent " +
+                          $"{contrast[VisualStyle.Realistic].Crescent:0.000}, night side " +
+                          $"{contrast[VisualStyle.Realistic].Night:0.000}; {stylized.Count} lines " +
+                          $"(realistic {lines[VisualStyle.Realistic].Count}), expected/stylized: {all}";
+            TestContext.WriteLine(summary);
+            Debug.Log("UniverseSim crescent under the bloom: " + summary);
+            Assert.That(stylized.Count, Is.GreaterThan(20), "scan lines across the terminator");
+            Assert.That(stylized.Count, Is.EqualTo(lines[VisualStyle.Realistic].Count), summary);
+            foreach (var (expected, measured) in stylized)
+            {
+                Assert.That(Math.Abs(measured - expected), Is.LessThanOrEqualTo(1), summary);
+            }
+            // The bloom was on (it shows around the Sun), yet it neither lifts the night side nor dims the crescent:
+            // measured 2026-11-02, no change at three decimals.
+            Assert.That(aroundSun, Is.GreaterThan(aroundSunNoBloom + 1e-4f), summary);
+            Assert.That(night, Is.LessThanOrEqualTo(nightNoBloom + 0.005f), summary);
+            Assert.That(crescent, Is.GreaterThanOrEqualTo(crescentNoBloom - 0.005f), summary);
+            // The crescent stays well above the night side. Measured 3.45 times (realistic 5.7): the difference is
+            // A-05's lifted night side and night rim (ART_DIRECTION.md section 3), not the bloom.
+            Assert.That(crescent, Is.GreaterThan(3f * night), summary);
+        }
+
         [UnityTest]
         public IEnumerator NoSurfaceExceedsTheBrightnessCap()
         {

@@ -122,7 +122,7 @@ namespace UniverseSim.Unity
                 var go = new GameObject("Rings of " + system.Planet.Info.Name);
                 go.transform.SetParent(transform, false);
                 system.Transform = go.transform;
-                system.Mesh = BuildAnnulus(system.InnerFraction);
+                system.Mesh = BuildAnnulus(system.InnerFraction, segments);
                 go.AddComponent<MeshFilter>().sharedMesh = system.Mesh;
                 system.Renderer = go.AddComponent<MeshRenderer>();
                 system.Renderer.sharedMaterial = ringMaterial;
@@ -153,8 +153,46 @@ namespace UniverseSim.Unity
             return texture;
         }
 
-        // A flat annulus in the XZ plane from innerFraction to 1, double-sided through the shader (Cull Off).
-        private Mesh BuildAnnulus(float innerFraction)
+        /// <summary>
+        /// True when a ring system is drawn and at least <paramref name="minPixels"/> across its outer radius on the
+        /// screen of <paramref name="cam"/>, at least partly on screen (for the "what is exaggerated" panel, A-03).
+        /// </summary>
+        public bool IsShown(Camera cam, float minPixels)
+        {
+            if (!Visible)
+            {
+                return false;
+            }
+            var focalPixels = 0.5f * cam.pixelHeight / Mathf.Tan(0.5f * cam.fieldOfView * Mathf.Deg2Rad);
+            foreach (var system in systems)
+            {
+                if (!system.Renderer.enabled)
+                {
+                    continue;
+                }
+                var center = system.Transform.position;
+                var outer = system.Transform.lossyScale.x;
+                var distance = Vector3.Distance(center, cam.transform.position);
+                if (distance <= 2f * outer)
+                {
+                    return true;
+                }
+                var p = cam.WorldToScreenPoint(center);
+                var r = SphereLods.PixelRadius(outer, distance, focalPixels);
+                if (p.z > 0f && r >= minPixels && p.x > -r && p.x < cam.pixelWidth + r && p.y > -r &&
+                    p.y < cam.pixelHeight + r)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// A flat annulus in the XZ plane from <paramref name="innerFraction"/> to radius 1, in
+        /// <paramref name="segments"/> around, double-sided through the shader (Cull Off).
+        /// </summary>
+        public static Mesh BuildAnnulus(float innerFraction, int segments)
         {
             var vertices = new Vector3[2 * (segments + 1)];
             var indices = new int[6 * segments];

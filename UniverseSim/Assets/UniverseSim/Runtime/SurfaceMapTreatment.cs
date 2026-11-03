@@ -15,6 +15,8 @@ namespace UniverseSim.Unity
     {
         [SerializeField] private SimulationHost host;
         [SerializeField] private VisualStyleSettings style;
+        [Tooltip("The effects tier (A-13): the smoothing is drawn at the high tier only.")]
+        [SerializeField] private EffectsQuality quality;
 
         // Display choices from docs/ART_DIRECTION.md.
         [Tooltip("Kuwahara radius in texels of the mip it reads (0 = no smoothing).")]
@@ -39,10 +41,14 @@ namespace UniverseSim.Unity
         /// <summary>The global <c>_UsimMapGrade</c> value of the look (for SurfaceMapTreatmentTests).</summary>
         public Vector4 GradeParameters => new Vector4(saturation - 1f, contrast - 1f, contrastPivot, 0f);
 
+        // The smoothing reads many texels per pixel, the costliest part of the treatment (A-13).
+        private bool Smoothing => quality == null || quality.Tier == EffectsTier.High;
+
         public IReadOnlyList<Exaggeration> Exaggerations => exaggerations ??= new[]
         {
             new Exaggeration("Surface maps",
-                             "colors more vivid, shadows lifted and fine detail smoothed into patches; " +
+                             (Smoothing ? "colors more vivid, shadows lifted and fine detail smoothed into patches; "
+                                        : "colors more vivid and shadows lifted; ") +
                              "each color keeps its hue",
                              $"saturation x{saturation.ToString("0.0", CultureInfo.InvariantCulture)}, " +
                              $"contrast {contrast.ToString("0.0#", CultureInfo.InvariantCulture)}"),
@@ -69,6 +75,10 @@ namespace UniverseSim.Unity
         private void OnEnable()
         {
             style.Changed += OnStyleChanged;
+            if (quality != null)
+            {
+                quality.Changed += OnTierChanged;
+            }
             Apply();
         }
 
@@ -78,6 +88,16 @@ namespace UniverseSim.Unity
             {
                 style.Changed -= OnStyleChanged;
             }
+            if (quality != null)
+            {
+                quality.Changed -= OnTierChanged;
+            }
+            Apply();
+        }
+
+        private void OnTierChanged(EffectsTier _)
+        {
+            exaggerations = null;
             Apply();
         }
 
@@ -95,7 +115,7 @@ namespace UniverseSim.Unity
         private void Apply()
         {
             var on = Applied;
-            Shader.SetGlobalVector(PaintId, on ? PaintParameters : Vector4.zero);
+            Shader.SetGlobalVector(PaintId, on && Smoothing ? PaintParameters : Vector4.zero);
             Shader.SetGlobalVector(GradeId, on ? GradeParameters : Vector4.zero);
         }
     }

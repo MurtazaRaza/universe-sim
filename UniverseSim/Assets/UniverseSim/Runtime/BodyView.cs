@@ -52,6 +52,9 @@ namespace UniverseSim.Unity
         /// <summary>The sphere level drawn (0 is the finest; see <see cref="SphereLods"/>), or -1 without a mesh.</summary>
         public int LodLevel { get; private set; } = -1;
 
+        /// <summary>True when the body's sphere is drawn (it has a radius and the latest snapshot gave a position).</summary>
+        public bool IsDrawn => meshRenderer != null && meshRenderer.enabled;
+
         private Texture ringProfile;
         private float ringInnerFraction;
         private double ringOuterKm;

@@ -9,11 +9,17 @@ namespace UniverseSim.Unity
 {
     /// <summary>
     /// The spaceship of the stylized style (ADR-0016, SPEC FR-REN-16): a fictional craft that carries the camera.
-    /// It flies freely near any body, travels to another in seconds, and descends to hover over a point of a body's
-    /// reference surface. Every fact it shows comes from the core: where bodies are, the distance and light time, a
-    /// two-body transfer estimate of the real trip, and at a surface point the horizon, the Sun, the gravity and the
-    /// length of the day. The ship itself is a display object: not in the catalog, never moving the clock or anything
-    /// the core computes, drawn at a fixed size on screen, and gone in the realistic style.
+    /// It flies freely near any body, travels to another in seconds, and goes down over a point of a body's reference
+    /// surface: it lands where the core says the surface is solid, stops at its lowest hover height where it is a
+    /// pressure level in the atmosphere, and hovers where the data does not say (ADR-0017). Every fact it shows comes
+    /// from the core: where bodies are, the distance and light time, a two-body transfer estimate of the real trip,
+    /// and at a surface point the horizon, the Sun, the gravity, the length of the day and the surface conditions.
+    /// The ship itself is a display object: not in the catalog, never moving the clock or anything the core computes,
+    /// drawn at a fixed size on screen, and gone in the realistic style.
+    ///
+    /// Near a surface the view is lowered onto the drawn sphere, which lies inside the true ellipsoid by up to a few
+    /// kilometers between its vertices (<see cref="SphereMesh.DrawnRadiusFraction"/>), so a landed ship rests on the
+    /// ground as drawn. The ship's position, and every value shown, stay those of the reference surface.
     ///
     /// Like the camera rig, it keeps its position in double precision relative to a body center (its anchor, the
     /// nearest body), in host axes and the ECLIPJ2000 frame. Its motion is navigation, not physics: no gravity acts on
@@ -31,6 +37,8 @@ namespace UniverseSim.Unity
             Descending,
             Hovering,
             Ascending,
+            /// <summary>Resting on solid ground (a body whose reference surface is solid, ADR-0017).</summary>
+            Landed,
         }
 
         [SerializeField] private SimulationHost host;
@@ -39,6 +47,8 @@ namespace UniverseSim.Unity
         [SerializeField] private InputActionAsset actions;
         [SerializeField] private UIDocument hud;
         [SerializeField] private Material shipMaterial;
+        [SerializeField] private Material shadowMaterial;
+        [SerializeField] private StylizedSky sky;
 
         // Display choices (docs/ART_DIRECTION.md), not physical values.
         [Header("Look")]
@@ -46,6 +56,14 @@ namespace UniverseSim.Unity
         [SerializeField] private float shipSize = 0.075f;
         [SerializeField] private float chaseDistance = 0.32f;
         [SerializeField] private float chaseHeight = 0.07f;
+        [Tooltip("In flight the view looks down at the ship by this much more than its heading, so its top shows.")]
+        [SerializeField, Range(0f, 20f)] private float chasePitchDegrees = 8f;
+        [Tooltip("How much of the sky's daytime color lights the ship under a sky, at its full strength.")]
+        [SerializeField, Range(0f, 1f)] private float skyFill = 0.45f;
+        [Tooltip("Darkening of the ground right under a landed ship, at its center.")]
+        [SerializeField, Range(0f, 1f)] private float contactShade = 0.8f;
+        [Tooltip("Height above the ground, in ship lengths, at which the contact shade is gone.")]
+        [SerializeField] private float contactShadeLengths = 1.2f;
 
         [Header("Flight (navigation, not physics)")]
         [Tooltip("Cruise speed in heights per second: the ship covers its own height above the surface below it.")]
@@ -53,6 +71,11 @@ namespace UniverseSim.Unity
         [SerializeField] private double boostFactor = 8.0;
         [SerializeField] private float turnDegreesPerSecond = 70f;
         [SerializeField] private float steerDegreesPerPixel = 0.15f;
+        [Tooltip("Mouse steering (ADR-0019): the pointer's offset from the view's center, in half its shorter side, " +
+                 "below which the ship flies straight, the offset of the fastest turn, and that turn's rate.")]
+        [SerializeField, Range(0f, 0.5f)] private float mouseDeadZone = 0.12f;
+        [SerializeField, Range(0.2f, 1.5f)] private float mouseFullTurn = 0.85f;
+        [SerializeField] private float mouseTurnDegreesPerSecond = 60f;
         [Tooltip("Closest approach to a reference surface, km (the camera rig's limit is 1 km).")]
         [SerializeField] private double minAltitudeKm = 2.0;
 
@@ -69,6 +92,9 @@ namespace UniverseSim.Unity
                  "surface map, high enough that the drawn sphere's facets stay far below.")]
         [SerializeField] private double hoverFraction = 0.01;
         [SerializeField] private double maxHoverFraction = 0.5;
+        [Tooltip("Near solid ground, the view's km per render unit is at least this, so the camera stays about " +
+                 "chaseHeight times it (1 km) above the ground, like the camera rig: below that float rounding shows.")]
+        [SerializeField] private double landedKmPerUnit = 15.0;
 
         private const int BodyKindStar = 1; // usim::catalog::BodyKind
 
@@ -76,6 +102,9 @@ namespace UniverseSim.Unity
         private GameObject model;
         private Material material;
         private Mesh mesh;
+        private MeshRenderer shadowRenderer;
+        private Material shadow;
+        private Mesh shadowQuad;
         private Exaggeration[] exaggerations;
         private readonly List<int> candidates = new List<int>();
 
@@ -101,6 +130,13 @@ namespace UniverseSim.Unity
         private float viewYawDegrees, viewPitchDegrees = 12f;
         private float nextConditions;
 
+        // Landing (ADR-0017): whether the current descent ends on the ground, and whether the ship is near it (landing,
+        // landed or lifting off), which sets the view's smallest scale.
+        private bool landing, nearGround;
+        private double viewFloorKmPerUnit = 1.0;
+        // How far the view is lowered onto the drawn sphere, km, eased in and out with the surface modes.
+        private double drawnCorrectionKm, correctionWeight;
+
         // This frame's camera pose.
         private Double3 poseOffsetKm;
         private double poseKmPerUnit = 1.0;
@@ -108,9 +144,26 @@ namespace UniverseSim.Unity
         private static readonly int LightDirectionId = Shader.PropertyToID("_LightDirection");
         private static readonly int SunlitId = Shader.PropertyToID("_Sunlit");
         private static readonly int EngineGlowId = Shader.PropertyToID("_EngineGlow");
+        private static readonly int SkyLightId = Shader.PropertyToID("_SkyLight");
+        private static readonly int SkyUpId = Shader.PropertyToID("_SkyUp");
+        private static readonly int StrengthId = Shader.PropertyToID("_Strength");
+
+        // The contact shade's quad, in ship lengths: wider and longer than the ship's footprint, so the soft edge shows
+        // around it from the chase camera.
+        private const float ShadeHalfWidth = 0.85f;
+        private const float ShadeHalfLength = 0.9f;
 
         /// <summary>What the ship is doing.</summary>
         public Mode State { get; private set; } = Mode.Off;
+
+        /// <summary>Whether the pointer steers the flying ship without a button held. Tests turn it off.</summary>
+        public static bool MouseSteering = true;
+
+        /// <summary>This frame's mouse steering, -1 to 1 per axis (zero when the mouse is not steering), for the HUD.</summary>
+        public Vector2 Steering { get; private set; }
+
+        /// <summary>The mouse's dead zone and full-turn offset, in half the view's shorter side (for the HUD's reticle).</summary>
+        public Vector2 SteeringZone => new Vector2(mouseDeadZone, mouseFullTurn);
 
         /// <summary>True while the ship is out (any mode but <see cref="Mode.Off"/>).</summary>
         public bool Active => State != Mode.Off;
@@ -163,6 +216,18 @@ namespace UniverseSim.Unity
         /// <summary>True when the anchor has what a site needs: a radius and a rotation model.</summary>
         public bool CanDescend => Sim != null && anchor >= 0 && Sim.Bodies[anchor].HasMeanRadius && Sim.Bodies[anchor].HasRotation;
 
+        /// <summary>
+        /// What the anchor's reference surface is (NativeConstants.Surface*, from the core, ADR-0017): where the ship
+        /// lands, stops above a pressure level, or hovers.
+        /// </summary>
+        public int SurfaceKind => Sim != null && anchor >= 0 ? Sim.SurfaceKind(anchor) : NativeConstants.SurfaceUnknown;
+
+        /// <summary>How far the drawn sphere lies below the reference surface at the site, km (a display correction).</summary>
+        public double DrawnSurfaceDepthKm { get; private set; }
+
+        /// <summary>The height above the reference surface where a landed ship rests: its lowest point on the ground, km.</summary>
+        public double LandedAltitudeKm => Math.Max(-mesh.bounds.min.y * shipSize * landedKmPerUnit, 0.01);
+
         /// <summary>Raised when <see cref="State"/> changes.</summary>
         public event Action<Mode> ModeChanged;
 
@@ -205,6 +270,29 @@ namespace UniverseSim.Unity
                 renderer.sharedMaterial = material;
             }
             model.SetActive(false);
+
+            // The contact shade on the ground under a landed ship: a quad in the ship's ground plane.
+            if (shadowMaterial != null)
+            {
+                shadowQuad = new Mesh { name = "Spaceship contact shade" };
+                shadowQuad.SetVertices(new[]
+                {
+                    new Vector3(-ShadeHalfWidth, 0f, -ShadeHalfLength), new Vector3(-ShadeHalfWidth, 0f, ShadeHalfLength),
+                    new Vector3(ShadeHalfWidth, 0f, ShadeHalfLength), new Vector3(ShadeHalfWidth, 0f, -ShadeHalfLength),
+                });
+                shadowQuad.SetUVs(0, new[] { new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f) });
+                shadowQuad.SetTriangles(new[] { 0, 1, 2, 0, 2, 3 }, 0);
+                shadowQuad.RecalculateBounds();
+                var shade = new GameObject("Spaceship contact shade");
+                shade.transform.SetParent(transform, false);
+                shade.AddComponent<MeshFilter>().sharedMesh = shadowQuad;
+                shadowRenderer = shade.AddComponent<MeshRenderer>();
+                shadowRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                shadowRenderer.receiveShadows = false;
+                shadow = new Material(shadowMaterial) { name = "Spaceship contact shade (runtime)" };
+                shadowRenderer.sharedMaterial = shadow;
+                shadowRenderer.enabled = false;
+            }
         }
 
         private void OnEnable()
@@ -234,6 +322,14 @@ namespace UniverseSim.Unity
             {
                 Destroy(mesh);
             }
+            if (shadow != null)
+            {
+                Destroy(shadow);
+            }
+            if (shadowQuad != null)
+            {
+                Destroy(shadowQuad);
+            }
         }
 
         // The ship belongs to the stylized style; switching to the realistic one lands the camera back on the rig.
@@ -262,6 +358,10 @@ namespace UniverseSim.Unity
                 {
                     model.SetActive(false);
                 }
+                if (shadowRenderer != null)
+                {
+                    shadowRenderer.enabled = false;
+                }
                 SetMode(Mode.Off);
                 return;
             }
@@ -284,12 +384,15 @@ namespace UniverseSim.Unity
                     shipKm += startRelative;
                 }
             }
-            shipRotation = rig.transform.rotation;
-            viewRotation = shipRotation;
+            viewRotation = rig.transform.rotation;
+            shipRotation = viewRotation * Quaternion.Euler(-chasePitchDegrees, 0f, 0f);
             speedKmS = 0.0;
             bank = 0f;
             HasSite = false;
             HasDay = false;
+            landing = nearGround = false;
+            viewFloorKmPerUnit = 1.0;
+            correctionWeight = 0.0;
             UpdateAltitude();
             model.SetActive(true);
             rig.Pilot = this;
@@ -327,6 +430,7 @@ namespace UniverseSim.Unity
             }
             HasSite = false;
             HasDay = false;
+            landing = nearGround = false;
             travelFromKm = shipKm;
             travelArriveKm = Math.Max(arrivalRadii * Sim.Bodies[index].MaxRadiusKm,
                                       Sim.Bodies[index].MaxRadiusKm + minAltitudeKm);
@@ -339,7 +443,10 @@ namespace UniverseSim.Unity
             SetMode(Mode.Traveling);
         }
 
-        /// <summary>Goes down to hover over the point of the anchor's reference surface below the ship.</summary>
+        /// <summary>
+        /// Goes down over the point of the anchor's reference surface below the ship: to land on solid ground, to the
+        /// lowest hover height above a pressure level, or to hover where the data does not say what the surface is.
+        /// </summary>
         public void Descend()
         {
             if (!(State == Mode.Flying || State == Mode.Ascending) || !CanDescend || !TrySiteBelow(shipKm, out var below))
@@ -348,7 +455,12 @@ namespace UniverseSim.Unity
             }
             siteLatitudeRad = below.LatitudeRad;
             siteLongitudeRad = below.LongitudeRad;
-            hoverAltitudeKm = Math.Max(minAltitudeKm, hoverFraction * Sim.Bodies[anchor].MeanRadiusKm);
+            var kind = SurfaceKind;
+            landing = kind == NativeConstants.SurfaceSolid;
+            nearGround = landing;
+            hoverAltitudeKm = landing ? LandedAltitudeKm
+                : kind == NativeConstants.SurfacePressureLevel ? minAltitudeKm
+                : Math.Max(minAltitudeKm, hoverFraction * Sim.Bodies[anchor].MeanRadiusKm);
             descendFromKm = Math.Max(below.AltitudeKm, hoverAltitudeKm);
             siteAltitudeKm = descendFromKm;
             var forward = Double3.From(shipRotation * Vector3.forward);
@@ -363,13 +475,14 @@ namespace UniverseSim.Unity
             SetMode(Mode.Descending);
         }
 
-        /// <summary>Climbs from hovering back to free flight, about one radius up.</summary>
+        /// <summary>Climbs from the ground or from hovering back to free flight, about one radius up.</summary>
         public void LiftOff()
         {
-            if (!(State == Mode.Hovering || State == Mode.Descending))
+            if (!(State == Mode.Hovering || State == Mode.Descending || State == Mode.Landed))
             {
                 return;
             }
+            landing = false;
             descendFromKm = siteAltitudeKm;
             hoverAltitudeKm = Math.Max(Sim.Bodies[anchor].MeanRadiusKm, siteAltitudeKm);
             verticalStart = Time.unscaledTime;
@@ -398,7 +511,10 @@ namespace UniverseSim.Unity
             ModeChanged?.Invoke(mode);
         }
 
-        private bool Typing => hud != null && hud.rootVisualElement?.focusController?.focusedElement is TextField;
+        private bool Typing => HudKeyboard.Typing(hud);
+
+        // The view in flight: the ship's heading, looking down at it a little more so its top shows.
+        private Quaternion ChaseView => shipRotation * Quaternion.Euler(chasePitchDegrees, 0f, 0f);
 
         private void Update()
         {
@@ -418,7 +534,7 @@ namespace UniverseSim.Unity
                 }
                 if (Active && land.WasPressedThisFrame())
                 {
-                    if (State == Mode.Hovering || State == Mode.Descending)
+                    if (State == Mode.Hovering || State == Mode.Descending || State == Mode.Landed)
                     {
                         LiftOff();
                     }
@@ -434,6 +550,7 @@ namespace UniverseSim.Unity
             }
 
             var dt = Time.unscaledDeltaTime;
+            Steering = Vector2.zero; // set by Fly
             switch (State)
             {
                 case Mode.Flying:
@@ -449,8 +566,11 @@ namespace UniverseSim.Unity
                 case Mode.Hovering:
                     Hover(dt);
                     break;
+                case Mode.Landed:
+                    Rest(dt);
+                    break;
             }
-            UpdatePose();
+            UpdatePose(dt);
         }
 
         private void LateUpdate()
@@ -473,7 +593,48 @@ namespace UniverseSim.Unity
                 var glow = State == Mode.Traveling ? 0.35f + 0.65f * Mathf.Sin(Mathf.PI * TravelProgress)
                     : 0.25f + 0.75f * Mathf.Clamp01((float)(Math.Abs(speedKmS) / cruise));
                 material.SetFloat(EngineGlowId, glow);
+
+                // Under a sky (StylizedSky), its daytime hue lights the ship, as it lights the scene around it.
+                var skyLight = Vector4.zero;
+                var up = shipRotation * Vector3.up;
+                if (sky != null && sky.Strength > 0f)
+                {
+                    var hue = sky.DayColor.linear * (sky.Strength * sky.Daylight * skyFill);
+                    skyLight = new Vector4(hue.r, hue.g, hue.b, 0f);
+                    up = sky.Up;
+                }
+                material.SetVector(SkyLightId, skyLight);
+                material.SetVector(SkyUpId, up);
             }
+            PlaceContactShade(t);
+        }
+
+        // The contact shade on the ground under a ship on solid ground (landing, landed or lifting off): straight
+        // below its lowest point, in the plane of the local horizon, fading out as the ship rises.
+        private void PlaceContactShade(Transform ship)
+        {
+            if (shadowRenderer == null)
+            {
+                return;
+            }
+            var strength = 0f;
+            if (nearGround && (State == Mode.Descending || State == Mode.Landed || State == Mode.Ascending))
+            {
+                var lengthKm = shipSize * poseKmPerUnit;
+                var aboveGroundKm = Math.Max(siteAltitudeKm - LandedAltitudeKm, 0.0);
+                strength = contactShade * (1f - Mathf.SmoothStep(0f, 1f, (float)(aboveGroundKm / (contactShadeLengths * lengthKm))));
+            }
+            shadowRenderer.enabled = strength > 1e-3f;
+            if (!shadowRenderer.enabled)
+            {
+                return;
+            }
+            // The ship's center is the site's height above the ground as drawn (the view is lowered onto the drawn
+            // sphere); the shade lies there, level with the horizon (the ship's rotation without its bank).
+            var below = ship.position - shipRotation * Vector3.up * (float)(siteAltitudeKm / poseKmPerUnit);
+            shadowRenderer.transform.SetPositionAndRotation(below, shipRotation);
+            shadowRenderer.transform.localScale = Vector3.one * shipSize;
+            shadow.SetFloat(StrengthId, strength);
         }
 
         // ---- Modes ----
@@ -482,6 +643,35 @@ namespace UniverseSim.Unity
         {
             steering = drag.IsPressed() && !PointerOverUi();
             return steering ? look.ReadValue<Vector2>() : Vector2.zero;
+        }
+
+        /// <summary>
+        /// Mouse steering while flying (ADR-0019 decision 2): the pointer's offset from the center of the view, in
+        /// half the view's shorter side, past a dead zone and eased (squared), as -1 to 1 per axis. Zero while the
+        /// pointer is over the HUD or outside the window, while dragging (which steers instead), while typing, without
+        /// a mouse, and when <see cref="MouseSteering"/> is off.
+        /// </summary>
+        private Vector2 MouseStick()
+        {
+            if (!MouseSteering || Typing || Mouse.current == null || !Application.isFocused || drag.IsPressed())
+            {
+                return Vector2.zero;
+            }
+            var screen = point.ReadValue<Vector2>();
+            if (screen.x <= 1f || screen.y <= 1f || screen.x >= Screen.width - 1f || screen.y >= Screen.height - 1f ||
+                PointerOverUi())
+            {
+                return Vector2.zero;
+            }
+            var half = 0.5f * new Vector2(Screen.width, Screen.height);
+            var offset = (screen - half) / Mathf.Max(Mathf.Min(half.x, half.y), 1f);
+            var length = offset.magnitude;
+            if (length <= mouseDeadZone)
+            {
+                return Vector2.zero;
+            }
+            var s = Mathf.Clamp01((length - mouseDeadZone) / Mathf.Max(mouseFullTurn - mouseDeadZone, 1e-3f));
+            return offset / length * (s * s);
         }
 
         private bool PointerOverUi()
@@ -501,10 +691,14 @@ namespace UniverseSim.Unity
             var input = Typing ? Vector2.zero : move.ReadValue<Vector2>();
             var vertical = Typing ? 0f : moveVertical.ReadValue<float>();
             var steer = SteerInput(out _);
+            var stick = MouseStick();
+            Steering = stick;
 
-            // Turn: A and D yaw, Q and E pitch, dragging steers; the ship banks into turns.
-            var yaw = input.x * turnDegreesPerSecond * dt + steer.x * steerDegreesPerPixel;
-            var pitch = -vertical * turnDegreesPerSecond * dt - steer.y * steerDegreesPerPixel;
+            // Turn: A and D yaw, Q and E pitch, the mouse or a drag steers; the ship banks into turns.
+            var yaw = input.x * turnDegreesPerSecond * dt + steer.x * steerDegreesPerPixel +
+                      stick.x * mouseTurnDegreesPerSecond * dt;
+            var pitch = -vertical * turnDegreesPerSecond * dt - steer.y * steerDegreesPerPixel -
+                        stick.y * mouseTurnDegreesPerSecond * dt;
             shipRotation = shipRotation * Quaternion.AngleAxis(yaw, Vector3.up) * Quaternion.AngleAxis(pitch, Vector3.right);
             // Level the wings slowly to the local vertical (away from the anchor's center).
             var forward = shipRotation * Vector3.forward;
@@ -513,7 +707,7 @@ namespace UniverseSim.Unity
             {
                 shipRotation = Quaternion.Slerp(shipRotation, Quaternion.LookRotation(forward, up), 1f - Mathf.Exp(-dt / 1.5f));
             }
-            bank = Mathf.Lerp(bank, -Mathf.Clamp(input.x + steer.x * 0.05f, -1f, 1f) * 30f, 1f - Mathf.Exp(-dt / 0.25f));
+            bank = Mathf.Lerp(bank, -Mathf.Clamp(input.x + steer.x * 0.05f + stick.x, -1f, 1f) * 30f, 1f - Mathf.Exp(-dt / 0.25f));
 
             // Thrust: a cruise speed that scales with the height above the surface, eased in and out.
             var target = input.y * cruisePerSecond * Math.Max(altitudeKm, minAltitudeKm) * (boost.IsPressed() ? boostFactor : 1.0);
@@ -527,7 +721,7 @@ namespace UniverseSim.Unity
                 speedKmS = Math.Min(speedKmS, 0.0);
                 UpdateAltitude();
             }
-            viewRotation = Quaternion.Slerp(viewRotation, shipRotation, 1f - Mathf.Exp(-dt / 0.2f));
+            viewRotation = Quaternion.Slerp(viewRotation, ChaseView, 1f - Mathf.Exp(-dt / 0.2f));
 
             if (Time.unscaledTime >= nextReanchor)
             {
@@ -550,7 +744,7 @@ namespace UniverseSim.Unity
             var up = Mathf.Abs(Vector3.Dot(toward, Vector3.up)) < 0.98f ? Vector3.up : Vector3.forward;
             shipRotation = Quaternion.Slerp(travelStartRotation, Quaternion.LookRotation(toward, up),
                                             Mathf.SmoothStep(0f, 1f, s / 0.2f));
-            viewRotation = Quaternion.Slerp(viewRotation, shipRotation, 1f - Mathf.Exp(-Time.unscaledDeltaTime / 0.25f));
+            viewRotation = Quaternion.Slerp(viewRotation, ChaseView, 1f - Mathf.Exp(-Time.unscaledDeltaTime / 0.25f));
             bank = Mathf.Lerp(bank, 0f, 0.1f);
             speedKmS = 0.0;
             UpdateAltitude();
@@ -567,22 +761,37 @@ namespace UniverseSim.Unity
             siteAltitudeKm = Math.Exp(Math.Log(descendFromKm) + (Math.Log(hoverAltitudeKm) - Math.Log(descendFromKm)) * eased);
             PlaceAtSite();
             var hover = shipRotation * Quaternion.Euler(viewPitchDegrees, viewYawDegrees, 0f);
-            viewRotation = Quaternion.Slerp(viewRotation, State == Mode.Ascending ? shipRotation : hover,
+            viewRotation = Quaternion.Slerp(viewRotation, State == Mode.Ascending ? ChaseView : hover,
                                             1f - Mathf.Exp(-Time.unscaledDeltaTime / 0.4f));
             if (s >= 1f)
             {
                 if (State == Mode.Descending)
                 {
-                    SetMode(Mode.Hovering);
+                    SetMode(landing ? Mode.Landed : Mode.Hovering);
                 }
                 else
                 {
                     // Free flight from here, pitched up away from the surface.
                     shipRotation *= Quaternion.AngleAxis(-25f, Vector3.right);
                     HasSite = false;
+                    nearGround = false;
                     SetMode(Mode.Flying);
                 }
             }
+        }
+
+        // On the ground: A and D turn the ship in place, dragging looks around; L lifts off.
+        private void Rest(float dt)
+        {
+            var input = Typing ? Vector2.zero : move.ReadValue<Vector2>();
+            var steer = SteerInput(out _);
+            headingRad += input.x * turnDegreesPerSecond * Mathf.Deg2Rad * dt;
+            viewYawDegrees += steer.x * steerDegreesPerPixel * 2f;
+            viewPitchDegrees = Mathf.Clamp(viewPitchDegrees - steer.y * steerDegreesPerPixel * 2f, -45f, 75f);
+            PlaceAtSite();
+            viewRotation = shipRotation * Quaternion.Euler(viewPitchDegrees, viewYawDegrees, 0f);
+            bank = Mathf.Lerp(bank, 0f, 1f - Mathf.Exp(-dt / 0.25f));
+            speedKmS = 0.0;
         }
 
         private void Hover(float dt)
@@ -594,6 +803,10 @@ namespace UniverseSim.Unity
 
             // Height: Q and E or the scroll wheel, on a log scale, between the closest approach and half a radius.
             var scroll = PointerOverUi() ? 0f : zoom.ReadValue<float>();
+            if (Typing && Mathf.Abs(scroll) <= 2f)
+            {
+                scroll = 0f; // the minus and equals keys, not the wheel
+            }
             var climb = vertical * dt * 1.2 + (Mathf.Abs(scroll) > 2f ? scroll * 0.0025 : scroll * 2.0 * dt);
             siteAltitudeKm = Math.Clamp(siteAltitudeKm * Math.Exp(climb), minAltitudeKm, Math.Max(minAltitudeKm, maxHoverFraction * radius));
 
@@ -628,6 +841,7 @@ namespace UniverseSim.Unity
             }
             shipKm = Double3.From(site.PositionKm);
             altitudeKm = siteAltitudeKm;
+            DrawnSurfaceDepthKm = DrawnDepthKm(site);
             var north = Double3.From(site.North);
             var east = Double3.From(site.East);
             var forward = (north * Math.Cos(headingRad) + east * Math.Sin(headingRad)).ToVector3();
@@ -642,18 +856,48 @@ namespace UniverseSim.Unity
             }
         }
 
+        // How far below the reference surface at `site` the anchor's sphere is drawn, km: the mesh lies inside the
+        // ellipsoid between its vertices (SphereMesh.DrawnRadiusFraction). Display geometry only.
+        private double DrawnDepthKm(in UsimSurfaceSite site)
+        {
+            var view = host.Views[anchor];
+            var scale = view.transform.localScale;
+            if (view.LodLevel < 0 || scale.x <= 0f || scale.y <= 0f || scale.z <= 0f)
+            {
+                return 0.0;
+            }
+            var direction = Quaternion.Inverse(view.transform.rotation) * Double3.From(site.PositionKm).Normalized.ToVector3();
+            var local = new Double3(direction.x / scale.x, direction.y / scale.y, direction.z / scale.z);
+            var fraction = SphereMesh.DrawnRadiusFraction(local, SphereLods.Segments[view.LodLevel], view.SurfaceMap != null,
+                                                          host.Request.Axes);
+            return (1.0 - fraction) * site.SurfaceRadiusKm;
+        }
+
         // ---- Helpers ----
 
-        private void UpdatePose()
+        private void UpdatePose(float dt = 0f)
         {
             if (anchor < 0)
             {
                 return;
             }
             // One render unit is the ship's height above the surface, so the surface is about one unit away and the
-            // ship, a third of a unit ahead, never meets it.
-            poseKmPerUnit = Math.Max(altitudeKm, 1.0);
-            poseOffsetKm = shipKm + Double3.From(viewRotation * new Vector3(0f, chaseHeight, -chaseDistance)) * poseKmPerUnit;
+            // ship, a third of a unit ahead, never meets it. Near solid ground the scale stays at landedKmPerUnit or
+            // more, so the camera stays about a kilometer up; the change is eased so the view does not jump.
+            var ease = dt > 0f ? 1.0 - Math.Exp(-dt / 0.5) : 1.0;
+            viewFloorKmPerUnit += ((nearGround ? landedKmPerUnit : 1.0) - viewFloorKmPerUnit) * ease;
+            poseKmPerUnit = Math.Max(altitudeKm, viewFloorKmPerUnit);
+            // In the surface modes the view is lowered onto the drawn sphere below the site, eased in and out.
+            var surfaceMode = State == Mode.Descending || State == Mode.Hovering || State == Mode.Ascending ||
+                              State == Mode.Landed;
+            correctionWeight += ((surfaceMode ? 1.0 : 0.0) - correctionWeight) * ease;
+            if (surfaceMode)
+            {
+                drawnCorrectionKm = DrawnSurfaceDepthKm;
+            }
+            var down = shipKm.Length > 0.0 ? shipKm.Normalized * -(drawnCorrectionKm * correctionWeight) : default;
+            poseOffsetKm = shipKm + down +
+                           Double3.From(viewRotation * new Vector3(0f, chaseHeight, -chaseDistance)) * poseKmPerUnit;
         }
 
         private void UpdateAltitude()

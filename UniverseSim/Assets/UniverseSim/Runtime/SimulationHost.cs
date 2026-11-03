@@ -31,6 +31,10 @@ namespace UniverseSim.Unity
         [SerializeField] private TextAsset surfaceMapManifest;
         [SerializeField] private Texture2D[] surfaceMapTextures = Array.Empty<Texture2D>();
 
+        [Tooltip("Sky cues (A-07, B-06, ADR-0018): Data/SkyCues.json, the sourced hues of skies and twilight. Set by " +
+                 "the scene builder.")]
+        [SerializeField] private TextAsset skyCueManifest;
+
         [Tooltip("Start at the current UTC time (UC-01). Otherwise the clock starts at J2000.")]
         [SerializeField] private bool startAtNow = true;
 
@@ -67,6 +71,9 @@ namespace UniverseSim.Unity
 
         /// <summary>The surface maps of the bodies that have one (P6-07).</summary>
         public SurfaceMaps SurfaceMaps { get; private set; } = SurfaceMaps.None;
+
+        /// <summary>The sourced sky and twilight hues of the bodies that have them (ADR-0018).</summary>
+        public SkyCues SkyCues { get; private set; } = SkyCues.None;
 
         /// <summary>Raised once the pack is loaded and the views exist.</summary>
         public event Action Loaded;
@@ -133,6 +140,7 @@ namespace UniverseSim.Unity
             // with the same ratios (every sphere) share one set of meshes.
             var mapped = new Dictionary<(double, double), SphereLods>();
             SurfaceMaps = SurfaceMaps.Parse(surfaceMapManifest != null ? surfaceMapManifest.text : null, surfaceMapTextures);
+            SkyCues = SkyCues.Parse(skyCueManifest != null ? skyCueManifest.text : null);
             var parent = new GameObject("Bodies").transform;
             parent.SetParent(transform, false);
             foreach (var body in Simulation.Bodies)

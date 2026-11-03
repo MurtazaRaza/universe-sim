@@ -31,6 +31,7 @@ namespace UniverseSim.Unity
         private Label status, note;
         private Button travelButton, landButton, leaveButton;
         private ScrollView facts;
+        private VisualElement steer, steerCenter, steerDot;
         private readonly List<Label> rows = new List<Label>();
         private int used;
         private float nextRefresh;
@@ -47,6 +48,9 @@ namespace UniverseSim.Unity
             }
         }
 
+        /// <summary>The text of the land button: "Land (L)", "Descend (L)" or "Lift off (L)" (for tests).</summary>
+        public string LandButtonText => landButton != null ? landButton.text : string.Empty;
+
         private CoreSimulation Sim => host != null ? host.Simulation : null;
 
         private void OnEnable()
@@ -62,6 +66,9 @@ namespace UniverseSim.Unity
             landButton = root.Q<Button>("ship-land");
             leaveButton = root.Q<Button>("ship-leave");
             facts = root.Q<ScrollView>("ship-facts");
+            steer = root.Q<VisualElement>("steer");
+            steerCenter = root.Q<VisualElement>("steer-center");
+            steerDot = root.Q<VisualElement>("steer-dot");
             toggleShip.tooltip = "The spaceship belongs to the stylized style.";
 
             toggleShip.RegisterValueChangedCallback(e => pilot.SetActive(e.newValue));
@@ -97,12 +104,57 @@ namespace UniverseSim.Unity
 
         private void LateUpdate()
         {
+            PlaceSteering();
             if (Sim == null || Time.unscaledTime < nextRefresh)
             {
                 return;
             }
             nextRefresh = Time.unscaledTime + refreshSeconds;
             Refresh();
+        }
+
+        // The mouse steering's reticle (ADR-0019 decision 2): a ring for the dead zone at the view's center and a dot
+        // toward the pointer that grows as the turn does. Shown while the ship flies with mouse steering on.
+        private void PlaceSteering()
+        {
+            if (steer == null)
+            {
+                return;
+            }
+            var shown = pilot.Active && pilot.State == ShipPilot.Mode.Flying && ShipPilot.MouseSteering &&
+                        steer.panel != null;
+            var display = shown ? DisplayStyle.Flex : DisplayStyle.None;
+            if (steer.style.display != display)
+            {
+                steer.style.display = display;
+            }
+            if (!shown)
+            {
+                return;
+            }
+            var panelSize = steer.panel.visualTree.layout.size;
+            var half = 0.5f * Mathf.Min(panelSize.x, panelSize.y);
+            var zone = pilot.SteeringZone;
+            var ring = Mathf.Max(zone.x * half, 6f);
+            if (!(steerCenter.userData is float sized) || Mathf.Abs(sized - ring) > 0.5f)
+            {
+                steerCenter.userData = ring;
+                steerCenter.style.width = 2f * ring;
+                steerCenter.style.height = 2f * ring;
+                steerCenter.style.borderTopLeftRadius = ring;
+                steerCenter.style.borderTopRightRadius = ring;
+                steerCenter.style.borderBottomLeftRadius = ring;
+                steerCenter.style.borderBottomRightRadius = ring;
+                steerCenter.style.translate = new Translate(-ring, -ring);
+            }
+            // The dot sits where the turn points, from the dead zone's edge out to the full-turn offset (screen y is up,
+            // panel y is down).
+            var s = pilot.Steering;
+            var amount = Mathf.Sqrt(Mathf.Clamp01(s.magnitude));
+            var reach = (zone.x + (zone.y - zone.x) * amount) * half;
+            var direction = s.sqrMagnitude > 0f ? s.normalized : Vector2.zero;
+            steerDot.style.translate = new Translate(direction.x * reach - 4f, -direction.y * reach - 4f);
+            steerDot.style.opacity = s.sqrMagnitude > 0f ? 0.35f + 0.65f * amount : 0f;
         }
 
         /// <summary>Updates the toggle and the panel now (also done ten times a second).</summary>
@@ -132,21 +184,27 @@ namespace UniverseSim.Unity
                                             $"{(100f * pilot.TravelProgress).ToString("0", CultureInfo.InvariantCulture)} %",
                 ShipPilot.Mode.Descending => $"Descending toward {anchorName}",
                 ShipPilot.Mode.Hovering => $"Hovering {Distance(pilot.AltitudeKm)} above {anchorName}",
+                ShipPilot.Mode.Landed => $"Landed on {anchorName}",
                 ShipPilot.Mode.Ascending => $"Climbing away from {anchorName}",
                 _ => $"Near {anchorName}, {Distance(Math.Max(pilot.AltitudeKm, 0.0))} up",
             };
 
             var selected = rig.SelectedIndex;
             var canTravel = selected >= 0 && selected < Sim.Bodies.Count && Sim.Bodies[selected].HasMeanRadius &&
-                            (pilot.State == ShipPilot.Mode.Flying || pilot.State == ShipPilot.Mode.Hovering);
+                            (pilot.State == ShipPilot.Mode.Flying || pilot.State == ShipPilot.Mode.Hovering ||
+                             pilot.State == ShipPilot.Mode.Landed);
             travelButton.text = canTravel ? $"Travel to {Sim.Bodies[selected].Name} (T)" : "Travel (T): select a body";
             travelButton.SetEnabled(canTravel && (selected != pilot.AnchorIndex || pilot.State == ShipPilot.Mode.Flying));
-            var down = pilot.State == ShipPilot.Mode.Hovering || pilot.State == ShipPilot.Mode.Descending;
-            landButton.text = down ? "Lift off (L)" : "Descend (L)";
+            var down = pilot.State == ShipPilot.Mode.Hovering || pilot.State == ShipPilot.Mode.Descending ||
+                       pilot.State == ShipPilot.Mode.Landed;
+            // Land on solid ground; descend elsewhere (ADR-0017).
+            landButton.text = down ? "Lift off (L)"
+                : pilot.CanDescend && pilot.SurfaceKind == NativeConstants.SurfaceSolid ? "Land (L)" : "Descend (L)";
             landButton.SetEnabled(down || (pilot.State == ShipPilot.Mode.Flying && pilot.CanDescend));
 
             used = 0;
-            if (pilot.State == ShipPilot.Mode.Descending || pilot.State == ShipPilot.Mode.Hovering)
+            if (pilot.State == ShipPilot.Mode.Descending || pilot.State == ShipPilot.Mode.Hovering ||
+                pilot.State == ShipPilot.Mode.Landed)
             {
                 AddSurface(anchor);
             }
@@ -156,8 +214,9 @@ namespace UniverseSim.Unity
             }
             else
             {
-                Row("value", "W and S thrust, A and D turn, Q and E pitch, drag to steer, Shift to boost. Select a body " +
-                             "and press T to fly there, or L to descend to the surface below.");
+                Row("value", "W and S thrust, Shift to boost. Move the mouse away from the center to steer (or A and D " +
+                             "to turn, Q and E to pitch). Select a body and press T to fly there, or L to go down to the " +
+                             "surface below: you land where it is solid ground.");
             }
             for (var i = used; i < rows.Count; ++i)
             {
@@ -272,10 +331,124 @@ namespace UniverseSim.Unity
                 Row("value-source", "From the rotation model's mean rate and the orbit around the Sun; rotation: " +
                                     (string.IsNullOrEmpty(body.RotationSourceId) ? "-" : body.RotationSourceId) + ".");
             }
-            Row("value-name", "Not yet in the data");
-            Row("value-source", "Surface temperature and pressure, and whether the reference surface is solid ground or " +
-                                "cloud tops. The sky is drawn without an atmosphere.");
+            AddConditions(body);
         }
+
+        // ---- Surface conditions (core: usim_body_surface_kind and the SURF quantities, ADR-0017) ----
+
+        // Unit definitions for display only (NIST Special Publication 811, Appendix B.8): T/K = t/degC + 273.15, and
+        // 1 bar = 100 000 Pa. The core keeps kelvins and pascals.
+        private const double KelvinAtZeroCelsius = 273.15;
+        private const double PascalsPerBar = 100000.0;
+
+        private void AddConditions(BodyInfo body)
+        {
+            var kind = Sim.SurfaceKind(body.Index);
+            var temperature = Sim.Quantity(body.Index, NativeConstants.FieldMeanTemperature);
+            var pressure = Sim.Quantity(body.Index, NativeConstants.FieldSurfacePressure);
+            var level = Sim.Quantity(body.Index, NativeConstants.FieldReferencePressure);
+            Row("value-name", "Surface");
+            switch (kind)
+            {
+                case NativeConstants.SurfaceSolid:
+                    Row("value", pilot.State == ShipPilot.Mode.Landed
+                                     ? "Solid ground: the ship has landed on it."
+                                     : "Solid ground: press L to land.");
+                    Row("value-source", Cited(pressure) + "; it gives a pressure at the surface.");
+                    break;
+                case NativeConstants.SurfacePressureLevel:
+                    Row("value", $"No solid surface here: the reference surface is the {Bars(level.Value)} level of the " +
+                                 "atmosphere, where the radii are measured. The ship stays above it.");
+                    Row("value-source", Cited(level));
+                    break;
+                default:
+                    Row("value", "Not in the data: whether the reference surface is solid ground. The ship hovers.");
+                    break;
+            }
+            if (temperature.HasValue)
+            {
+                Row("value-name", "Mean temperature");
+                var where = kind == NativeConstants.SurfacePressureLevel ? "at that level" : "over the whole surface";
+                Row("value", $"{Celsius(temperature.Value)}, averaged {where}, day and night: not the temperature here");
+                Row("value-source", Cited(temperature));
+            }
+            if (pressure.HasValue)
+            {
+                Row("value-name", "Surface pressure");
+                Row("value", pressure.Value > 0.0
+                                 ? $"{Bars(pressure.Value)} ({pressure.Value.ToString("N0", CultureInfo.InvariantCulture)} Pa)"
+                                 : "0 bar in the source's table");
+                Row("value-source", Cited(pressure));
+            }
+            AddAtmosphere(body);
+            if (!temperature.HasValue)
+            {
+                Row("value-name", "Not yet in the data");
+                Row("value-source", "Surface temperature and pressure for this body.");
+            }
+        }
+
+        // ---- Atmosphere and sky (core: usim_body_atmosphere; sky cues: Data/SkyCues.json, ADR-0018) ----
+
+        private void AddAtmosphere(BodyInfo body)
+        {
+            Row("value-name", "Atmosphere");
+            switch (Sim.Atmosphere(body.Index))
+            {
+                case NativeConstants.AtmospherePresent:
+                    Row("value", "Yes, from the pressures above. Near the ground the sky brightens by day.");
+                    AddSkyCue(body, SkyCues.DaytimeSky, "Sky by day",
+                              "Not in the data: the sky is drawn in a neutral gray.");
+                    AddSkyCue(body, SkyCues.Twilight, "Twilight", null);
+                    break;
+                case NativeConstants.AtmosphereNone:
+                    Row("value", "None at the source's precision (0 bar in its table): the sky stays black.");
+                    break;
+                default:
+                    Row("value", "Not in the data: whether this body has an atmosphere. The sky is drawn without one.");
+                    break;
+            }
+        }
+
+        private void AddSkyCue(BodyInfo body, string cue, string name, string missing)
+        {
+            if (host.SkyCues.TryGet(body.Id.Value, cue, out var info))
+            {
+                Row("value-name", name);
+                Row("value", cue == SkyCues.Twilight
+                                 ? $"{Capitalized(info.HueName)} near a low Sun and along the limb at the terminator."
+                                 : Capitalized(info.HueName) + ".");
+                Row("value-source", info.Citation);
+            }
+            else if (missing != null)
+            {
+                Row("value-name", name);
+                Row("value", missing);
+            }
+        }
+
+        // A value's source, its tier when it is a Tier 2 compilation (DATA_SOURCES.md section 1), and where in it.
+        private string Cited(QuantityInfo q)
+        {
+            var tier = string.Empty;
+            foreach (var s in Sim.Sources)
+            {
+                if (s.Id == q.SourceId && s.Tier == 2)
+                {
+                    tier = " (Tier 2)";
+                }
+            }
+            return $"{q.SourceId}{tier}: {q.Locator}";
+        }
+
+        /// <summary>A temperature in degrees Celsius with its kelvins: "-65 °C (208.15 K)".</summary>
+        public static string Celsius(double kelvin) =>
+            (kelvin - KelvinAtZeroCelsius).ToString("0.#", CultureInfo.InvariantCulture) + " °C (" +
+            kelvin.ToString("0.##", CultureInfo.InvariantCulture) + " K)";
+
+        /// <summary>A pressure in bars, to the source's digits: "92 bar", "0.01 bar", "0.00001 bar".</summary>
+        public static string Bars(double pascals) =>
+            (pascals / PascalsPerBar).ToString("0.#########", CultureInfo.InvariantCulture) + " bar";
 
         private string SourceOf(BodyInfo body, params int[] fields)
         {

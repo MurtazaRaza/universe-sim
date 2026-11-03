@@ -1,7 +1,14 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="UniverseSimHud.uss" />
     <ui:VisualElement name="root" class="root" picking-mode="Ignore">
+        <ui:VisualElement name="rings" class="rings" picking-mode="Ignore" />
         <ui:VisualElement name="labels" class="labels" picking-mode="Ignore" />
+
+        <!-- The mouse steering's reticle at the view's center (ADR-0019): moved by ShipHud. -->
+        <ui:VisualElement name="steer" class="steer" picking-mode="Ignore">
+            <ui:VisualElement name="steer-center" class="steer-center" picking-mode="Ignore" />
+            <ui:VisualElement name="steer-dot" class="steer-dot" picking-mode="Ignore" />
+        </ui:VisualElement>
 
         <ui:VisualElement name="top-bar" class="bar top-bar" picking-mode="Ignore">
             <ui:VisualElement class="clock" picking-mode="Ignore">
@@ -9,6 +16,7 @@
                 <ui:Label name="time-secondary" class="time-secondary" text="-" picking-mode="Ignore" />
             </ui:VisualElement>
             <ui:VisualElement class="spacer" picking-mode="Ignore" />
+            <ui:Button name="logbook-toggle" class="logbook-toggle" text="Logbook (J)" />
             <ui:VisualElement class="status" picking-mode="Ignore">
                 <ui:VisualElement class="indicators" picking-mode="Ignore">
                     <ui:Label name="style-indicator" class="style-indicator" text="Stylized style" picking-mode="Ignore" />
@@ -19,6 +27,14 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- Arrival banner and toasts (LogbookHud). -->
+        <ui:VisualElement name="arrival" class="arrival" picking-mode="Ignore">
+            <ui:Label name="arrival-title" class="arrival-title" picking-mode="Ignore" />
+            <ui:Label name="arrival-subtitle" class="arrival-subtitle" picking-mode="Ignore" />
+            <ui:Label name="arrival-fact" class="arrival-fact" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="toasts" class="toasts" picking-mode="Ignore" />
+
         <ui:VisualElement name="exaggerations" class="panel exaggerations-panel">
             <ui:Button name="exaggerations-toggle" class="exaggerations-toggle" text="What is exaggerated?" />
             <ui:VisualElement name="exaggerations-list" class="exaggerations-list" />
@@ -28,7 +44,11 @@
             <ui:Label name="info-title" class="title" text="-" />
             <ui:Label name="info-kind" class="subtitle" />
             <ui:Label name="info-warning" class="warning" />
-            <ui:ScrollView name="info-values" class="values" />
+            <ui:ScrollView name="info-values" class="values">
+                <ui:Label name="info-facts-title" class="section-title" text="What it's like here" />
+                <ui:VisualElement name="info-facts" class="facts" />
+                <ui:Foldout name="info-data" class="data-foldout" text="Data and sources" value="false" />
+            </ui:ScrollView>
             <ui:VisualElement class="row">
                 <ui:Button name="info-focus" text="Focus" />
             </ui:VisualElement>
@@ -46,18 +66,29 @@
             <ui:ScrollView name="ship-facts" class="values" />
         </ui:VisualElement>
 
+        <ui:VisualElement name="logbook-panel" class="panel logbook-panel">
+            <ui:Label class="title" text="Logbook" />
+            <ui:Label name="logbook-progress" class="subtitle" text="-" />
+            <ui:ScrollView name="logbook-goals" class="values" />
+            <ui:VisualElement class="row">
+                <ui:Button name="logbook-reset" text="Start over" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
         <ui:VisualElement name="bottom-bar" class="bar bottom-bar">
             <ui:VisualElement class="row time-controls">
-                <ui:Button name="slower" text="Slower" />
-                <ui:Button name="reverse" text="Reverse" />
                 <ui:Button name="play-pause" text="Pause" />
-                <ui:Button name="faster" text="Faster" />
+                <ui:SliderInt name="rate-slider" label="Speed" class="rate-slider" low-value="0" high-value="13" />
                 <ui:Label name="rate" class="rate" text="-" />
+                <ui:Label class="hint" text="Hold Tab to rush" picking-mode="Ignore" />
+                <ui:Slider name="timeline" label="Timeline" class="timeline" low-value="0" high-value="1" />
+                <ui:Label name="timeline-year" class="rate" text="-" />
+                <ui:Button name="set-date" text="Set date" />
+                <ui:Button name="now" text="Now" />
             </ui:VisualElement>
-            <ui:VisualElement class="row">
+            <ui:VisualElement name="date-row" class="row date-row">
                 <ui:TextField name="date-entry" class="date-entry" />
                 <ui:Button name="go" text="Go" />
-                <ui:Button name="now" text="Now" />
                 <ui:Label name="date-error" class="warning" />
             </ui:VisualElement>
             <ui:VisualElement class="row">
@@ -69,6 +100,8 @@
                 <ui:Toggle name="toggle-realistic" label="Realistic style" />
                 <ui:Toggle name="toggle-fly" label="Free fly (F)" />
                 <ui:Toggle name="toggle-ship" label="Spaceship (V)" />
+                <ui:Toggle name="toggle-sound" label="Sound (M)" value="true" />
+                <ui:Toggle name="toggle-music" label="Music" value="true" />
                 <ui:VisualElement class="spacer" picking-mode="Ignore" />
                 <ui:Label name="star-credit" class="coverage credit" picking-mode="Ignore" />
             </ui:VisualElement>

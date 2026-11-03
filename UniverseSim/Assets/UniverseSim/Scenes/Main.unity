@@ -269,17 +269,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0eef5a790ee0443b584735c7009a21e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.CameraRig
-  host: {fileID: 588033432}
+  host: {fileID: 831108910}
   actions: {fileID: -944628639613478452, guid: 81a8323b84f624cbda044e818594d743, type: 3}
-  hud: {fileID: 1130597470}
+  hud: {fileID: 805056118}
   minAltitudeKm: 1
   maxDistanceKm: 100000000000
   compressionDistance: 10000
   orbitDegreesPerPixel: 0.2
   zoomPerScrollUnit: 0.0025
-  transitionSeconds: 1.5
+  flightMinSeconds: 0.9
+  flightSecondsPerDecade: 0.45
+  flightMaxSeconds: 3
+  zoomEaseSeconds: 0.08
   clickPickPixels: 24
---- !u!1 &588033429
+--- !u!1 &805056114
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -287,16 +290,142 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 588033437}
-  - component: {fileID: 588033431}
-  - component: {fileID: 588033432}
-  - component: {fileID: 588033438}
-  - component: {fileID: 588033439}
-  - component: {fileID: 588033436}
-  - component: {fileID: 588033435}
-  - component: {fileID: 588033434}
-  - component: {fileID: 588033430}
-  - component: {fileID: 588033433}
+  - component: {fileID: 805056119}
+  - component: {fileID: 805056118}
+  - component: {fileID: 805056117}
+  - component: {fileID: 805056116}
+  - component: {fileID: 805056115}
+  m_Layer: 0
+  m_Name: HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &805056115
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 805056114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68744f67b2ce4143815895cbc570c979, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.LogbookHud
+  host: {fileID: 831108910}
+  rig: {fileID: 330585548}
+  ship: {fileID: 831108905}
+  logbook: {fileID: 831108904}
+  start: {fileID: 831108903}
+  actions: {fileID: -944628639613478452, guid: 81a8323b84f624cbda044e818594d743, type: 3}
+  toastSeconds: 4.5
+  arrivalSeconds: 5
+--- !u!114 &805056116
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 805056114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9294254715d44598a08e459a88ed8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.ShipHud
+  host: {fileID: 831108910}
+  rig: {fileID: 330585548}
+  pilot: {fileID: 831108905}
+  refreshSeconds: 0.1
+--- !u!114 &805056117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 805056114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b13d6b643eacf4e4bb4522e233b0c6c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.HudController
+  host: {fileID: 831108910}
+  rig: {fileID: 330585548}
+  orbitLines: {fileID: 831108923}
+  starField: {fileID: 1106914839}
+  style: {fileID: 831108909}
+  exaggerationRegister: {fileID: 831108911}
+  quality: {fileID: 831108908}
+  actions: {fileID: -944628639613478452, guid: 81a8323b84f624cbda044e818594d743, type: 3}
+  textRefreshSeconds: 0.1
+--- !u!114 &805056118
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 805056114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: a10862f56ab114ac6ab5e9bbfabc5d05, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: ce55132458bf84b0cbeff88d1e59aeb0, type: 3}
+  m_SortingOrder: 0
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &805056119
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 805056114}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &831108902
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 831108922}
+  - component: {fileID: 831108909}
+  - component: {fileID: 831108908}
+  - component: {fileID: 831108910}
+  - component: {fileID: 831108923}
+  - component: {fileID: 831108916}
+  - component: {fileID: 831108921}
+  - component: {fileID: 831108920}
+  - component: {fileID: 831108919}
+  - component: {fileID: 831108918}
+  - component: {fileID: 831108917}
+  - component: {fileID: 831108915}
+  - component: {fileID: 831108914}
+  - component: {fileID: 831108907}
+  - component: {fileID: 831108906}
+  - component: {fileID: 831108905}
+  - component: {fileID: 831108913}
+  - component: {fileID: 831108912}
+  - component: {fileID: 831108903}
+  - component: {fileID: 831108904}
+  - component: {fileID: 831108911}
   m_Layer: 0
   m_Name: UniverseSim
   m_TagString: Untagged
@@ -304,31 +433,74 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &588033430
+--- !u!114 &831108903
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79ab053b65b24e29be536b37165fbdf8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StartExperience
+  host: {fileID: 831108910}
+  rig: {fileID: 330585548}
+  ship: {fileID: 831108905}
+  startRadii: 8
+  turnDegrees: 25
+  raiseDegrees: 12
+--- !u!114 &831108904
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 862d9a93aa084ebe9e2b5be9d33fcc3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.Logbook
+  host: {fileID: 831108910}
+  rig: {fileID: 330585548}
+  ship: {fileID: 831108905}
+  checkSeconds: 0.25
+--- !u!114 &831108905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f1bd2e1e1573da448bbd7601c9fc4ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.ShipPilot
-  host: {fileID: 588033432}
+  host: {fileID: 831108910}
   rig: {fileID: 330585548}
-  style: {fileID: 588033431}
+  style: {fileID: 831108909}
   actions: {fileID: -944628639613478452, guid: 81a8323b84f624cbda044e818594d743, type: 3}
-  hud: {fileID: 1130597470}
+  hud: {fileID: 805056118}
   shipMaterial: {fileID: 2100000, guid: 1f3f29229d3472e468866a2f3fe5659a, type: 2}
+  shadowMaterial: {fileID: 2100000, guid: af58a20b7f6040c48a3cfca7101e61f3, type: 2}
+  sky: {fileID: 831108906}
   shipSize: 0.075
   chaseDistance: 0.32
   chaseHeight: 0.07
+  chasePitchDegrees: 8
+  skyFill: 0.45
+  contactShade: 0.8
+  contactShadeLengths: 1.2
   cruisePerSecond: 0.6
   boostFactor: 8
   turnDegreesPerSecond: 70
   steerDegreesPerPixel: 0.15
+  mouseDeadZone: 0.12
+  mouseFullTurn: 0.85
+  mouseTurnDegreesPerSecond: 60
   minAltitudeKm: 2
   travelMinSeconds: 4
   travelMaxSeconds: 14
@@ -336,25 +508,128 @@ MonoBehaviour:
   arrivalRadii: 3
   hoverFraction: 0.01
   maxHoverFraction: 0.5
---- !u!114 &588033431
+  landedKmPerUnit: 15
+--- !u!114 &831108906
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60020d9c47a4e5643a94d929de130d42, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedSky
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  host: {fileID: 831108910}
+  atmospheres: {fileID: 831108907}
+  skyMaterial: {fileID: 2100000, guid: 4464786754bf72b43ac870454e735e67, type: 2}
+  opacity: 0.97
+  faintestPressurePa: 1
+  fullAfterDecades: 3
+--- !u!114 &831108907
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac6f5f45226b7df48958bf010e63a43e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedAtmospheres
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  host: {fileID: 831108910}
+  haloMaterial: {fileID: 2100000, guid: 856931d84ea75d74f9e0da6c90dfaf95, type: 2}
+  intensity: 2.1
+  thickness: 0.12
+  falloff: 2.2
+  discReach: 16
+  twilight: 0.6
+  styles:
+  - naifId: 299
+    outer: {r: 1, g: 0.88, b: 0.62, a: 1}
+    core: {r: 1, g: 0.95, b: 0.82, a: 1}
+    thickness: 0.6
+    intensity: 0.6
+  - naifId: 399
+    outer: {r: 0.2, g: 0.45, b: 1, a: 1}
+    core: {r: 0.55, g: 0.8, b: 1, a: 1}
+    thickness: 1
+    intensity: 1
+  - naifId: 499
+    outer: {r: 0.85, g: 0.8, b: 0.8, a: 1}
+    core: {r: 0.95, g: 0.9, b: 0.85, a: 1}
+    thickness: 0.5
+    intensity: 0.35
+  - naifId: 599
+    outer: {r: 1, g: 0.85, b: 0.65, a: 1}
+    core: {r: 1, g: 0.95, b: 0.85, a: 1}
+    thickness: 0.5
+    intensity: 0.55
+  - naifId: 699
+    outer: {r: 1, g: 0.88, b: 0.62, a: 1}
+    core: {r: 1, g: 0.95, b: 0.85, a: 1}
+    thickness: 0.5
+    intensity: 0.45
+  - naifId: 799
+    outer: {r: 0.55, g: 0.85, b: 0.95, a: 1}
+    core: {r: 0.8, g: 0.95, b: 1, a: 1}
+    thickness: 0.5
+    intensity: 0.45
+  - naifId: 899
+    outer: {r: 0.3, g: 0.5, b: 1, a: 1}
+    core: {r: 0.6, g: 0.75, b: 1, a: 1}
+    thickness: 0.5
+    intensity: 0.5
+  - naifId: 999
+    outer: {r: 0.35, g: 0.55, b: 1, a: 1}
+    core: {r: 0.6, g: 0.75, b: 1, a: 1}
+    thickness: 0.35
+    intensity: 0.3
+  fallback:
+    naifId: 0
+    outer: {r: 0.8, g: 0.85, b: 0.95, a: 1}
+    core: {r: 0.92, g: 0.94, b: 1, a: 1}
+    thickness: 0.4
+    intensity: 0.4
+  minPixels: 2
+--- !u!114 &831108908
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cc7db081bfe65543b2dc25c294bcd68, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.EffectsQuality
+  targetFramesPerSecond: 60
+--- !u!114 &831108909
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f0a7fbf3ee1024419920c6c6ebcf5237, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.VisualStyleSettings
---- !u!114 &588033432
+--- !u!114 &831108910
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bc011a4441a254de6a1ed2a4ed4e9780, type: 3}
@@ -384,38 +659,199 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 765b70bf66b724ef58af5bf20a647842, type: 3}
   - {fileID: 2800000, guid: 3b6ba801adf4b4af9917d80a404a49ab, type: 3}
   - {fileID: 2800000, guid: a2029965523174fc99852b19e34afb79, type: 3}
+  skyCueManifest: {fileID: 4900000, guid: 7192fc52b38c32b41ad90414b2510b1d, type: 3}
   startAtNow: 1
   lodTolerancePixels: 0.5
---- !u!114 &588033433
+--- !u!114 &831108911
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a911529a6279b47afb9488e989df1526, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.ExaggerationRegister
   effects:
-  - {fileID: 588033436}
-  - {fileID: 588033435}
-  - {fileID: 588033434}
-  - {fileID: 588033430}
---- !u!114 &588033434
+  - {fileID: 831108921}
+  - {fileID: 831108920}
+  - {fileID: 831108919}
+  - {fileID: 831108918}
+  - {fileID: 831108917}
+  - {fileID: 831108915}
+  - {fileID: 831108914}
+  - {fileID: 831108913}
+  - {fileID: 831108905}
+  - {fileID: 831108907}
+  - {fileID: 831108906}
+  - {fileID: 831108912}
+--- !u!114 &831108912
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce921b8129743d4952e0c820a51dd8c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.SpeedCues
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  ship: {fileID: 831108905}
+  streakMaterial: {fileID: 2100000, guid: 9600e7ff4e508b0419f1cf5773a05843, type: 2}
+  streakCount: 180
+  extraFieldOfView: 9
+  paceStart: 1.2
+  paceFull: 4.5
+  tripStrength: 1
+  streakColor: {r: 0.75, g: 0.85, b: 1, a: 1}
+--- !u!114 &831108913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a02d7807dd478d4baa627cc1c02db7d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedLabels
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  hud: {fileID: 805056118}
+--- !u!114 &831108914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 278db19b93627984e9634b1f71d9e737, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedOrbitLines
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  orbitLines: {fileID: 831108923}
+  halfWidthPixels: 1.3
+  planet: {r: 0.4, g: 0.72, b: 1, a: 0.8}
+  dwarfPlanet: {r: 0.78, g: 0.6, b: 1, a: 0.8}
+  moon: {r: 0.4, g: 0.92, b: 0.8, a: 0.65}
+  approximate: {r: 1, g: 0.62, b: 0.28, a: 0.8}
+  fadeTo: 0.25
+  focusBoost: 1.35
+  otherLines: 0.75
+  dashPoints: 8
+  dashDrawn: 0.6
+--- !u!114 &831108915
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59f6342b62414584ba96ae33d45ef669, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedRings
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  rings: {fileID: 831108916}
+  sparse: {r: 0.7, g: 0.58, b: 0.45, a: 1}
+  dense: {r: 1, g: 0.9, b: 0.68, a: 1}
+  denseAt: 2
+  opacityGain: 1.5
+  brightness: 1.2
+--- !u!114 &831108916
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1fd139fa291f4e429a7367adb6ec73b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.RingSystems
+  host: {fileID: 831108910}
+  ringMaterial: {fileID: 2100000, guid: 73b72f12c204347bfa4f09bb7bd9880e, type: 2}
+  profileResolution: 4096
+  segments: 720
+--- !u!114 &831108917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf0af528e08a93448b3cbeb2022ad28a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedStars
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  starField: {fileID: 1106914839}
+  exposure: 1.9
+  size: 1.5
+  sparkleStrength: 0.8
+  sparkleFrom: 0.9
+  sparkleReach: 5
+--- !u!114 &831108918
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00f606d12e5127444bdd1926d4f87a4c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedSun
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
+  host: {fileID: 831108910}
+  glowMaterial: {fileID: 2100000, guid: 93c9e17837f697745bb3fc7d22bafce2, type: 2}
+  diskColor: {r: 1, g: 0.93, b: 0.8, a: 1}
+  diskIntensity: 4
+  coronaStrength: 1.6
+  coronaReach: 4
+  coronaFalloff: 2.2
+  coronaColor: {r: 1, g: 0.78, b: 0.48, a: 1}
+  haloStrength: 0.9
+  haloScale: 0.5
+  haloMinPixels: 4
+  haloMaxPixels: 16
+  rayStrength: 0.8
+  rayScale: 3
+  rayMinPixels: 12
+  rayMaxPixels: 90
+  rayCount: 6
+  raySharpness: 48
+  glareColor: {r: 1, g: 0.9, b: 0.72, a: 1}
+--- !u!114 &831108919
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 782aa1254fd2443758ab96959531ad83, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedCamera
-  style: {fileID: 588033431}
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
   bloomIntensity: 0.9
   bloomThreshold: 1.33
   bloomScatter: 0.7
@@ -424,39 +860,40 @@ MonoBehaviour:
   vignette: 0.3
   vignetteSmoothness: 0.5
   sky: {r: 0.02, g: 0.02, b: 0.06, a: 1}
---- !u!114 &588033435
+--- !u!114 &831108920
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 305ece743172d467d966c73f14ab6f19, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.SurfaceMapTreatment
-  host: {fileID: 588033432}
-  style: {fileID: 588033431}
+  host: {fileID: 831108910}
+  style: {fileID: 831108909}
+  quality: {fileID: 831108908}
   paintRadius: 1.5
   paintLevel: 1
   saturation: 1.6
   contrast: 0.9
   contrastPivot: 0.4
---- !u!114 &588033436
+--- !u!114 &831108921
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ec11dcb3f64834092b96d36f0c3964f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StylizedBodyShading
-  host: {fileID: 588033432}
-  style: {fileID: 588033431}
+  host: {fileID: 831108910}
+  style: {fileID: 831108909}
   dayCurve: 2.2
   lightTint: {r: 1.1, g: 1.04, b: 0.95, a: 1}
   shadeTint: {r: 0.75, g: 0.8, b: 1.05, a: 1}
@@ -471,56 +908,41 @@ MonoBehaviour:
   nightRimPower: 3.5
   nightRimColor: {r: 0.35, g: 0.65, b: 1, a: 1}
   brightnessCap: 0.95
---- !u!4 &588033437
+--- !u!4 &831108922
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1581535828}
+  - {fileID: 1106914840}
+  - {fileID: 2131234162}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &588033438
+--- !u!114 &831108923
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
+  m_GameObject: {fileID: 831108902}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1924cabcde2a24f71a1a4e7ac695eeb0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.OrbitLines
-  host: {fileID: 588033432}
+  host: {fileID: 831108910}
   lineMaterial: {fileID: 2100000, guid: a21088fcef0574b1582e20c4f7ae4925, type: 2}
   color: {r: 0.45, g: 0.6, b: 0.85, a: 0.55}
   approximateColor: {r: 0.9, g: 0.65, b: 0.3, a: 0.55}
   moonColor: {r: 0.55, g: 0.7, b: 0.75, a: 0.4}
   moonMinPixels: 10
---- !u!114 &588033439
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 588033429}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c1fd139fa291f4e429a7367adb6ec73b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.RingSystems
-  host: {fileID: 588033432}
-  ringMaterial: {fileID: 2100000, guid: 73b72f12c204347bfa4f09bb7bd9880e, type: 2}
-  profileResolution: 4096
-  segments: 720
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -570,7 +992,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1130597467
+--- !u!1 &1106914838
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -578,101 +1000,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1130597471}
-  - component: {fileID: 1130597470}
-  - component: {fileID: 1130597469}
-  - component: {fileID: 1130597468}
-  m_Layer: 0
-  m_Name: HUD
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1130597468
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1130597467}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2b9294254715d44598a08e459a88ed8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.ShipHud
-  host: {fileID: 588033432}
-  rig: {fileID: 330585548}
-  pilot: {fileID: 588033430}
-  refreshSeconds: 0.1
---- !u!114 &1130597469
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1130597467}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b13d6b643eacf4e4bb4522e233b0c6c8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.HudController
-  host: {fileID: 588033432}
-  rig: {fileID: 330585548}
-  orbitLines: {fileID: 588033438}
-  starField: {fileID: 1581535827}
-  style: {fileID: 588033431}
-  exaggerationRegister: {fileID: 588033433}
-  actions: {fileID: -944628639613478452, guid: 81a8323b84f624cbda044e818594d743, type: 3}
-  textRefreshSeconds: 0.1
---- !u!114 &1130597470
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1130597467}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
-  m_PanelSettings: {fileID: 11400000, guid: a10862f56ab114ac6ab5e9bbfabc5d05, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 9197481963319205126, guid: ce55132458bf84b0cbeff88d1e59aeb0, type: 3}
-  m_SortingOrder: 0
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 1920
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 0
-  m_Pivot: 0
-  m_WorldSpaceCollider: {fileID: 0}
---- !u!4 &1130597471
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1130597467}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1581535826
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1581535828}
-  - component: {fileID: 1581535827}
+  - component: {fileID: 1106914840}
+  - component: {fileID: 1106914839}
   m_Layer: 0
   m_Name: Star field
   m_TagString: Untagged
@@ -680,43 +1009,194 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1581535827
+--- !u!114 &1106914839
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1581535826}
+  m_GameObject: {fileID: 1106914838}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8afbc995ea0e54bd5a1ce160c2107811, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.StarField
-  host: {fileID: 588033432}
+  host: {fileID: 831108910}
   starFieldMaterial: {fileID: 2100000, guid: 4e6ba5aa915894f3a813a529d5436277, type: 2}
   skyDistance: 200000
   faintestMagnitude: 6.5
   refreshDays: 365.25
---- !u!4 &1581535828
+--- !u!4 &1106914840
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1581535826}
+  m_GameObject: {fileID: 1106914838}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 588033437}
+  m_Father: {fileID: 831108922}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2131234161
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2131234162}
+  - component: {fileID: 2131234164}
+  - component: {fileID: 2131234163}
+  m_Layer: 0
+  m_Name: Sound
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2131234162
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2131234161}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 831108922}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2131234163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2131234161}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2fc62ab74953429ab77418a9dca51642, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UniverseSim.Unity::UniverseSim.Unity.SoundScape
+  ship: {fileID: 831108905}
+  rig: {fileID: 330585548}
+  logbook: {fileID: 831108904}
+  hud: {fileID: 805056118}
+  actions: {fileID: -944628639613478452, guid: 81a8323b84f624cbda044e818594d743, type: 3}
+  master: 0.8
+  music: 0.5
+  engine: 0.7
+  interfaceSounds: 0.7
+--- !u!82 &2131234164
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2131234161}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 330585546}
   - {fileID: 832575519}
-  - {fileID: 588033437}
-  - {fileID: 1130597471}
+  - {fileID: 831108922}
+  - {fileID: 805056119}

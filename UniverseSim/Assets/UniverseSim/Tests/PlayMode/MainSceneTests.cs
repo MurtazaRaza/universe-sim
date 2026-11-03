@@ -188,6 +188,17 @@ namespace UniverseSim.Unity.Tests.PlayMode
             yield return Screenshot("12-moon-from-earth");
             yield return JumpAlong(jupiter, Sim.Bodies[jupiter].MaxRadiusKm * 3.0, host.Views[jupiter].LightDirection);
             yield return Screenshot("13-jupiter-sunlit");
+
+            // The Sun up close, and a crescent Moon with the Sun in the same view (A-08).
+            rig.JumpTo(sun, Sim.Bodies[sun].MaxRadiusKm * 8.0, 0.4, 0.2);
+            rig.Select(sun);
+            yield return Frames(3);
+            yield return Screenshot("14-sun");
+            var light = ((Vector3)host.Views[moon].LightDirection).normalized;
+            var side = Vector3.Cross(light, Vector3.up).normalized;
+            yield return JumpAlong(moon, Sim.Bodies[moon].MaxRadiusKm * 3.0,
+                                   light * Mathf.Cos(150f * Mathf.Deg2Rad) + side * Mathf.Sin(150f * Mathf.Deg2Rad));
+            yield return Screenshot("15-moon-crescent-and-sun");
         }
 
         // Places the camera on the side of a body that `direction` (render space, host axes) points to, the
@@ -248,7 +259,10 @@ namespace UniverseSim.Unity.Tests.PlayMode
             // A focus change flies to the new body and ends four radii from its center (UC-04).
             var earth = Index(399);
             rig.Focus(earth);
-            yield return new WaitForSecondsRealtime(1.8f);
+            // The flight's length depends on the distance it covers (A-12): wait for it to end.
+            Assert.That(rig.Transitioning);
+            yield return new WaitForSecondsRealtime(rig.FlightSeconds + 0.3f);
+            Assert.That(rig.Transitioning, Is.False);
             Assert.That(host.Request.Center.Value, Is.EqualTo(399));
             var radius = Sim.Bodies[earth].MaxRadiusKm;
             Assert.That(rig.OffsetKm.Length, Is.EqualTo(radius * 4.0).Within(radius * 1e-6));

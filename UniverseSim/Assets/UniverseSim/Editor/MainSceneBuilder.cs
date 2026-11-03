@@ -13,9 +13,11 @@ namespace UniverseSim.Unity.Editor
 {
     /// <summary>
     /// Composes the main scene (Phase 5) from the project's assets: the visual style setting, the simulation
-    /// host, the camera rig, orbit lines, the star field, the rings, the style effects with their register (A-03),
-    /// the spaceship (ADR-0016) and the HUD, with their materials and panel settings. Running it again rebuilds the same scene, so the
-    /// scene file never needs hand edits. Menu: UniverseSim > Build Main Scene; batch:
+    /// host, the camera rig, orbit lines, the star field, the rings, the style effects with their register (A-03:
+    /// body shading, map treatment, camera, Sun, stars, rings, orbit lines, labels, atmospheres, sky), the spaceship
+    /// (ADR-0016), the sky cues (ADR-0018), the play components of ADR-0019 (speed cues, the start near the Earth, the
+    /// logbook, the sound) and the HUD, with their materials and panel settings. Running it again rebuilds the same scene, so the scene file never
+    /// needs hand edits. Menu: UniverseSim > Build Main Scene; batch:
     /// -executeMethod UniverseSim.Unity.Editor.MainSceneBuilder.Build
     /// </summary>
     public static class MainSceneBuilder
@@ -35,6 +37,11 @@ namespace UniverseSim.Unity.Editor
             var starFieldMaterial = EnsureMaterial(Root + "/Materials/StarField.mat", "UniverseSim/StarField");
             var ringMaterial = EnsureMaterial(Root + "/Materials/Rings.mat", "UniverseSim/Rings");
             var shipMaterial = EnsureMaterial(Root + "/Materials/Ship.mat", "UniverseSim/Ship");
+            var shipShadowMaterial = EnsureMaterial(Root + "/Materials/ShipShadow.mat", "UniverseSim/ShipShadow");
+            var sunGlowMaterial = EnsureMaterial(Root + "/Materials/SunGlow.mat", "UniverseSim/SunGlow");
+            var haloMaterial = EnsureMaterial(Root + "/Materials/AtmosphereHalo.mat", "UniverseSim/AtmosphereHalo");
+            var skyMaterial = EnsureMaterial(Root + "/Materials/Sky.mat", "UniverseSim/Sky");
+            var streakMaterial = EnsureMaterial(Root + "/Materials/SpeedStreaks.mat", "UniverseSim/SpeedStreaks");
             var panelSettings = EnsurePanelSettings(Root + "/UI/UniverseSimPanelSettings.asset");
             var hudLayout = Load<VisualTreeAsset>(Root + "/UI/UniverseSimHud.uxml");
             var controls = Load<InputActionAsset>(Root + "/Input/UniverseSimControls.inputactions");
@@ -59,16 +66,25 @@ namespace UniverseSim.Unity.Editor
             camera.fieldOfView = 50f;
             camera.allowHDR = true;
             camera.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            // The listener for the synthesized sound (ADR-0019).
+            if (camera.GetComponent<AudioListener>() == null)
+            {
+                camera.gameObject.AddComponent<AudioListener>();
+            }
             MakeVolumeRealistic();
 
             var simulation = new GameObject("UniverseSim");
             var style = simulation.AddComponent<VisualStyleSettings>();
+            // The effects tier (A-13): the style effects that cost the most read it.
+            var quality = simulation.AddComponent<EffectsQuality>();
             var host = simulation.AddComponent<SimulationHost>();
             Set(host, "bodyMaterial", bodyMaterial);
             Set(host, "starMaterial", starMaterial);
             var (manifest, maps) = LoadSurfaceMaps();
             Set(host, "surfaceMapManifest", manifest);
             SetArray(host, "surfaceMapTextures", maps);
+            // The sourced sky cues the pipeline wrote (ADR-0018): Data/SkyCues.json.
+            Set(host, "skyCueManifest", Load<TextAsset>(Root + "/Data/SkyCues.json"));
             var orbits = simulation.AddComponent<OrbitLines>();
             Set(orbits, "host", host);
             Set(orbits, "lineMaterial", lineMaterial);
@@ -89,6 +105,30 @@ namespace UniverseSim.Unity.Editor
             Set(mapTreatment, "style", style);
             var stylizedCamera = simulation.AddComponent<StylizedCamera>();
             Set(stylizedCamera, "style", style);
+            Set(stylizedCamera, "quality", quality);
+            Set(mapTreatment, "quality", quality);
+            var stylizedSun = simulation.AddComponent<StylizedSun>();
+            Set(stylizedSun, "style", style);
+            Set(stylizedSun, "host", host);
+            Set(stylizedSun, "glowMaterial", sunGlowMaterial);
+            var stylizedStars = simulation.AddComponent<StylizedStars>();
+            Set(stylizedStars, "style", style);
+            Set(stylizedStars, "starField", stars);
+            var stylizedRings = simulation.AddComponent<StylizedRings>();
+            Set(stylizedRings, "style", style);
+            Set(stylizedRings, "rings", rings);
+            var stylizedOrbits = simulation.AddComponent<StylizedOrbitLines>();
+            Set(stylizedOrbits, "style", style);
+            Set(stylizedOrbits, "orbitLines", orbits);
+            var stylizedAtmospheres = simulation.AddComponent<StylizedAtmospheres>();
+            Set(stylizedAtmospheres, "style", style);
+            Set(stylizedAtmospheres, "host", host);
+            Set(stylizedAtmospheres, "haloMaterial", haloMaterial);
+            var stylizedSky = simulation.AddComponent<StylizedSky>();
+            Set(stylizedSky, "style", style);
+            Set(stylizedSky, "host", host);
+            Set(stylizedSky, "atmospheres", stylizedAtmospheres);
+            Set(stylizedSky, "skyMaterial", skyMaterial);
 
             var hud = new GameObject("HUD");
             var document = hud.AddComponent<UIDocument>();
@@ -112,9 +152,44 @@ namespace UniverseSim.Unity.Editor
             Set(ship, "actions", controls);
             Set(ship, "hud", document);
             Set(ship, "shipMaterial", shipMaterial);
+            Set(ship, "shadowMaterial", shipShadowMaterial);
+            Set(ship, "sky", stylizedSky);
 
+            var stylizedLabels = simulation.AddComponent<StylizedLabels>();
+            Set(stylizedLabels, "style", style);
+            Set(stylizedLabels, "hud", document);
+
+            // Play (ADR-0019): the speed cues (a style effect), the start near the Earth, the logbook and the sound.
+            var speedCues = simulation.AddComponent<SpeedCues>();
+            Set(speedCues, "style", style);
+            Set(speedCues, "ship", ship);
+            Set(speedCues, "streakMaterial", streakMaterial);
+            var start = simulation.AddComponent<StartExperience>();
+            Set(start, "host", host);
+            Set(start, "rig", rig);
+            Set(start, "ship", ship);
+            var logbook = simulation.AddComponent<Logbook>();
+            Set(logbook, "host", host);
+            Set(logbook, "rig", rig);
+            Set(logbook, "ship", ship);
+            var sound = new GameObject("Sound").AddComponent<SoundScape>();
+            sound.transform.SetParent(simulation.transform, false);
+            Set(sound, "ship", ship);
+            Set(sound, "rig", rig);
+            Set(sound, "logbook", logbook);
+            Set(sound, "hud", document);
+            Set(sound, "actions", controls);
+
+            foreach (var effect in simulation.GetComponents<StyleEffect>())
+            {
+                Set(effect, "quality", quality);
+            }
             var register = simulation.AddComponent<ExaggerationRegister>();
-            SetArray(register, "effects", new Object[] { bodyShading, mapTreatment, stylizedCamera, ship });
+            SetArray(register, "effects", new Object[]
+            {
+                bodyShading, mapTreatment, stylizedCamera, stylizedSun, stylizedStars, stylizedRings, stylizedOrbits,
+                stylizedLabels, ship, stylizedAtmospheres, stylizedSky, speedCues,
+            });
 
             var controller = hud.AddComponent<HudController>();
             Set(controller, "host", host);
@@ -123,11 +198,19 @@ namespace UniverseSim.Unity.Editor
             Set(controller, "starField", stars);
             Set(controller, "style", style);
             Set(controller, "exaggerationRegister", register);
+            Set(controller, "quality", quality);
             Set(controller, "actions", controls);
             var shipHud = hud.AddComponent<ShipHud>();
             Set(shipHud, "host", host);
             Set(shipHud, "rig", rig);
             Set(shipHud, "pilot", ship);
+            var logbookHud = hud.AddComponent<LogbookHud>();
+            Set(logbookHud, "host", host);
+            Set(logbookHud, "rig", rig);
+            Set(logbookHud, "ship", ship);
+            Set(logbookHud, "logbook", logbook);
+            Set(logbookHud, "start", start);
+            Set(logbookHud, "actions", controls);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);

@@ -166,6 +166,33 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "RushTime",
+                    "type": "Button",
+                    "id": "5b2f7c41-9a3e-4d68-8c15-e7f0a2b96d34",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleLogbook",
+                    "type": "Button",
+                    "id": "a81e4d92-6c07-4b3f-9e25-3d7b1f0c8a56",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleMute",
+                    "type": "Button",
+                    "id": "d4c39a17-2e8b-4f50-b6a1-8f2e7c5d3b09",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -551,6 +578,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "Land",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7e1c5f38-0b4d-4a92-8d63-c2f9e1a07b45",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RushTime",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3f9a2d64-8c1e-4b07-a5d2-9e6b0c7f1a83",
+                    "path": "<Keyboard>/j",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleLogbook",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b62e0f15-4d7a-4c39-9f84-1a5c3e8d2b70",
+                    "path": "<Keyboard>/m",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleMute",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

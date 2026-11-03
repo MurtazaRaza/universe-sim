@@ -46,6 +46,17 @@ namespace UniverseSim.Unity.Tests.EditMode
                 var glowing = Enumerable.Range(0, colors.Length).Where(i => colors[i].a > 0f).ToList();
                 Assert.That(glowing, Is.Not.Empty);
                 Assert.That(glowing.All(i => vertices[i].z < -0.47f), "only the nozzles at the back glow");
+
+                // The baked occlusion darkens where parts meet, softly (never to black: no ink lines), and only the
+                // canopy is glass.
+                var surface = mesh.uv;
+                Assert.That(surface.Length, Is.EqualTo(vertices.Length));
+                Assert.That(surface.All(s => s.x >= 0.4f - 1e-6f && s.x <= 1f + 1e-6f));
+                Assert.That(surface.Count(s => s.x < 0.8f), Is.GreaterThan(vertices.Length / 50), "occlusion is baked");
+                var glass = Enumerable.Range(0, surface.Length).Where(i => surface[i].y > 0.5f).ToList();
+                Assert.That(glass, Is.Not.Empty);
+                Assert.That(glass.All(i => colors[i] == new Color(ShipMesh.Canopy.r, ShipMesh.Canopy.g, ShipMesh.Canopy.b, 0f)),
+                            "only the canopy is glass");
             }
             finally
             {
@@ -65,6 +76,18 @@ namespace UniverseSim.Unity.Tests.EditMode
             Assert.That(ShipHud.Duration(30.6 * 365.25 * 86400.0), Is.EqualTo("30.6 years"));
             Assert.That(ShipHud.Duration(double.NaN), Is.EqualTo("-"));
             Assert.That(ShipHud.Duration(-1.0), Is.EqualTo("-"));
+        }
+
+        [Test]
+        public void TemperaturesAndPressuresReadInDisplayUnits()
+        {
+            // Synthetic values; the core keeps kelvins and pascals (ADR-0017).
+            Assert.That(ShipHud.Celsius(208.15), Is.EqualTo("-65 °C (208.15 K)"));
+            Assert.That(ShipHud.Celsius(300.0), Is.EqualTo("26.9 °C (300 K)"));
+            Assert.That(ShipHud.Bars(9.2e6), Is.EqualTo("92 bar"));
+            Assert.That(ShipHud.Bars(1000.0), Is.EqualTo("0.01 bar"));
+            Assert.That(ShipHud.Bars(1.0), Is.EqualTo("0.00001 bar"));
+            Assert.That(ShipHud.Bars(100000.0), Is.EqualTo("1 bar"));
         }
 
         [Test]

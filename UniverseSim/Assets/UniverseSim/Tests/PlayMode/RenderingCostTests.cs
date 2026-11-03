@@ -17,9 +17,10 @@ namespace UniverseSim.Unity.Tests.PlayMode
     /// <summary>
     /// What the main scene costs to draw: bodies use the coarsest sphere their size on screen allows, the
     /// orbit lines are one mesh, and a table of Unity's render counters (triangles, SetPass calls) and the CPU
-    /// time of the main thread and the per-frame scripts at typical views, logged for comparisons. It renders
-    /// into an offscreen 1920 x 1080 target, since batch mode has no screen. Timings depend on the machine and
-    /// are only logged.
+    /// time of the main thread and the per-frame scripts at typical views, logged for comparisons, in the realistic
+    /// style and in the stylized style at the high and low effects tiers (A-13). It renders into an offscreen
+    /// 1920 x 1080 target, since batch mode has no screen. Timings depend on the machine and are only logged; the
+    /// frame rate of NFR-11 is measured in a player build (PerformanceBenchmark).
     /// </summary>
     public class RenderingCostTests
     {
@@ -53,7 +54,7 @@ namespace UniverseSim.Unity.Tests.PlayMode
         [UnitySetUp]
         public IEnumerator LoadScene()
         {
-            // Measured in the default style (A-02); A-13 extends the measurements to both.
+            // Each configuration sets its own style and tier (A-13).
             VisualStyleSettings.SavePreference(VisualStyle.Stylized);
             SceneManager.LoadScene("Main");
             yield return null;
@@ -168,20 +169,38 @@ namespace UniverseSim.Unity.Tests.PlayMode
 
             var earth = Index(399);
             var jupiter = Index(599);
+            var start = rig.OffsetKm;
+            var startFocus = rig.FocusIndex;
             var views = new (string Name, System.Action Place)[]
             {
-                ("system (start view)", () => { }),
+                ("system", () => rig.JumpTo(startFocus, start.Length, System.Math.Atan2(start.X, start.Z),
+                                            System.Math.Asin(System.Math.Clamp(start.Normalized.Y, -1.0, 1.0)))),
                 ("Jupiter system", () => rig.JumpTo(jupiter, 4.0e6, 0.5, 0.35)),
                 ("Earth, 4 radii", () => rig.JumpTo(earth, Sim.Bodies[earth].MaxRadiusKm * 4.0, 0.6, 0.3)),
             };
+            var configs = new (string Name, VisualStyle Style, EffectsTier Tier)[]
+            {
+                ("realistic", VisualStyle.Realistic, EffectsTier.High),
+                ("stylized", VisualStyle.Stylized, EffectsTier.High),
+                ("stylized low", VisualStyle.Stylized, EffectsTier.Low),
+            };
+            var settings = Object.FindAnyObjectByType<VisualStyleSettings>();
+            var quality = Object.FindAnyObjectByType<EffectsQuality>();
             var results = new List<(string View, Dictionary<string, double> Values)>();
             foreach (var (name, place) in views)
             {
-                place();
-                var values = new Dictionary<string, double>();
-                yield return Measure(values);
-                results.Add((name, values));
+                foreach (var (config, style, tier) in configs)
+                {
+                    settings.SetStyle(style);
+                    quality.SetFixed(tier, remember: false);
+                    place();
+                    var values = new Dictionary<string, double>();
+                    yield return Measure(values);
+                    results.Add(($"{name} ({config})", values));
+                }
             }
+            settings.SetStyle(VisualStyle.Stylized);
+            quality.SetFixed(EffectsTier.High, remember: false);
 
             cam.targetTexture = null;
             document.panelSettings.targetTexture = null;
@@ -192,7 +211,7 @@ namespace UniverseSim.Unity.Tests.PlayMode
             table.Append("counter".PadRight(26));
             foreach (var (view, _) in results)
             {
-                table.Append(view.PadLeft(22));
+                table.Append(view.PadLeft(32));
             }
             table.Append('\n');
             foreach (var counter in Counters)
@@ -203,7 +222,7 @@ namespace UniverseSim.Unity.Tests.PlayMode
                     var text = values.TryGetValue(counter.Name, out var v)
                         ? v.ToString(counter.Unit.Length > 0 ? "F3" : "F0", CultureInfo.InvariantCulture) + counter.Unit
                         : "n/a";
-                    table.Append(text.PadLeft(22));
+                    table.Append(text.PadLeft(32));
                 }
                 table.Append('\n');
             }

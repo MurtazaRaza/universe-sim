@@ -1,0 +1,65 @@
+{
+  "generatedBy": "tools/pipeline/usim-pipeline sky-cues from data/catalog/sky-cues.json. Do not edit by hand.",
+  "cues": [
+    {
+      "naifId": 299,
+      "body": "Venus",
+      "cue": "daytime_sky",
+      "hue": "orange",
+      "sourceId": "S-PIETERS-1986",
+      "tier": 1,
+      "reference": "Pieters et al. (1986), Science 234, abstract (NASA Technical Reports Server record 19870039592)",
+      "url": "https://ntrs.nasa.gov/citations/19870039592",
+      "accessed": "2026-11-02",
+      "quote": "Multispectral images of the basaltic surface of Venus obtained by Venera 13 were processed to remove the effects of orange-colored incident radiation resulting from interactions with the thick Venusian atmosphere."
+    },
+    {
+      "naifId": 399,
+      "body": "Earth",
+      "cue": "daytime_sky",
+      "hue": "blue",
+      "sourceId": "S-NASA-SPACEPLACE",
+      "tier": 2,
+      "reference": "NASA Space Place, 'Why Is the Sky Blue?'",
+      "url": "https://spaceplace.nasa.gov/blue-sky/en/",
+      "accessed": "2026-11-02",
+      "quote": "This is why we see a blue sky most of the time."
+    },
+    {
+      "naifId": 399,
+      "body": "Earth",
+      "cue": "twilight",
+      "hue": "red_and_yellow",
+      "sourceId": "S-NASA-EO-ISS",
+      "tier": 1,
+      "reference": "NASA Earth Observatory, 'Sundown and Lights Up Over the U.S. Northeast', astronaut photograph ISS070-E-76065",
+      "url": "https://science.nasa.gov/earth/earth-observatory/sundown-and-lights-up-over-the-us-northeast-152802",
+      "accessed": "2026-11-02",
+      "quote": "The troposphere, the lowest layer of the atmosphere, appears red and yellow."
+    },
+    {
+      "naifId": 499,
+      "body": "Mars",
+      "cue": "daytime_sky",
+      "hue": "brownish_gray",
+      "sourceId": "S-NASA-PJ-SKIES",
+      "tier": 1,
+      "reference": "NASA/JPL, PIA01547, 'True Color of Mars - Pathfinder Sol 24 at 4 PM'",
+      "url": "https://science.nasa.gov/photojournal/true-color-of-mars-pathfinder-sol-24-at-4-pm",
+      "accessed": "2026-11-02",
+      "quote": "The brownish gray sky as it would be seen by an observer on Mars in this four-frame, true color mosaic taken on sol 24 (at approximately 1610 LST)."
+    },
+    {
+      "naifId": 499,
+      "body": "Mars",
+      "cue": "twilight",
+      "hue": "blue",
+      "sourceId": "S-NASA-PJ-SKIES",
+      "tier": 1,
+      "reference": "NASA/JPL, PIA00917, 'Color Variations in the Sky at Sunset'",
+      "url": "https://science.nasa.gov/photojournal/color-variations-in-the-sky-at-sunset",
+      "accessed": "2026-11-02",
+      "quote": "The blue color only becomes apparent near sunrise and sunset, when the light has to pass through the largest amount of dust."
+    }
+  ]
+}

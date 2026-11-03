@@ -47,7 +47,14 @@ namespace UniverseSim.Unity
         [SerializeField] private double compressionDistance = 1.0e4;
         [SerializeField] private float orbitDegreesPerPixel = 0.2f;
         [SerializeField] private float zoomPerScrollUnit = 0.0025f;
-        [SerializeField] private float transitionSeconds = 1.5f;
+        [Tooltip("A flight between bodies lasts this long at least (A-12) ...")]
+        [SerializeField] private float flightMinSeconds = 0.9f;
+        [Tooltip("... plus this per decade of distance it covers (on a log scale) ...")]
+        [SerializeField] private float flightSecondsPerDecade = 0.45f;
+        [Tooltip("... and never longer than this.")]
+        [SerializeField] private float flightMaxSeconds = 3f;
+        [Tooltip("How quickly a zoom step settles: the time constant of its ease, seconds (A-12).")]
+        [SerializeField] private float zoomEaseSeconds = 0.08f;
         [SerializeField] private float clickPickPixels = 24f;
 
         private Camera cam;
@@ -59,6 +66,7 @@ namespace UniverseSim.Unity
         private double yaw;
         private double pitch = 0.45;
         private double distanceKm;
+        private double targetDistanceKm; // where zoom steps are taking distanceKm (A-12)
 
         // Free-fly mode: offset from the focus and the camera's own rotation.
         private Double3 flyOffsetKm;
@@ -69,6 +77,7 @@ namespace UniverseSim.Unity
         private float transitionStart;
         private Double3 transitionFromKm;
         private double transitionToDistanceKm;
+        private Quaternion transitionFromRotation = Quaternion.identity;
 
         private bool dragging;
         private float dragTravel;
@@ -91,6 +100,20 @@ namespace UniverseSim.Unity
 
         /// <summary>The camera's offset from the focus center, km, host axes.</summary>
         public Double3 OffsetKm { get; private set; }
+
+        /// <summary>True during a flight to a new focus (A-12).</summary>
+        public bool Transitioning => transitioning;
+
+        /// <summary>How long the latest flight to a new focus lasts, seconds (<see cref="FlightDuration"/>).</summary>
+        public float FlightSeconds { get; private set; }
+
+        /// <summary>The body under the pointer, or under the hovered label, or -1 (A-12). Hovering selects nothing.</summary>
+        public int HoveredIndex { get; private set; } = -1;
+
+        /// <summary>Raised when <see cref="HoveredIndex"/> changes.</summary>
+        public event Action<int> HoverChanged;
+
+        private int labelHoverIndex = -1;
 
         /// <summary>
         /// The driver of the camera, or null when the rig's own controls drive it (orbit, zoom, free fly). While a
@@ -169,6 +192,7 @@ namespace UniverseSim.Unity
                 }
             }
             distanceKm = farthest > 0.0 ? 1.5 * farthest : 1.0e9;
+            targetDistanceKm = distanceKm;
             UpdateRequest();
             FocusChanged?.Invoke(FocusIndex);
             SelectionChanged?.Invoke(SelectedIndex);
@@ -220,6 +244,7 @@ namespace UniverseSim.Unity
                 // Orbit the focus from where the pilot left the camera.
                 var direction = OffsetKm.Normalized;
                 distanceKm = Math.Max(OffsetKm.Length, MinDistanceKm());
+                targetDistanceKm = distanceKm;
                 yaw = Math.Atan2(direction.X, direction.Z);
                 pitch = Math.Clamp(Math.Asin(Math.Clamp(direction.Y, -1.0, 1.0)), -1.55, 1.55);
             }
@@ -241,6 +266,9 @@ namespace UniverseSim.Unity
             var pointer = point.ReadValue<Vector2>();
             var overUi = PointerOverUi(pointer);
             var dt = Time.unscaledDeltaTime;
+            // While the date field has the keyboard, keys type: no hotkeys, no key zoom, no flying.
+            var typing = HudKeyboard.Typing(hud);
+            UpdateHover(pointer, overUi);
 
             if (drag.WasPressedThisFrame() && !overUi)
             {
@@ -268,6 +296,10 @@ namespace UniverseSim.Unity
             }
 
             var scroll = zoom.ReadValue<float>();
+            if (typing && Mathf.Abs(scroll) <= 2f)
+            {
+                scroll = 0f; // the minus and equals keys, not the wheel
+            }
             if (!overUi && Mathf.Abs(scroll) > 0f && !FreeFly && !Piloted)
             {
                 // Mouse wheels report large steps, keys report +-1 per frame: scale keys by time.
@@ -290,27 +322,30 @@ namespace UniverseSim.Unity
                     lastClickIndex = picked;
                 }
             }
-            if (focusSelected.WasPressedThisFrame() && SelectedIndex >= 0)
+            if (!typing)
             {
-                Focus(SelectedIndex);
-            }
-            if (nextBody.WasPressedThisFrame())
-            {
-                StepFocus(1);
-            }
-            if (previousBody.WasPressedThisFrame())
-            {
-                StepFocus(-1);
-            }
-            if (toggleFly.WasPressedThisFrame() && !Piloted)
-            {
-                SetFreeFly(!FreeFly);
+                if (focusSelected.WasPressedThisFrame() && SelectedIndex >= 0)
+                {
+                    Focus(SelectedIndex);
+                }
+                if (nextBody.WasPressedThisFrame())
+                {
+                    StepFocus(1);
+                }
+                if (previousBody.WasPressedThisFrame())
+                {
+                    StepFocus(-1);
+                }
+                if (toggleFly.WasPressedThisFrame() && !Piloted)
+                {
+                    SetFreeFly(!FreeFly);
+                }
             }
 
             if (FreeFly && !Piloted)
             {
-                var input = move.ReadValue<Vector2>();
-                var vertical = moveVertical.ReadValue<float>();
+                var input = typing ? Vector2.zero : move.ReadValue<Vector2>();
+                var vertical = typing ? 0f : moveVertical.ReadValue<float>();
                 var altitude = Math.Max(OffsetKm.Length - FocusRadiusKm(), minAltitudeKm);
                 var speed = altitude * (boost.IsPressed() ? 5.0 : 0.5); // km per second, scaled by altitude
                 var direction = flyRotation * new Vector3(input.x, vertical, input.y);
@@ -324,11 +359,16 @@ namespace UniverseSim.Unity
             }
         }
 
-        private void ZoomBy(double factor)
+        /// <summary>
+        /// Zooms the orbit by <paramref name="factor"/> on the altitude above the focus (below 1 nearer), as the wheel
+        /// and keys do; the distance eases to the new value (A-12).
+        /// </summary>
+        public void ZoomBy(double factor)
         {
             var minimum = MinDistanceKm();
-            var altitude = Math.Max(distanceKm - FocusRadiusKm(), minAltitudeKm) * factor;
-            distanceKm = Math.Clamp(FocusRadiusKm() + altitude, minimum, maxDistanceKm);
+            // Steps move the target; the distance eases toward it (UpdateRequest).
+            var altitude = Math.Max(targetDistanceKm - FocusRadiusKm(), minAltitudeKm) * factor;
+            targetDistanceKm = Math.Clamp(FocusRadiusKm() + altitude, minimum, maxDistanceKm);
         }
 
         private void StepFocus(int step)
@@ -422,6 +462,9 @@ namespace UniverseSim.Unity
             var radius = info.MaxRadiusKm * (EnlargedBodies ? BodyScale : 1.0);
             transitionFromKm = from;
             transitionToDistanceKm = radius > 0.0 ? Math.Max(radius * 4.0, radius + minAltitudeKm) : from.Length * 0.25;
+            transitionFromRotation = transform.rotation;
+            FlightSeconds = FlightDuration(from.Length, transitionToDistanceKm, flightMinSeconds, flightSecondsPerDecade,
+                                           flightMaxSeconds);
             transitionStart = Time.unscaledTime;
             transitioning = true;
             if (FreeFly)
@@ -452,6 +495,7 @@ namespace UniverseSim.Unity
             yaw = yawRad;
             pitch = Math.Clamp(pitchRad, -1.55, 1.55);
             distanceKm = Math.Max(distanceFromCenterKm, MinDistanceKm());
+            targetDistanceKm = distanceKm;
             UpdateRequest();
             if (changed)
             {
@@ -476,9 +520,63 @@ namespace UniverseSim.Unity
             {
                 var direction = OffsetKm.Normalized;
                 distanceKm = Math.Max(OffsetKm.Length, MinDistanceKm());
+                targetDistanceKm = distanceKm;
                 yaw = Math.Atan2(direction.X, direction.Z);
                 pitch = Math.Asin(Math.Clamp(direction.Y, -1.0, 1.0));
             }
+        }
+
+        /// <summary>
+        /// How long a flight from <paramref name="fromKm"/> to <paramref name="toKm"/> from the new focus lasts: the
+        /// shortest time plus the time per decade of the distance's change, at most the longest (A-12). A hop to a
+        /// neighbor is short; a flight from the edge of the system to a moon takes longer, but never long.
+        /// </summary>
+        public static float FlightDuration(double fromKm, double toKm, float minSeconds, float secondsPerDecade,
+                                           float maxSeconds)
+        {
+            var decades = fromKm > 0.0 && toKm > 0.0 ? Math.Abs(Math.Log10(fromKm / toKm)) : 0.0;
+            return Mathf.Clamp(minSeconds + secondsPerDecade * (float)decades, minSeconds, maxSeconds);
+        }
+
+        /// <summary>Smootherstep (6s^5 - 15s^4 + 10s^3): a slow start and a soft landing, with no jerk at either end.</summary>
+        public static float Smootherstep(float s)
+        {
+            s = Mathf.Clamp01(s);
+            return s * s * s * (s * (s * 6f - 15f) + 10f);
+        }
+
+        // Eases a distance toward its target on a log scale with time constant `seconds` (exact for any frame time).
+        private static double EaseDistance(double current, double target, float dt, float seconds)
+        {
+            if (current <= 0.0 || target <= 0.0 || seconds <= 0f)
+            {
+                return target;
+            }
+            var k = 1.0 - Math.Exp(-dt / seconds);
+            var eased = Math.Exp(Math.Log(current) + (Math.Log(target) - Math.Log(current)) * k);
+            return Math.Abs(eased / target - 1.0) < 1e-6 ? target : eased;
+        }
+
+        /// <summary>The body whose label the pointer is over (from the HUD), or -1 when it leaves (A-12).</summary>
+        public void SetLabelHover(int index)
+        {
+            labelHoverIndex = index;
+        }
+
+        // The body under the pointer (as a click would pick it), or the hovered label's; nothing while dragging or
+        // over other UI. The cursor shows that a click picks something.
+        private void UpdateHover(Vector2 pointer, bool overUi)
+        {
+            var onScreen = pointer.x >= 0f && pointer.y >= 0f && pointer.x < Screen.width && pointer.y < Screen.height;
+            var hovered = labelHoverIndex >= 0 ? labelHoverIndex
+                : !overUi && !dragging && onScreen ? PickBody(pointer) : -1;
+            if (hovered == HoveredIndex)
+            {
+                return;
+            }
+            HoveredIndex = hovered;
+            PickCursor.Show(hovered >= 0);
+            HoverChanged?.Invoke(hovered);
         }
 
         private static Double3 Direction(double yawRad, double pitchRad) =>
@@ -500,19 +598,24 @@ namespace UniverseSim.Unity
             }
             else if (transitioning)
             {
-                // Straight toward the new focus, distance interpolated on a log scale, eased in and out.
-                var s = Mathf.Clamp01((Time.unscaledTime - transitionStart) / transitionSeconds);
-                var eased = s * s * (3f - 2f * s);
+                // Straight toward the new focus, distance interpolated on a log scale with a slow start and a soft
+                // landing; the view turns from where it looked to the new focus over the first part (A-12).
+                var s = Mathf.Clamp01((Time.unscaledTime - transitionStart) / Mathf.Max(FlightSeconds, 1e-3f));
+                var eased = Smootherstep(s);
                 var from = Math.Max(transitionFromKm.Length, 1e-9);
                 var to = Math.Max(transitionToDistanceKm, MinDistanceKm());
                 var d = Math.Exp(Math.Log(from) + (Math.Log(to) - Math.Log(from)) * eased);
                 var direction = transitionFromKm.Normalized;
                 OffsetKm = direction * d;
-                rotation = Quaternion.LookRotation(-direction.ToVector3(), Vector3.up);
+                var turn = Mathf.Clamp01(s / 0.45f);
+                rotation = Quaternion.Slerp(transitionFromRotation,
+                                            Quaternion.LookRotation(-direction.ToVector3(), Vector3.up),
+                                            turn * turn * (3f - 2f * turn));
                 if (s >= 1f)
                 {
                     transitioning = false;
                     distanceKm = d;
+                    targetDistanceKm = d;
                     yaw = Math.Atan2(direction.X, direction.Z);
                     pitch = Math.Asin(Math.Clamp(direction.Y, -1.0, 1.0));
                 }
@@ -524,7 +627,9 @@ namespace UniverseSim.Unity
             }
             else
             {
-                distanceKm = Math.Clamp(distanceKm, MinDistanceKm(), maxDistanceKm);
+                targetDistanceKm = Math.Clamp(targetDistanceKm, MinDistanceKm(), maxDistanceKm);
+                distanceKm = Math.Clamp(EaseDistance(distanceKm, targetDistanceKm, Time.unscaledDeltaTime, zoomEaseSeconds),
+                                        MinDistanceKm(), maxDistanceKm);
                 var direction = Direction(yaw, pitch);
                 OffsetKm = direction * distanceKm;
                 rotation = Quaternion.LookRotation(-direction.ToVector3(), Vector3.up);

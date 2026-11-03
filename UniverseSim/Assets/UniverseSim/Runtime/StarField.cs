@@ -111,21 +111,9 @@ namespace UniverseSim.Unity
                 {
                     continue;
                 }
-                var t = Mathf.Clamp01((faintestMagnitude - (float)s.VMagnitude) / (faintestMagnitude - BrightestMagnitude));
-                var halfSize = Mathf.Lerp(SmallestHalfSizePixels, LargestHalfSizePixels, Mathf.Pow(t, 1.5f)) * 2f;
-                var color = DisplayColor((s.Flags & NativeConstants.StarHasColor) != 0, s.BMinusV);
-                color.a = DisplayIntensity(t);
-                for (var c = 0; c < 4; ++c)
-                {
-                    corners[4 * k + c] = new Vector4(c == 0 || c == 3 ? -1f : 1f, c < 2 ? -1f : 1f, halfSize, 0f);
-                    colors[4 * k + c] = color;
-                }
-                indices[6 * k] = 4 * k;
-                indices[6 * k + 1] = 4 * k + 2;
-                indices[6 * k + 2] = 4 * k + 1;
-                indices[6 * k + 3] = 4 * k;
-                indices[6 * k + 4] = 4 * k + 3;
-                indices[6 * k + 5] = 4 * k + 2;
+                var (halfSize, color) = DisplayOf(s.VMagnitude, (s.Flags & NativeConstants.StarHasColor) != 0,
+                                                  s.BMinusV, faintestMagnitude);
+                WriteQuad(k, halfSize, color, corners, colors, indices);
                 ++k;
             }
             UpdatePositions();
@@ -183,6 +171,42 @@ namespace UniverseSim.Unity
         }
 
         private static double SecondsOf(UsimInstant t) => t.Days * 86400.0 + t.Seconds;
+
+        /// <summary>
+        /// The display of one star (the ADR-0011 mapping): the half size of its quad in pixels, and its display
+        /// color with the display intensity in alpha, from its V magnitude and B-V color index. Stars at or
+        /// brighter than V -1.5 get the largest point; <paramref name="faintestMagnitude"/> gets the smallest.
+        /// </summary>
+        public static (float HalfSizePixels, Color Color) DisplayOf(double vMagnitude, bool hasColor, double bMinusV,
+                                                                    float faintestMagnitude)
+        {
+            var t = Mathf.Clamp01((faintestMagnitude - (float)vMagnitude) / (faintestMagnitude - BrightestMagnitude));
+            var halfSize = Mathf.Lerp(SmallestHalfSizePixels, LargestHalfSizePixels, Mathf.Pow(t, 1.5f)) * 2f;
+            var color = DisplayColor(hasColor, bMinusV);
+            color.a = DisplayIntensity(t);
+            return (halfSize, color);
+        }
+
+        /// <summary>
+        /// Writes star <paramref name="k"/> as the shader reads it: four corners (TEXCOORD0: the corner in [-1, 1]
+        /// and the half size in pixels), the display color and intensity per vertex, and two triangles. The four
+        /// vertex positions are the star's (set separately).
+        /// </summary>
+        public static void WriteQuad(int k, float halfSizePixels, Color color, Vector4[] corners, Color[] colors,
+                                     int[] indices)
+        {
+            for (var c = 0; c < 4; ++c)
+            {
+                corners[4 * k + c] = new Vector4(c == 0 || c == 3 ? -1f : 1f, c < 2 ? -1f : 1f, halfSizePixels, 0f);
+                colors[4 * k + c] = color;
+            }
+            indices[6 * k] = 4 * k;
+            indices[6 * k + 1] = 4 * k + 2;
+            indices[6 * k + 2] = 4 * k + 1;
+            indices[6 * k + 3] = 4 * k;
+            indices[6 * k + 4] = 4 * k + 3;
+            indices[6 * k + 5] = 4 * k + 2;
+        }
 
         /// <summary>
         /// Display color for a B-V color index: a gradient from blue-white (B-V -0.4) through white and

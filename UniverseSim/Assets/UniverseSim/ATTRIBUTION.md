@@ -229,3 +229,10 @@ visible-light global mosaic from a verified source and are drawn as plain lit sp
 - File: `Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl` (4886 bytes, SHA-256 4a6fb79d54f5e60f5fd36e04fd3bf0c4c66bfafe27e52088c132e515af88d2e2), https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Pluto_NewHorizons_Global_Mosaic_300m_Jul2017_8bit.lbl
 - Geometry: 24888 x 12444 pixels of 0.0144649784 degrees, area registration, first column at -0.00219143166 degrees east, first row at 90.0010957 degrees, planetographic, converted with the map's ellipsoid (ISIS Mapping group).
 - Terms: USGS Copyrights and Credits (https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits, read 2026-10-23): 'USGS-authored or produced data and information are considered to be in the U.S. Public Domain'; credit is requested ('Credit: U.S. Geological Survey'). The products' FGDC metadata ask users to cite the authors.
+
+## Artistic assets
+
+Original or licensed art (ADR-0015 decision 6), listed in `data/catalog/artistic-assets.json`; each file is under `Art/`.
+An artist's impression is labeled as such in the viewer and drawn only in the stylized style (FR-REN-14).
+
+None yet: every effect, icon, cursor and model is drawn by code.

@@ -5,6 +5,7 @@ using System.Linq;
 using NUnit.Framework;
 using UniverseSim.Unity.Native;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
@@ -150,14 +151,18 @@ namespace UniverseSim.Unity.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator HoveringPutsTheShipAtTheCoreSiteWithItsValues()
+        public IEnumerator OnSolidGroundTheShipLandsAtTheCoreSiteWithItsValues()
         {
+            // The Moon's reference surface is solid (it has a surface pressure, ADR-0017).
             yield return StartNear(301, 1.5);
             var moon = Index(301);
+            Assert.That(pilot.SurfaceKind, Is.EqualTo(NativeConstants.SurfaceSolid));
+            shipHud.Refresh();
+            Assert.That(shipHud.LandButtonText, Is.EqualTo("Land (L)"));
             pilot.Descend();
             Assert.That(pilot.State, Is.EqualTo(ShipPilot.Mode.Descending));
             yield return Seconds(9.5f);
-            Assert.That(pilot.State, Is.EqualTo(ShipPilot.Mode.Hovering));
+            Assert.That(pilot.State, Is.EqualTo(ShipPilot.Mode.Landed));
             yield return Frames(15); // the conditions refresh five times a second
             Assert.That(pilot.HasSite);
             var site = pilot.Site;
@@ -166,20 +171,30 @@ namespace UniverseSim.Unity.Tests.PlayMode
                                            ref request, Sim.Clock.Now, out var expected));
             var position = Double3.From(expected.PositionKm);
             Assert.That((pilot.PositionKm - position).Length, Is.LessThan(1e-9 * position.Length));
-            var hover = 0.01 * Sim.Bodies[moon].MeanRadiusKm;
-            Assert.That(pilot.AltitudeKm, Is.EqualTo(hover).Within(1e-9 * hover));
-            // The camera is above the reference surface, never inside the body.
-            Assert.That(rig.OffsetKm.Length, Is.GreaterThan(expected.SurfaceRadiusKm));
+            // On the ground: the ship's lowest point at the reference surface.
+            Assert.That(pilot.AltitudeKm, Is.EqualTo(pilot.LandedAltitudeKm).Within(1e-9));
+            // The view rests on the drawn sphere, which lies inside the ellipsoid between its vertices: lowered by that
+            // depth, and still about a kilometer above the ground as drawn.
+            Assert.That(pilot.DrawnSurfaceDepthKm, Is.GreaterThanOrEqualTo(0.0));
+            Assert.That(pilot.DrawnSurfaceDepthKm, Is.LessThan(expected.SurfaceRadiusKm * (1.0 - Math.Cos(Math.PI / 64))));
+            var drawnGround = expected.SurfaceRadiusKm - pilot.DrawnSurfaceDepthKm;
+            Assert.That(rig.OffsetKm.Length - drawnGround, Is.GreaterThan(0.9), "the camera stays a kilometer up");
 
             shipHud.Refresh();
             var facts = string.Join("\n", shipHud.FactTexts);
             StringAssert.Contains((site.GravityKmS2 * 1000.0).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) +
                                   " m/s^2", facts);
             StringAssert.Contains(ShipHud.Latitude(site.LatitudeRad), facts);
-            StringAssert.Contains("Not yet in the data", facts);
+            StringAssert.Contains("Solid ground: the ship has landed", facts);
+            var temperature = Sim.Quantity(moon, NativeConstants.FieldMeanTemperature);
+            StringAssert.Contains(ShipHud.Celsius(temperature.Value), facts);
+            StringAssert.Contains(temperature.SourceId + " (Tier 2)", facts);
+            // No atmosphere: the source's table gives 0 bar (ADR-0018).
+            StringAssert.Contains("None at the source's precision", facts);
             Assert.That(pilot.HasDay);
             StringAssert.Contains(ShipHud.Duration(pilot.Day.MeanSolarDayS), facts);
-            yield return Screenshot("ship-hover-moon");
+            Assert.That(shipHud.LandButtonText, Is.EqualTo("Lift off (L)"));
+            yield return Screenshot("ship-landed-moon");
 
             pilot.LiftOff();
             Assert.That(pilot.State, Is.EqualTo(ShipPilot.Mode.Ascending));
@@ -188,6 +203,90 @@ namespace UniverseSim.Unity.Tests.PlayMode
             pilot.SetActive(false);
             yield return Frames(2);
             Assert.That(rig.Piloted, Is.False, "the camera is the rig's again");
+        }
+
+        [UnityTest]
+        public IEnumerator ALandedShipHasAContactShadeUnderIt()
+        {
+            // Mars, solid ground under a sky (docs/ART_DIRECTION.md section 11), approached from the sunlit side so
+            // the ship lands by day.
+            var mars = Index(499);
+            var light = ((Vector3)host.Views[mars].LightDirection).normalized;
+            rig.JumpTo(mars, Sim.Bodies[mars].MaxRadiusKm * 1.5, Math.Atan2(light.x, light.z),
+                       Math.Asin(Mathf.Clamp(light.y, -1f, 1f)));
+            rig.Select(mars);
+            yield return Frames(2);
+            pilot.SetActive(true);
+            yield return Frames(2);
+            var shade = pilot.transform.Find("Spaceship contact shade");
+            Assert.That(shade, Is.Not.Null);
+            var shadeRenderer = shade.GetComponent<MeshRenderer>();
+            Assert.That(shadeRenderer.enabled, Is.False, "no shade in flight");
+            pilot.Descend();
+            yield return Seconds(9.5f);
+            Assert.That(pilot.State, Is.EqualTo(ShipPilot.Mode.Landed));
+            yield return Frames(3);
+            Assert.That(shadeRenderer.enabled, "a landed ship has its contact shade");
+
+            // On the ground as drawn, straight below the ship's lowest point.
+            var model = pilot.transform.Find("Spaceship");
+            var size = model.localScale.x;
+            var bounds = model.GetComponent<MeshFilter>().sharedMesh.bounds;
+            var up = shade.up;
+            Assert.That(Vector3.Dot(model.position - shade.position, up), Is.EqualTo(-bounds.min.y * size).Within(1e-3f * size));
+            Assert.That(Vector3.ProjectOnPlane(model.position - shade.position, up).magnitude, Is.LessThan(1e-3f * size),
+                        "straight below");
+
+            // It darkens the ground just beyond the wing tip against the ground beyond its edge, on the same side of
+            // the ship and before post-processing (the vignette darkens toward the edges of the view).
+            var cam = Camera.main;
+            var data = cam.GetUniversalAdditionalCameraData();
+            var target = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            cam.targetTexture = target;
+            data.renderPostProcessing = false;
+            yield return Frames(2);
+            var near = cam.WorldToScreenPoint(shade.position + shade.right * (0.55f * size));
+            var beyond = cam.WorldToScreenPoint(shade.position + shade.right * (1.1f * size));
+            var previous = RenderTexture.active;
+            RenderTexture.active = target;
+            var image = new Texture2D(1600, 900, TextureFormat.RGBAHalf, false, true);
+            image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0, false);
+            RenderTexture.active = previous;
+            cam.targetTexture = null;
+            data.renderPostProcessing = true;
+            var shaded = image.GetPixel((int)near.x, (int)near.y);
+            var open = image.GetPixel((int)beyond.x, (int)beyond.y);
+            Object.Destroy(image);
+            target.Release();
+            Object.Destroy(target);
+            float Luminance(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+            TestContext.WriteLine($"contact shade: {shaded} at {near}, {open} at {beyond}");
+            Assert.That(Luminance(open), Is.GreaterThan(0.05f), "landed by day");
+            Assert.That(Luminance(shaded), Is.LessThan(0.85f * Luminance(open)), "the ground is darker beside the ship");
+            yield return Screenshot("ship-landed-mars-shade");
+        }
+
+        [UnityTest]
+        public IEnumerator OverAGiantPlanetTheShipStopsAboveItsPressureLevel()
+        {
+            // Jupiter's reference surface is its 1 bar level, with no solid ground there (ADR-0017).
+            yield return StartNear(599, 1.5);
+            var jupiter = Index(599);
+            Assert.That(pilot.SurfaceKind, Is.EqualTo(NativeConstants.SurfacePressureLevel));
+            shipHud.Refresh();
+            Assert.That(shipHud.LandButtonText, Is.EqualTo("Descend (L)"));
+            pilot.Descend();
+            yield return Seconds(9.5f);
+            Assert.That(pilot.State, Is.EqualTo(ShipPilot.Mode.Hovering), "it never lands there");
+            Assert.That(pilot.AltitudeKm, Is.EqualTo(2.0).Within(1e-9), "the lowest hover height");
+            yield return Frames(15);
+            shipHud.Refresh();
+            var facts = string.Join("\n", shipHud.FactTexts);
+            var level = Sim.Quantity(jupiter, NativeConstants.FieldReferencePressure);
+            StringAssert.Contains($"No solid surface here: the reference surface is the {ShipHud.Bars(level.Value)} level", facts);
+            StringAssert.Contains(level.SourceId, facts);
+            StringAssert.Contains("averaged at that level", facts);
+            yield return Screenshot("ship-over-jupiter");
         }
 
         [UnityTest]
@@ -207,7 +306,7 @@ namespace UniverseSim.Unity.Tests.PlayMode
             yield return Seconds(pilot.FlightSeconds * 0.6f + 0.5f);
             pilot.Descend();
             yield return Seconds(9.5f);
-            yield return Screenshot("ship-hover-mars");
+            yield return Screenshot("ship-landed-mars");
         }
 
         // As MainSceneTests.Screenshot, into a "ship" folder.
