@@ -65,6 +65,12 @@ namespace UniverseSim.Unity.Native
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_body_quantity")]
         internal static extern int BodyQuantity(IntPtr simulation, int index, int field, out UsimQuantity quantity);
 
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_body_surface_kind")]
+        internal static extern int BodySurfaceKind(IntPtr simulation, int index, out int kind);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_body_atmosphere")]
+        internal static extern int BodyAtmosphere(IntPtr simulation, int index, out int atmosphere);
+
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "usim_body_approximation")]
         internal static extern int BodyApproximation(IntPtr simulation, int index, out IntPtr reason);
 

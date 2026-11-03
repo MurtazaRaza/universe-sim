@@ -303,6 +303,23 @@ namespace UniverseSim.Unity.Native
         public const int FieldRadiusA = 3;
         public const int FieldRadiusB = 4;
         public const int FieldRadiusC = 5;
+        // Surface conditions (ABI version 6, ADR-0017): K, Pa and Pa.
+        public const int FieldMeanTemperature = 6;
+        public const int FieldSurfacePressure = 7;
+        public const int FieldReferencePressure = 8;
+
+        public const int UnitKelvin = 7;
+        public const int UnitPascal = 8;
+
+        // usim_body_surface_kind: what a body's reference surface is.
+        public const int SurfaceUnknown = 0;
+        public const int SurfaceSolid = 1;
+        public const int SurfacePressureLevel = 2;
+
+        // usim_body_atmosphere (ABI version 7, ADR-0018): whether a body has an atmosphere.
+        public const int AtmosphereUnknown = 0;
+        public const int AtmosphereNone = 1;
+        public const int AtmospherePresent = 2;
 
         public const int ScaleTdb = 0;
         public const int ScaleTt = 1;

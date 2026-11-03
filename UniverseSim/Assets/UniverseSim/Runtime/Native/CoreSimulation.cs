@@ -116,6 +116,8 @@ namespace UniverseSim.Unity.Native
             4 => "rad",
             5 => "rad/s",
             6 => "km^3/s^2",
+            7 => "K",
+            8 => "Pa",
             _ => string.Empty,
         };
     }
@@ -315,6 +317,28 @@ namespace UniverseSim.Unity.Native
             return new QuantityInfo(q);
         }
 
+        /// <summary>
+        /// What the body's reference surface is (NativeConstants.Surface*, ADR-0017): solid ground, a pressure level
+        /// in its atmosphere, or unknown. It follows from the surface pressure or the reference pressure, whose
+        /// sources <see cref="Quantity"/> gives.
+        /// </summary>
+        public int SurfaceKind(int bodyIndex)
+        {
+            Check(NativeMethods.BodySurfaceKind(Pointer, bodyIndex, out var kind));
+            return kind;
+        }
+
+        /// <summary>
+        /// Whether the body has an atmosphere (NativeConstants.Atmosphere*, ADR-0018): present with a positive surface
+        /// pressure or a reference pressure level, none when the source gives a surface pressure of zero, else
+        /// unknown. The pressures' sources are in <see cref="Quantity"/>.
+        /// </summary>
+        public int Atmosphere(int bodyIndex)
+        {
+            Check(NativeMethods.BodyAtmosphere(Pointer, bodyIndex, out var atmosphere));
+            return atmosphere;
+        }
+
         /// <summary>The span in which every body with a position is covered: the clock's limits.</summary>
         public UsimCoverage Coverage
         {
@@ -346,6 +370,16 @@ namespace UniverseSim.Unity.Native
 
         /// <summary>Pauses or resumes the clock.</summary>
         public void SetPaused(bool paused) => Check(NativeMethods.ClockSetPaused(Pointer, paused ? 1 : 0));
+
+        /// <summary>Seconds from <paramref name="a"/> to <paramref name="b"/> (b - a), TDB, from the core (usim_instant_seconds_between).</summary>
+        public static double SecondsBetween(UsimInstant a, UsimInstant b) => NativeMethods.InstantSecondsBetween(a, b);
+
+        /// <summary><paramref name="seconds"/> (TDB, any sign) after <paramref name="t"/>, normalized by the core (usim_instant_make).</summary>
+        public static UsimInstant After(UsimInstant t, double seconds)
+        {
+            Check(NativeMethods.InstantMake(t.Days, t.Seconds + seconds, out var result));
+            return result;
+        }
 
         /// <summary>The instant of a UTC date and time (DateTimeKind is ignored; the fields are read as UTC).</summary>
         public UsimInstant FromUtc(DateTime utc)

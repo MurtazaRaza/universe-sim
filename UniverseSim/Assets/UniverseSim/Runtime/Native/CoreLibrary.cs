@@ -10,7 +10,7 @@ namespace UniverseSim.Unity.Native
         /// ABI version this binding was written against. Must equal USIM_ABI_VERSION in
         /// core/capi/include/usim/usim.h.
         /// </summary>
-        public const uint ExpectedAbiVersion = 5;
+        public const uint ExpectedAbiVersion = 7;
 
         /// <summary>ABI version reported by the loaded native library.</summary>
         public static uint AbiVersion => NativeMethods.AbiVersion();
