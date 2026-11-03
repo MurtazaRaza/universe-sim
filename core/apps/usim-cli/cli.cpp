@@ -40,7 +40,7 @@ Commands:
   snapshot                            Every body in render coordinates, as a host receives them
   orbit BODY                          One revolution of BODY around --center (default: its usual center)
   transfer FROM TO                    Two-body estimate of a trip: a Hohmann transfer and the light time
-  site BODY --lat L --lon L           A point of BODY's reference surface: horizon, the Sun there, gravity
+  site BODY --lat L --lon L           A point of BODY's reference surface: horizon, Sun, gravity, conditions
   day BODY                            BODY's sidereal rotation period and mean solar day
 
 BODY and --center take a NAIF ID (399) or a catalog name ("Earth", "mars barycenter").
@@ -299,6 +299,24 @@ std::string json_quantity(const catalog::Quantity& q) {
            "}";
 }
 
+// A body's surface conditions (ADR-0017) as JSON members: the kind of reference surface, whether it has an
+// atmosphere (ADR-0018) and the three sourced quantities, in K and Pa.
+std::string json_surface(const catalog::Body& b) {
+    return "\"surface\":" + json_string(catalog::to_string(catalog::surface_kind(b))) +
+           ",\"atmosphere\":" + json_string(catalog::to_string(catalog::atmosphere(b))) +
+           ",\"mean_temperature\":" + json_quantity(b.mean_temperature) +
+           ",\"surface_pressure\":" + json_quantity(b.surface_pressure) +
+           ",\"reference_pressure\":" + json_quantity(b.reference_pressure);
+}
+
+// The same as CSV fields: surface,atmosphere,mean_temperature_k,surface_pressure_pa,reference_pressure_pa.
+std::string csv_surface(const catalog::Body& b) {
+    const auto value = [](const catalog::Quantity& q) { return q.has_value() ? number(*q.value) : std::string(); };
+    return std::string(catalog::to_string(catalog::surface_kind(b))) + ',' +
+           std::string(catalog::to_string(catalog::atmosphere(b))) + ',' + value(b.mean_temperature) + ',' +
+           value(b.surface_pressure) + ',' + value(b.reference_pressure);
+}
+
 std::string snapshot_flags(std::uint32_t flags) {
     std::string out;
     const auto add = [&](std::uint32_t bit, const char* name) {
@@ -336,7 +354,7 @@ Result<void> cmd_catalog(const Context& c) {
     };
     if (c.csv) {
         c.out << "id,name,kind,primary,position,rotation_model,gm_km3_s2,mean_radius_km,radius_a_km,radius_b_"
-                 "km,radius_c_km\n";
+                 "km,radius_c_km,surface,atmosphere,mean_temperature_k,surface_pressure_pa,reference_pressure_pa\n";
         const auto bodies = c.sim.catalog().bodies();
         for (std::size_t i = 0; i < bodies.size(); ++i) {
             const catalog::Body& b = bodies[i];
@@ -347,7 +365,7 @@ Result<void> cmd_catalog(const Context& c) {
                   << ',' << (b.primary ? catalog::to_string(*b.primary) : std::string()) << ','
                   << position(b.id) << ',' << rotation(i)
                   << ',' << value(b.gm) << ',' << value(b.mean_radius) << ',' << value(b.radius_a) << ','
-                  << value(b.radius_b) << ',' << value(b.radius_c) << '\n';
+                  << value(b.radius_b) << ',' << value(b.radius_c) << ',' << csv_surface(b) << '\n';
         }
         return {};
     }
@@ -374,7 +392,7 @@ Result<void> cmd_catalog(const Context& c) {
               << ",\"gm\":" << json_quantity(b.gm) << ",\"mean_radius\":" << json_quantity(b.mean_radius)
               << ",\"radius_a\":" << json_quantity(b.radius_a)
               << ",\"radius_b\":" << json_quantity(b.radius_b)
-              << ",\"radius_c\":" << json_quantity(b.radius_c) << "}";
+              << ",\"radius_c\":" << json_quantity(b.radius_c) << ',' << json_surface(b) << "}";
         first = false;
     }
     c.out << "],\"sources\":[";
@@ -695,6 +713,7 @@ Result<void> cmd_site(const Context& c) {
         return site.error();
     }
     const sim::SurfaceSite& s = site.value();
+    const catalog::Body& b = *c.sim.catalog().find(body.value()); // surface_site found it
     const std::string flags = flag_names(s.flags, {{sim::site_has_sun, "sun"},
                                                    {sim::site_has_sun_size, "sun-size"},
                                                    {sim::site_has_gravity, "gravity"},
@@ -704,7 +723,8 @@ Result<void> cmd_site(const Context& c) {
         c.out
             << "body,tdb,tdb_seconds,latitude_deg,longitude_deg,altitude_km,surface_radius_km,x_km,y_km,z_km,"
                "sun_elevation_deg,sun_azimuth_deg,sun_distance_km,sun_angular_diameter_deg,sunlight_ratio,"
-               "local_solar_time_h,gravity_km_s2,escape_speed_km_s,flags\n"
+               "local_solar_time_h,gravity_km_s2,escape_speed_km_s,flags,surface,atmosphere,mean_temperature_k,"
+               "surface_pressure_pa,reference_pressure_pa\n"
             << catalog::to_string(body.value()) << ',' << tdb_text(c, t.value()) << ','
             << number(t.value().seconds_since_j2000()) << ',' << deg(s.point.latitude_rad) << ','
             << deg(s.point.longitude_rad) << ',' << number(s.point.altitude_km) << ','
@@ -713,7 +733,7 @@ Result<void> cmd_site(const Context& c) {
             << deg(s.sun_azimuth_rad) << ',' << number(s.sun_distance_km) << ','
             << deg(s.sun_angular_diameter_rad) << ',' << number(s.sunlight_ratio) << ','
             << number(s.local_solar_time_h) << ',' << number(s.gravity_km_s2) << ','
-            << number(s.escape_speed_km_s) << ',' << flags << '\n';
+            << number(s.escape_speed_km_s) << ',' << flags << ',' << csv_surface(b) << '\n';
     } else {
         c.out << "{\"body\":" << json_body(c, body.value()) << ",\"time\":" << json_time(c, t.value())
               << ",\"frame\":" << json_string(frames::to_string(frame.value()))
@@ -733,7 +753,7 @@ Result<void> cmd_site(const Context& c) {
               << ",\"local_solar_time_h\":" << number(s.local_solar_time_h)
               << ",\"gravity_km_s2\":" << number(s.gravity_km_s2)
               << ",\"escape_speed_km_s\":" << number(s.escape_speed_km_s)
-              << ",\"flags\":" << json_string(flags) << "}\n";
+              << ",\"flags\":" << json_string(flags) << ',' << json_surface(b) << "}\n";
     }
     return {};
 }

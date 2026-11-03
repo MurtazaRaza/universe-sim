@@ -59,8 +59,8 @@ constexpr double k_pi = 3.141592653589793; // the double nearest pi
 constexpr std::array<std::string_view, 10> k_required_sections = {"META", "SRCS", "FILE", "BODY", "QNTY",
                                                                   "ROTN", "TIME", "EPHS", "STRS", "EPHD"};
 
-// Sections added by later minor versions, optional (1.1: APPX; 1.2: STAR, RING; 1.3: ORNT).
-constexpr std::array<std::string_view, 4> k_optional_sections = {"APPX", "STAR", "RING", "ORNT"};
+// Sections added by later minor versions, optional (1.1: APPX; 1.2: STAR, RING; 1.3: ORNT; 1.4: SURF).
+constexpr std::array<std::string_view, 5> k_optional_sections = {"APPX", "STAR", "RING", "ORNT", "SURF"};
 
 Error format_error(std::string message) {
     return make_error(ErrorCode::data_format, "data pack: " + std::move(message));
@@ -184,7 +184,7 @@ bool all_finite(std::span<const double> values) noexcept {
     return std::all_of(values.begin(), values.end(), [](double v) { return std::isfinite(v); });
 }
 
-// The quantity fields of format 1 (DATA_PACK.md, QNTY): code -> member of Body and required unit.
+// The quantity fields of format 1 (DATA_PACK.md, QNTY and SURF): code -> member of Body and required unit.
 struct FieldInfo {
     catalog::Quantity catalog::Body::*member;
     catalog::Unit unit;
@@ -202,10 +202,22 @@ std::optional<FieldInfo> field_info(std::uint32_t code) noexcept {
         return FieldInfo{&catalog::Body::radius_b, catalog::Unit::km};
     case 5:
         return FieldInfo{&catalog::Body::radius_c, catalog::Unit::km};
+    case 6:
+        return FieldInfo{&catalog::Body::mean_temperature, catalog::Unit::kelvin};
+    case 7:
+        return FieldInfo{&catalog::Body::surface_pressure, catalog::Unit::pascal};
+    case 8:
+        return FieldInfo{&catalog::Body::reference_pressure, catalog::Unit::pascal};
     default:
         return std::nullopt;
     }
 }
+
+// The field codes each quantity section may hold: QNTY 1 to 5, SURF 6 to 8 (format 1.4).
+constexpr std::uint32_t k_first_surface_field = 6;
+constexpr std::uint32_t k_mean_temperature_field = 6;
+constexpr std::uint32_t k_surface_pressure_field = 7;
+constexpr std::uint32_t k_reference_pressure_field = 8;
 
 class Parser {
 public:
@@ -217,6 +229,7 @@ public:
     Result<std::vector<catalog::Source>> sources();
     Result<std::vector<SourceFile>> files();
     Result<std::vector<catalog::Body>> bodies();
+    /// The records of QNTY, and of SURF when the pack has it (format 1.4), into the bodies' quantities.
     Result<void> quantities(std::vector<catalog::Body>& bodies);
     Result<std::vector<frames::IauRotationElements>> rotations(const std::vector<catalog::Body>& bodies);
     Result<void> time_data(std::vector<time::LeapSecondEntry>& leaps, time::TdbModel& model, catalog::SourceRef& source);
@@ -486,50 +499,69 @@ Result<std::vector<catalog::Body>> Parser::bodies() {
 }
 
 Result<void> Parser::quantities(std::vector<catalog::Body>& bodies) {
-    const View view = section("QNTY");
-    const Result<std::uint32_t> count = record_count(view, k_quantity_size);
-    if (!count) {
-        return count.error();
-    }
-    std::vector<std::uint32_t> seen(bodies.size(), 0); // bit per field code
-    for (std::uint32_t i = 0; i < count.value(); ++i) {
-        const std::size_t at = k_counts_size + std::size_t{i} * k_quantity_size;
-        const std::uint32_t index = view.u32(at);
-        const std::uint32_t field = view.u32(at + 4);
-        const std::uint32_t unit = view.u32(at + 8);
-        const std::uint32_t flags = view.u32(at + 12);
-        if (index >= bodies.size()) {
-            return format_error("quantity " + std::to_string(i) + ": body index out of range");
+    std::vector<std::uint32_t> seen(bodies.size(), 0); // bit per field code, across both sections
+    for (const std::string_view id : {std::string_view("QNTY"), std::string_view("SURF")}) {
+        const bool surface = id == "SURF";
+        if (surface && !has_section(id)) {
+            continue; // format 1.3 and earlier
         }
-        const std::optional<FieldInfo> info = field_info(field);
-        const std::string what = "quantity " + std::to_string(field) + " of " + catalog::to_string(bodies[index].id);
-        if (!info) {
-            return format_error(what + ": unknown field code");
+        const View view = section(id);
+        const Result<std::uint32_t> count = record_count(view, k_quantity_size);
+        if (!count) {
+            return count.error();
         }
-        if (unit != static_cast<std::uint32_t>(info->unit)) {
-            return format_error(what + ": unit " + std::to_string(unit) + " does not match the field");
-        }
-        if ((seen[index] >> field) & 1u) {
-            return format_error(what + " appears twice");
-        }
-        seen[index] |= 1u << field;
-        Result<std::string> source = source_id(view.u32(at + 32));
-        Result<std::string> locator = text(view, at + 40);
-        Result<std::string> derivation = text(view, at + 48);
-        for (const Result<std::string>* r : {&source, &locator, &derivation}) {
-            if (!*r) {
-                return r->error();
+        for (std::uint32_t i = 0; i < count.value(); ++i) {
+            const std::size_t at = k_counts_size + std::size_t{i} * k_quantity_size;
+            const std::uint32_t index = view.u32(at);
+            const std::uint32_t field = view.u32(at + 4);
+            const std::uint32_t unit = view.u32(at + 8);
+            const std::uint32_t flags = view.u32(at + 12);
+            if (index >= bodies.size()) {
+                return format_error(std::string(id) + " record " + std::to_string(i) + ": body index out of range");
             }
+            const std::optional<FieldInfo> info = field_info(field);
+            const std::string what =
+                "quantity " + std::to_string(field) + " of " + catalog::to_string(bodies[index].id);
+            if (!info) {
+                return format_error(what + ": unknown field code");
+            }
+            if ((field >= k_first_surface_field) != surface) {
+                return format_error(what + ": the field does not belong in section " + std::string(id));
+            }
+            if (unit != static_cast<std::uint32_t>(info->unit)) {
+                return format_error(what + ": unit " + std::to_string(unit) + " does not match the field");
+            }
+            if ((seen[index] >> field) & 1u) {
+                return format_error(what + " appears twice");
+            }
+            seen[index] |= 1u << field;
+            Result<std::string> source = source_id(view.u32(at + 32));
+            Result<std::string> locator = text(view, at + 40);
+            Result<std::string> derivation = text(view, at + 48);
+            for (const Result<std::string>* r : {&source, &locator, &derivation}) {
+                if (!*r) {
+                    return r->error();
+                }
+            }
+            catalog::Quantity quantity;
+            quantity.value = view.f64(at + 16);
+            quantity.unit = info->unit;
+            if ((flags & k_quantity_has_uncertainty) != 0) {
+                quantity.uncertainty = view.f64(at + 24);
+            }
+            // The SURF constraints (DATA_PACK.md): a positive temperature and reference pressure, and a surface
+            // pressure that is not negative. Non-finite values are refused by the catalog.
+            const double value = *quantity.value;
+            if ((field == k_mean_temperature_field || field == k_reference_pressure_field) && !(value > 0.0)) {
+                return format_error(what + " must be positive");
+            }
+            if (field == k_surface_pressure_field && !(value >= 0.0)) {
+                return format_error(what + " must not be negative");
+            }
+            quantity.source = catalog::SourceRef{std::move(source).value(), std::move(locator).value()};
+            quantity.derivation = std::move(derivation).value();
+            bodies[index].*(info->member) = std::move(quantity);
         }
-        catalog::Quantity quantity;
-        quantity.value = view.f64(at + 16);
-        quantity.unit = info->unit;
-        if ((flags & k_quantity_has_uncertainty) != 0) {
-            quantity.uncertainty = view.f64(at + 24);
-        }
-        quantity.source = catalog::SourceRef{std::move(source).value(), std::move(locator).value()};
-        quantity.derivation = std::move(derivation).value();
-        bodies[index].*(info->member) = std::move(quantity);
     }
     return {};
 }

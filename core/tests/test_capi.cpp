@@ -67,7 +67,7 @@ usim::sim::Simulation cpp_simulation() {
 
 TEST_CASE("C ABI reports the ABI version of its header", "[capi]") {
     CHECK(usim_abi_version() == USIM_ABI_VERSION);
-    CHECK(USIM_ABI_VERSION == 5u);
+    CHECK(USIM_ABI_VERSION == 7u);
 }
 
 TEST_CASE("C ABI version string matches the core", "[capi]") {
@@ -188,6 +188,41 @@ TEST_CASE("C ABI catalog queries", "[capi]") {
     REQUIRE(usim_body_quantity(h.sim, 0, USIM_FIELD_GM, &q) == USIM_STATUS_OK);
     CHECK(q.has_value == 0);
     CHECK(usim_body_quantity(h.sim, 0, 42, &q) == USIM_STATUS_INVALID_ARGUMENT);
+
+    // Surface conditions (ABI version 6): the synthetic planet's reference surface is a pressure level, the moon's
+    // is solid, the dwarf planet's unknown; the values carry their sources.
+    REQUIRE(usim_body_quantity(h.sim, 2, USIM_FIELD_REFERENCE_PRESSURE, &q) == USIM_STATUS_OK); // 1001
+    CHECK(q.has_value == 1);
+    CHECK(q.unit == USIM_UNIT_PA);
+    CHECK(std::string_view{q.source_id} == "S-TEST-B");
+    REQUIRE(usim_body_quantity(h.sim, 2, USIM_FIELD_MEAN_TEMPERATURE, &q) == USIM_STATUS_OK);
+    CHECK(q.unit == USIM_UNIT_K);
+    CHECK(std::string_view{q.derivation}.find("celsius") != std::string_view::npos);
+    REQUIRE(usim_body_quantity(h.sim, 2, USIM_FIELD_SURFACE_PRESSURE, &q) == USIM_STATUS_OK);
+    CHECK(q.has_value == 0);
+    std::int32_t kind = -1;
+    REQUIRE(usim_body_surface_kind(h.sim, 2, &kind) == USIM_STATUS_OK);
+    CHECK(kind == USIM_SURFACE_PRESSURE_LEVEL);
+    REQUIRE(usim_body_surface_kind(h.sim, 3, &kind) == USIM_STATUS_OK); // 1002
+    CHECK(kind == USIM_SURFACE_SOLID);
+    REQUIRE(usim_body_surface_kind(h.sim, 4, &kind) == USIM_STATUS_OK); // 1003
+    CHECK(kind == USIM_SURFACE_UNKNOWN);
+    CHECK(usim_body_surface_kind(h.sim, count, &kind) == USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_body_surface_kind(h.sim, 2, nullptr) == USIM_STATUS_INVALID_ARGUMENT);
+
+    // Atmospheres (ABI version 7, ADR-0018): the planet's reference level and the moon's positive surface pressure
+    // mean one; the dwarf planet's conditions are unknown.
+    std::int32_t atmosphere = -1;
+    REQUIRE(usim_body_atmosphere(h.sim, 2, &atmosphere) == USIM_STATUS_OK); // 1001
+    CHECK(atmosphere == USIM_ATMOSPHERE_PRESENT);
+    REQUIRE(usim_body_atmosphere(h.sim, 3, &atmosphere) == USIM_STATUS_OK); // 1002
+    CHECK(atmosphere == USIM_ATMOSPHERE_PRESENT);
+    REQUIRE(usim_body_atmosphere(h.sim, 4, &atmosphere) == USIM_STATUS_OK); // 1003
+    CHECK(atmosphere == USIM_ATMOSPHERE_UNKNOWN);
+    REQUIRE(usim_body_atmosphere(h.sim, 0, &atmosphere) == USIM_STATUS_OK); // no surface conditions
+    CHECK(atmosphere == USIM_ATMOSPHERE_UNKNOWN);
+    CHECK(usim_body_atmosphere(h.sim, count, &atmosphere) == USIM_STATUS_INVALID_ARGUMENT);
+    CHECK(usim_body_atmosphere(h.sim, 2, nullptr) == USIM_STATUS_INVALID_ARGUMENT);
     CHECK(usim_body_info_at(h.sim, count, &planet) == USIM_STATUS_INVALID_ARGUMENT);
     std::int32_t index = 0;
     CHECK(usim_body_find(h.sim, naif(4242), &index) == USIM_STATUS_NOT_FOUND);

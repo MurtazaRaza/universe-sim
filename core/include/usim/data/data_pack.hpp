@@ -34,7 +34,7 @@ struct FormatVersion {
 };
 
 /// The format version this reader implements.
-inline constexpr FormatVersion k_format_version{1, 3};
+inline constexpr FormatVersion k_format_version{1, 4};
 
 /// The fixed header of a pack.
 struct DataPackHeader {

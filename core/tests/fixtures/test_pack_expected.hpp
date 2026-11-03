@@ -10,8 +10,8 @@
 namespace usim::test::pack {
 
 inline constexpr const char* k_file_name = "test_pack_v1.uspack";
-inline constexpr std::uint64_t k_file_size = 5656;
-inline constexpr const char* k_content_sha256 = "7a86af4fa03cc8d205e6979a0b774e6bb7031c2fde1403635b39144bbdf4c8ad";
+inline constexpr std::uint64_t k_file_size = 6048;
+inline constexpr const char* k_content_sha256 = "ef49fd7e774057c591ada54477ab56cf6fbb109d4f42ad3bf8a91921600ef73f";
 inline constexpr const char* k_lock_sha256 = "d916b278e664651247fc46d544faa2998e0c91344b3a397ac5f2ec811d467c78";
 
 struct MetaRow {
@@ -86,7 +86,11 @@ inline constexpr QuantityRow k_quantities[] = {
     {1001, 3, 1, 3.5, false, 0.0, "S-TEST-B", "synthetic-b.txt RADII[0]", ""},
     {1001, 4, 1, 2.5, false, 0.0, "S-TEST-B", "synthetic-b.txt RADII[1]", ""},
     {1001, 5, 1, 1.5, false, 0.0, "S-TEST-B", "synthetic-b.txt RADII[2]", ""},
+    {1001, 6, 7, 123.5, false, 0.0, "S-TEST-B", "synthetic-b.txt TEMP", "converted from -149.65 celsius (synthetic)"},
+    {1001, 8, 8, 250000.0, false, 0.0, "S-TEST-B", "synthetic-b.txt LEVEL", ""},
     {1002, 1, 6, 0.0625, true, 0.001953125, "S-TEST-A", "synthetic-a.bin GM2", ""},
+    {1002, 6, 7, 42.25, true, 0.5, "S-TEST-A", "synthetic-a.bin TEMP2", ""},
+    {1002, 7, 8, 0.5, false, 0.0, "S-TEST-A", "synthetic-a.bin PRES2", ""},
 };
 
 inline constexpr double k_rotation0_pole_ra[] = {1.0};

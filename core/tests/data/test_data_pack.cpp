@@ -151,7 +151,8 @@ TEST_CASE("Data pack bodies and quantities round-trip", "[data][pack]") {
 
     std::size_t present = 0;
     for (const auto& body : catalog.bodies()) {
-        for (const auto* q : {&body.gm, &body.mean_radius, &body.radius_a, &body.radius_b, &body.radius_c}) {
+        for (const auto* q : {&body.gm, &body.mean_radius, &body.radius_a, &body.radius_b, &body.radius_c,
+                              &body.mean_temperature, &body.surface_pressure, &body.reference_pressure}) {
             present += q->has_value() ? 1 : 0;
         }
     }
@@ -159,8 +160,12 @@ TEST_CASE("Data pack bodies and quantities round-trip", "[data][pack]") {
     for (const auto& e : expected::k_quantities) {
         const auto* body = catalog.find(BodyId::naif(e.naif_id));
         REQUIRE(body != nullptr);
-        const usim::catalog::Quantity* fields[] = {nullptr, &body->gm, &body->mean_radius, &body->radius_a,
-                                                   &body->radius_b, &body->radius_c};
+        // Fields 1 to 5 from QNTY, 6 to 8 from SURF (format 1.4).
+        const usim::catalog::Quantity* fields[] = {nullptr,          &body->gm,
+                                                   &body->mean_radius, &body->radius_a,
+                                                   &body->radius_b,  &body->radius_c,
+                                                   &body->mean_temperature, &body->surface_pressure,
+                                                   &body->reference_pressure};
         const auto& q = *fields[e.field];
         INFO("body " << e.naif_id << " field " << e.field);
         REQUIRE(q.has_value());
@@ -176,6 +181,10 @@ TEST_CASE("Data pack bodies and quantities round-trip", "[data][pack]") {
     }
     // A body without values keeps them missing, not zero.
     CHECK_FALSE(catalog.find(BodyId::naif(1003))->gm.has_value());
+    // The kinds of reference surface follow from the surface conditions (ADR-0017).
+    CHECK(usim::catalog::surface_kind(*catalog.find(BodyId::naif(1001))) == usim::catalog::SurfaceKind::pressure_level);
+    CHECK(usim::catalog::surface_kind(*catalog.find(BodyId::naif(1002))) == usim::catalog::SurfaceKind::solid);
+    CHECK(usim::catalog::surface_kind(*catalog.find(BodyId::naif(1003))) == usim::catalog::SurfaceKind::unknown);
 }
 
 TEST_CASE("Data pack rotation elements round-trip", "[data][pack]") {
@@ -431,6 +440,49 @@ TEST_CASE("The reader rejects damaged and incompatible packs", "[data][pack]") {
         REQUIRE(result.has_value());
         CHECK(result.value().star_catalog().stars.empty());
         CHECK(result.value().rings().empty());
+    }
+    SECTION("a pack without SURF (format 1.3) has no surface conditions") {
+        auto bytes = good;
+        std::memcpy(bytes.data() + section_entry(bytes, "SURF"), "ZZZ5", 4); // unknown sections are skipped
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE(result.has_value());
+        for (const auto& body : result.value().catalog().bodies()) {
+            CHECK_FALSE(body.mean_temperature.has_value());
+            CHECK(usim::catalog::surface_kind(body) == usim::catalog::SurfaceKind::unknown);
+        }
+    }
+    SECTION("surface conditions break the SURF constraints") {
+        // SURF holds, in order: 1001 mean_temperature, 1001 reference_pressure, 1002 mean_temperature and
+        // 1002 surface_pressure (the synthetic pack); a record's value is at its byte 16.
+        std::uint64_t surf = 0;
+        std::memcpy(&surf, good.data() + section_entry(good, "SURF") + 8, 8);
+        const auto with_value = [&](std::size_t record, double value) {
+            auto bytes = good;
+            std::memcpy(bytes.data() + surf + 8 + record * 56 + 16, &value, 8);
+            rehash(bytes);
+            return bytes;
+        };
+        const auto message = [](const std::vector<std::byte>& bytes) {
+            const auto result = DataPack::parse(bytes);
+            REQUIRE_FALSE(result.has_value());
+            CHECK(result.error().code == ErrorCode::data_format);
+            return result.error().message;
+        };
+        CHECK(message(with_value(0, 0.0)).find("must be positive") != std::string::npos);
+        CHECK(message(with_value(1, -1.0)).find("must be positive") != std::string::npos);
+        CHECK(message(with_value(3, -0.5)).find("must not be negative") != std::string::npos);
+        // Zero is a valid surface pressure.
+        REQUIRE(DataPack::parse(with_value(3, 0.0)).has_value());
+    }
+    SECTION("surface fields belong in SURF and the others in QNTY") {
+        auto bytes = good;
+        std::memcpy(bytes.data() + section_entry(good, "QNTY"), "SURF", 4); // swap the two sections' ids
+        std::memcpy(bytes.data() + section_entry(good, "SURF"), "QNTY", 4);
+        rehash(bytes);
+        const auto result = DataPack::parse(bytes);
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().message.find("does not belong in section") != std::string::npos);
     }
     SECTION("a pack without ORNT (format 1.2) has no binary PCK orientation models") {
         auto bytes = good;

@@ -14,7 +14,7 @@
  *     and check the struct sizes they declare against usim_struct_size().
  *   - Fallible functions return a status (USIM_STATUS_*). On failure, usim_last_error_message() gives
  *     the reason, and output parameters are left unchanged unless stated otherwise.
- *   - Units: km, s, km/s, rad, km^3/s^2. Times are TDB unless stated otherwise (usim_instant).
+ *   - Units: km, s, km/s, rad, km^3/s^2, K, Pa. Times are TDB unless stated otherwise (usim_instant).
  *
  * Thread safety: functions taking a const usim_simulation* may run on several threads at once. Functions
  * taking a non-const usim_simulation* (loading, the clock, orbit paths, destroy) must not run at the same
@@ -40,7 +40,7 @@ extern "C" {
 #endif
 
 /* Version of this binary interface. */
-#define USIM_ABI_VERSION 5u
+#define USIM_ABI_VERSION 7u
 
 /* Returns the ABI version the library was built with (USIM_ABI_VERSION of its header). */
 USIM_API uint32_t usim_abi_version(void);
@@ -219,6 +219,11 @@ USIM_API int32_t usim_body_find(const usim_simulation* sim, usim_body_id id, int
 #define USIM_FIELD_RADIUS_A 3
 #define USIM_FIELD_RADIUS_B 4
 #define USIM_FIELD_RADIUS_C 5
+/* Surface conditions (pack format 1.4, ADR-0017; ABI version 6). The reference surface is the ellipsoid of the
+ * radii; see usim_body_surface_kind. */
+#define USIM_FIELD_MEAN_TEMPERATURE 6   /* K: at the reference surface, averaged over the body */
+#define USIM_FIELD_SURFACE_PRESSURE 7   /* Pa: at the solid surface */
+#define USIM_FIELD_REFERENCE_PRESSURE 8 /* Pa: the pressure level the radii refer to (no solid surface there) */
 
 /* Units (usim::catalog::Unit). */
 #define USIM_UNIT_NONE 0
@@ -228,6 +233,8 @@ USIM_API int32_t usim_body_find(const usim_simulation* sim, usim_body_id id, int
 #define USIM_UNIT_RAD 4
 #define USIM_UNIT_RAD_PER_S 5
 #define USIM_UNIT_KM3_PER_S2 6
+#define USIM_UNIT_K 7  /* kelvin (ABI version 6) */
+#define USIM_UNIT_PA 8 /* pascal (ABI version 6) */
 
 /* A sourced value with its provenance (FR-DATA). has_value 0 means no source provides it. */
 typedef struct usim_quantity {
@@ -244,6 +251,24 @@ typedef struct usim_quantity {
 
 /* A value of the body at index. Fails with USIM_STATUS_INVALID_ARGUMENT for an unknown field. */
 USIM_API int32_t usim_body_quantity(const usim_simulation* sim, int32_t index, int32_t field, usim_quantity* out);
+
+/* Kinds of reference surface (usim::catalog::SurfaceKind, ADR-0017; ABI version 6). */
+#define USIM_SURFACE_UNKNOWN 0        /* no source in the pack says */
+#define USIM_SURFACE_SOLID 1          /* solid ground: the body has USIM_FIELD_SURFACE_PRESSURE */
+#define USIM_SURFACE_PRESSURE_LEVEL 2 /* a level in the atmosphere: the body has USIM_FIELD_REFERENCE_PRESSURE */
+
+/* What the reference surface (the ellipsoid of the radii) of the body at index is: USIM_SURFACE_*, from its
+ * surface conditions, whose sources usim_body_quantity gives. */
+USIM_API int32_t usim_body_surface_kind(const usim_simulation* sim, int32_t index, int32_t* out_kind);
+
+/* Whether a body has an atmosphere (usim::catalog::Atmosphere, ADR-0018; ABI version 7). */
+#define USIM_ATMOSPHERE_UNKNOWN 0 /* no source in the pack says */
+#define USIM_ATMOSPHERE_NONE 1    /* surface pressure zero at the source's precision (an exosphere may exist) */
+#define USIM_ATMOSPHERE_PRESENT 2 /* a positive surface pressure, or a reference pressure level */
+
+/* Whether the body at index has an atmosphere: USIM_ATMOSPHERE_*, from its surface conditions, whose sources
+ * usim_body_quantity gives. */
+USIM_API int32_t usim_body_atmosphere(const usim_simulation* sim, int32_t index, int32_t* out_atmosphere);
 
 /* Why a body is approximate (ADR-0008), or "" if it is not. */
 USIM_API int32_t usim_body_approximation(const usim_simulation* sim, int32_t index, const char** out_reason);

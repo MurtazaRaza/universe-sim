@@ -96,7 +96,7 @@ TEST_CASE("usim reports query failures with the status", "[cli]") {
 TEST_CASE("usim catalog and coverage", "[cli]") {
     const Output json = run({"catalog"});
     REQUIRE(json.code == 0);
-    CHECK(contains(json.out, R"("format":"1.3")"));
+    CHECK(contains(json.out, R"("format":"1.4")"));
     CHECK(contains(
         json.out,
         R"("position":"approximate","approximation":"Synthetic: no segment; placed at its primary")"));
@@ -106,10 +106,17 @@ TEST_CASE("usim catalog and coverage", "[cli]") {
     CHECK(contains(json.out, R"("rotation_model":"iau")"));        // 1000
     CHECK(contains(json.out, R"("rotation_model":"binary-pck")")); // 1001 and 1002
     CHECK(contains(json.out, R"("rotation_model":"none")"));       // 1003
+    // Surface conditions (ADR-0017): the kinds and a sourced value of the synthetic pack.
+    CHECK(contains(json.out, R"("surface":"pressure_level","atmosphere":"present")")); // 1001 (ADR-0018)
+    CHECK(contains(json.out, R"("surface":"solid")"));          // 1002
+    CHECK(contains(json.out, R"("surface":"unknown","atmosphere":"unknown")")); // 1000 and 1003
+    CHECK(contains(json.out, R"("unit":"Pa","uncertainty":null,"source":"S-TEST-B","locator":"synthetic-b.txt LEVEL")"));
     const Output csv = run({"catalog", "--format", "csv"});
     REQUIRE(csv.code == 0);
     CHECK(lines(csv.out) == 1 + std::size(expected::k_bodies));
     CHECK(contains(csv.out, ",ephemeris,binary-pck,"));
+    CHECK(contains(csv.out, ",surface,atmosphere,mean_temperature_k,surface_pressure_pa,reference_pressure_pa\n"));
+    CHECK(contains(csv.out, ",pressure_level,present,123.5,,250000\n"));
     const Output coverage = run({"coverage", "--format", "csv"});
     REQUIRE(coverage.code == 0);
     CHECK(contains(coverage.out, ",3600,86400\n"));
@@ -162,6 +169,7 @@ TEST_CASE("usim transfer, site and day", "[cli][exploration]") {
     CHECK(contains(site.out, "\"longitude_deg\":-45"));
     CHECK(contains(site.out, "\"altitude_km\":0.5"));
     CHECK(contains(site.out, "\"flags\":\"sun\"")); // no star radius, no planet GM in the synthetic pack
+    CHECK(contains(site.out, R"("surface":"pressure_level","atmosphere":"present","mean_temperature":{"value":123.5,"unit":"K")"));
     const Output site_csv = run(
         {"site", "1001", "--lat", "20", "--lon", "-45", "--time", t, "--axes", "unity", "--format", "csv"});
     CHECK(site_csv.code == usim::cli::k_exit_ok);

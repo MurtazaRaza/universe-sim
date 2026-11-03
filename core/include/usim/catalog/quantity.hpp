@@ -34,9 +34,11 @@ enum class Unit : std::uint8_t {
     rad,        ///< Radians.
     rad_per_s,  ///< Radians per second.
     km3_per_s2, ///< Gravitational parameter, km^3/s^2.
+    kelvin,     ///< Temperature, kelvin (pack format 1.4).
+    pascal,     ///< Pressure, pascals (pack format 1.4).
 };
 
-/// Unit symbol: "", "km", "s", "km/s", "rad", "rad/s" or "km^3/s^2".
+/// Unit symbol: "", "km", "s", "km/s", "rad", "rad/s", "km^3/s^2", "K" or "Pa".
 [[nodiscard]] std::string_view to_string(Unit unit) noexcept;
 
 /// A physical value with its provenance (SPEC section 10). A missing value is explicit (no value),

@@ -17,6 +17,7 @@ using usim::catalog::BodyId;
 using usim::catalog::BodyKind;
 using usim::catalog::Quantity;
 using usim::catalog::Source;
+using usim::catalog::SurfaceKind;
 using usim::catalog::Unit;
 
 // The values in these tests are synthetic (round numbers from a fake source). They test the catalog's
@@ -148,6 +149,19 @@ TEST_CASE("catalog validation", "[catalog]") {
         bodies[1].gm = sourced(1.0, Unit::km3_per_s2, "");
         CHECK(create_error(test_sources(), bodies) == ErrorCode::data_format);
     }
+    SECTION("a surface pressure and a reference pressure on one body") {
+        auto bodies = test_bodies();
+        bodies[1].surface_pressure = sourced(1.0, Unit::pascal);
+        bodies[1].reference_pressure = sourced(2.0, Unit::pascal);
+        CHECK(create_error(test_sources(), bodies) == ErrorCode::data_format);
+        bodies[1].reference_pressure = Quantity::missing(Unit::pascal);
+        CHECK(BodyCatalog::create(test_sources(), bodies).has_value());
+    }
+    SECTION("an unsourced surface condition") {
+        auto bodies = test_bodies();
+        bodies[1].mean_temperature = sourced(3.0, Unit::kelvin, "UNKNOWN");
+        CHECK(create_error(test_sources(), bodies) == ErrorCode::data_format);
+    }
     SECTION("non-finite value or bad uncertainty") {
         auto bodies = test_bodies();
         bodies[1].gm = sourced(std::numeric_limits<double>::quiet_NaN(), Unit::km3_per_s2);
@@ -179,4 +193,33 @@ TEST_CASE("identifier and kind names", "[catalog]") {
     CHECK(k_sun < k_earth);
     CHECK_FALSE(BodyId{}.is_valid());
     CHECK(BodyCatalog().size() == 0);
+}
+
+TEST_CASE("the kind of reference surface follows from the surface conditions", "[catalog]") {
+    // Synthetic values; only which quantities are present matters (ADR-0017).
+    Body b;
+    CHECK(surface_kind(b) == SurfaceKind::unknown);
+    b.mean_temperature = sourced(3.0, Unit::kelvin);
+    CHECK(surface_kind(b) == SurfaceKind::unknown); // a temperature alone says nothing about the surface
+    b.surface_pressure = sourced(0.0, Unit::pascal);
+    CHECK(surface_kind(b) == SurfaceKind::solid);
+    b.surface_pressure = Quantity::missing(Unit::pascal);
+    b.reference_pressure = sourced(7.0, Unit::pascal);
+    CHECK(surface_kind(b) == SurfaceKind::pressure_level);
+    CHECK(to_string(SurfaceKind::pressure_level) == "pressure_level");
+
+    // Whether there is an atmosphere (ADR-0018): a reference pressure level, or a positive surface pressure.
+    using usim::catalog::Atmosphere;
+    CHECK(atmosphere(b) == Atmosphere::present); // the reference pressure above
+    b.reference_pressure = Quantity::missing(Unit::pascal);
+    CHECK(atmosphere(b) == Atmosphere::unknown); // the temperature alone says nothing
+    b.surface_pressure = sourced(0.0, Unit::pascal);
+    CHECK(atmosphere(b) == Atmosphere::none);
+    b.surface_pressure = sourced(2.0, Unit::pascal);
+    CHECK(atmosphere(b) == Atmosphere::present);
+    CHECK(to_string(Atmosphere::none) == "none");
+    CHECK(to_string(Atmosphere::present) == "present");
+    CHECK(to_string(Atmosphere::unknown) == "unknown");
+    CHECK(to_string(Unit::kelvin) == "K");
+    CHECK(to_string(Unit::pascal) == "Pa");
 }

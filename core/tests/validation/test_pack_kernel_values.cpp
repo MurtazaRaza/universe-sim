@@ -175,7 +175,8 @@ TEST_CASE("Default pack provenance is complete", "[validation][pack]") {
         CHECK(pack.catalog().find_source(file.source_id) != nullptr);
     }
     for (const auto& body : pack.catalog().bodies()) {
-        for (const auto* q : {&body.gm, &body.mean_radius, &body.radius_a, &body.radius_b, &body.radius_c}) {
+        for (const auto* q : {&body.gm, &body.mean_radius, &body.radius_a, &body.radius_b, &body.radius_c,
+                              &body.mean_temperature, &body.surface_pressure, &body.reference_pressure}) {
             if (q->has_value()) {
                 CHECK(pack.catalog().find_source(q->source.source_id) != nullptr);
                 CHECK_FALSE(q->source.locator.empty());
@@ -185,5 +186,43 @@ TEST_CASE("Default pack provenance is complete", "[validation][pack]") {
     for (const auto& s : pack.ephemeris_segments()) {
         CHECK(pack.catalog().find_source(s.source.source_id) != nullptr);
         CHECK(s.source.locator.starts_with("de440s.bsp segment "));
+    }
+}
+
+TEST_CASE("Default pack surface conditions (ADR-0017)", "[validation][pack]") {
+    const auto& catalog = v::default_pack().catalog();
+    using usim::catalog::SurfaceKind;
+    // The kinds of reference surface the sources give: solid for the bodies the NSSDC notes call terrestrial,
+    // the 1 bar level for the giant planets, nothing for the Sun and the barycenters.
+    const std::map<std::int64_t, SurfaceKind> kinds = {
+        {199, SurfaceKind::solid},          {299, SurfaceKind::solid},          {399, SurfaceKind::solid},
+        {301, SurfaceKind::solid},          {499, SurfaceKind::solid},          {999, SurfaceKind::solid},
+        {599, SurfaceKind::pressure_level}, {699, SurfaceKind::pressure_level}, {799, SurfaceKind::pressure_level},
+        {899, SurfaceKind::pressure_level}};
+    for (const auto& body : catalog.bodies()) {
+        INFO(body.name);
+        const auto it = kinds.find(body.id.value);
+        CHECK(usim::catalog::surface_kind(body) == (it != kinds.end() ? it->second : SurfaceKind::unknown));
+        CHECK(body.mean_temperature.has_value() == (it != kinds.end()));
+        // Atmospheres (ADR-0018): the fact sheets' table gives Mercury and the Moon a surface pressure of 0 bar;
+        // every other body with conditions has a positive one or a pressure level.
+        using usim::catalog::Atmosphere;
+        const bool zero_pressure = body.id.value == 199 || body.id.value == 301;
+        CHECK(usim::catalog::atmosphere(body) == (it == kinds.end() ? Atmosphere::unknown
+                                                  : zero_pressure     ? Atmosphere::none
+                                                                      : Atmosphere::present));
+        for (const auto* q : {&body.mean_temperature, &body.surface_pressure, &body.reference_pressure}) {
+            if (!q->has_value()) {
+                continue;
+            }
+            // Transcribed from the source's text and converted by definition, with the conversion recorded.
+            CHECK(q->derivation.starts_with("converted from "));
+            const auto* source = catalog.find_source(q->source.source_id);
+            REQUIRE(source != nullptr);
+            // Neptune's 1 bar level comes from the IAU kernel (Tier 1); the rest from the fact sheets (Tier 2).
+            const bool neptune_level = body.id.value == 899 && q == &body.reference_pressure;
+            CHECK(source->id == (neptune_level ? "S-NAIF-PCK11" : "S-NSSDC-FACT"));
+            CHECK(source->tier == (neptune_level ? 1 : 2));
+        }
     }
 }

@@ -47,6 +47,14 @@ static_assert(USIM_BODY_MOON == static_cast<std::int32_t>(usim::catalog::BodyKin
 static_assert(USIM_BODY_DWARF_PLANET == static_cast<std::int32_t>(usim::catalog::BodyKind::dwarf_planet));
 static_assert(USIM_UNIT_KM == static_cast<std::int32_t>(usim::catalog::Unit::km));
 static_assert(USIM_UNIT_KM3_PER_S2 == static_cast<std::int32_t>(usim::catalog::Unit::km3_per_s2));
+static_assert(USIM_UNIT_K == static_cast<std::int32_t>(usim::catalog::Unit::kelvin));
+static_assert(USIM_UNIT_PA == static_cast<std::int32_t>(usim::catalog::Unit::pascal));
+static_assert(USIM_SURFACE_UNKNOWN == static_cast<std::int32_t>(usim::catalog::SurfaceKind::unknown));
+static_assert(USIM_SURFACE_SOLID == static_cast<std::int32_t>(usim::catalog::SurfaceKind::solid));
+static_assert(USIM_SURFACE_PRESSURE_LEVEL == static_cast<std::int32_t>(usim::catalog::SurfaceKind::pressure_level));
+static_assert(USIM_ATMOSPHERE_UNKNOWN == static_cast<std::int32_t>(usim::catalog::Atmosphere::unknown));
+static_assert(USIM_ATMOSPHERE_NONE == static_cast<std::int32_t>(usim::catalog::Atmosphere::none));
+static_assert(USIM_ATMOSPHERE_PRESENT == static_cast<std::int32_t>(usim::catalog::Atmosphere::present));
 static_assert(USIM_SCALE_TDB == static_cast<std::int32_t>(usim::time::TimeScale::tdb));
 static_assert(USIM_SCALE_UTC == static_cast<std::int32_t>(usim::time::TimeScale::utc));
 static_assert(USIM_CALENDAR_GREGORIAN == static_cast<std::int32_t>(usim::time::Calendar::gregorian));
@@ -423,6 +431,15 @@ USIM_API int32_t usim_body_quantity(const usim_simulation* sim, int32_t index, i
         case USIM_FIELD_RADIUS_C:
             q = &body->radius_c;
             break;
+        case USIM_FIELD_MEAN_TEMPERATURE:
+            q = &body->mean_temperature;
+            break;
+        case USIM_FIELD_SURFACE_PRESSURE:
+            q = &body->surface_pressure;
+            break;
+        case USIM_FIELD_REFERENCE_PRESSURE:
+            q = &body->reference_pressure;
+            break;
         default:
             return invalid("unknown quantity field");
         }
@@ -436,6 +453,36 @@ USIM_API int32_t usim_body_quantity(const usim_simulation* sim, int32_t index, i
         result.locator = q->source.locator.c_str();
         result.derivation = q->derivation.c_str();
         *out = result;
+        return USIM_STATUS_OK;
+    });
+}
+
+USIM_API int32_t usim_body_surface_kind(const usim_simulation* sim, int32_t index, int32_t* out_kind) {
+    return guarded([&] {
+        if (sim == nullptr || out_kind == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : "out_kind");
+        }
+        std::int32_t status = USIM_STATUS_OK;
+        const usim::catalog::Body* body = body_at(sim, index, status);
+        if (body == nullptr) {
+            return status;
+        }
+        *out_kind = static_cast<std::int32_t>(usim::catalog::surface_kind(*body));
+        return USIM_STATUS_OK;
+    });
+}
+
+USIM_API int32_t usim_body_atmosphere(const usim_simulation* sim, int32_t index, int32_t* out_atmosphere) {
+    return guarded([&] {
+        if (sim == nullptr || out_atmosphere == nullptr) {
+            return null_argument(sim == nullptr ? "sim" : "out_atmosphere");
+        }
+        std::int32_t status = USIM_STATUS_OK;
+        const usim::catalog::Body* body = body_at(sim, index, status);
+        if (body == nullptr) {
+            return status;
+        }
+        *out_atmosphere = static_cast<std::int32_t>(usim::catalog::atmosphere(*body));
         return USIM_STATUS_OK;
     });
 }

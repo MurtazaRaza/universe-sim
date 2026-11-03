@@ -46,8 +46,53 @@ std::string_view to_string(Unit unit) noexcept {
         return "rad/s";
     case Unit::km3_per_s2:
         return "km^3/s^2";
+    case Unit::kelvin:
+        return "K";
+    case Unit::pascal:
+        return "Pa";
     }
     return "";
+}
+
+SurfaceKind surface_kind(const Body& body) noexcept {
+    if (body.reference_pressure.has_value()) {
+        return SurfaceKind::pressure_level;
+    }
+    return body.surface_pressure.has_value() ? SurfaceKind::solid : SurfaceKind::unknown;
+}
+
+std::string_view to_string(SurfaceKind kind) noexcept {
+    switch (kind) {
+    case SurfaceKind::unknown:
+        return "unknown";
+    case SurfaceKind::solid:
+        return "solid";
+    case SurfaceKind::pressure_level:
+        return "pressure_level";
+    }
+    return "unknown";
+}
+
+Atmosphere atmosphere(const Body& body) noexcept {
+    if (body.reference_pressure.has_value()) {
+        return Atmosphere::present;
+    }
+    if (body.surface_pressure.has_value()) {
+        return *body.surface_pressure.value > 0.0 ? Atmosphere::present : Atmosphere::none;
+    }
+    return Atmosphere::unknown;
+}
+
+std::string_view to_string(Atmosphere atmosphere) noexcept {
+    switch (atmosphere) {
+    case Atmosphere::unknown:
+        return "unknown";
+    case Atmosphere::none:
+        return "none";
+    case Atmosphere::present:
+        return "present";
+    }
+    return "unknown";
 }
 
 std::string_view to_string(BodyKind kind) noexcept {
@@ -142,16 +187,24 @@ Result<BodyCatalog> BodyCatalog::create(std::vector<Source> sources, std::vector
         if (body.name.empty()) {
             return catalog_error(label + " has an empty name");
         }
-        const std::pair<const Quantity*, std::string_view> fields[] = {{&body.gm, "gm"},
-                                                                        {&body.mean_radius, "mean_radius"},
-                                                                        {&body.radius_a, "radius_a"},
-                                                                        {&body.radius_b, "radius_b"},
-                                                                        {&body.radius_c, "radius_c"}};
+        const std::pair<const Quantity*, std::string_view> fields[] = {
+            {&body.gm, "gm"},
+            {&body.mean_radius, "mean_radius"},
+            {&body.radius_a, "radius_a"},
+            {&body.radius_b, "radius_b"},
+            {&body.radius_c, "radius_c"},
+            {&body.mean_temperature, "mean_temperature"},
+            {&body.surface_pressure, "surface_pressure"},
+            {&body.reference_pressure, "reference_pressure"}};
         for (const auto& [quantity, field] : fields) {
             const std::string problem = check_quantity(*quantity, field, source_ids);
             if (!problem.empty()) {
                 return catalog_error(label + " " + problem);
             }
+        }
+        // A reference surface is solid or a pressure level, not both (ADR-0017).
+        if (body.surface_pressure.has_value() && body.reference_pressure.has_value()) {
+            return catalog_error(label + " has both a surface pressure and a reference pressure");
         }
     }
 
