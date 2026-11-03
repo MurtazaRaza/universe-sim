@@ -25,17 +25,16 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _DayCurve: 2.2
     - _EngineGlow: 0.4
-    - _NightLift: 0.18
+    - _NightLift: 0.15
+    - _Occlusion: 0.7
     - _Sunlit: 1
     m_Colors:
     - _EngineColor: {r: 1.8, g: 3.4, b: 4, a: 1}
+    - _Glass: {r: 0.8, g: 90, b: 1.6, a: 0}
     - _LightDirection: {r: 0, g: 1, b: 0, a: 0}
-    - _LightTint: {r: 1.1, g: 1.04, b: 0.95, a: 1}
-    - _NightTint: {r: 0.39999998, g: 0.45, b: 1, a: 1}
-    - _Rim: {r: 0.45, g: 3, b: 0, a: 0}
-    - _ShadeTint: {r: 0.75, g: 0.8, b: 1.05, a: 1}
-    - _Sheen: {r: 0.25, g: 12, b: 0, a: 0}
+    - _SkyEdge: {r: 0.5, g: 3, b: 0, a: 0}
+    - _SkyLight: {r: 0, g: 0, b: 0, a: 0}
+    - _SkyUp: {r: 0, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

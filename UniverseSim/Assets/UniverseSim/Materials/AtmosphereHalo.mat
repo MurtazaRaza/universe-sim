@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: AtmosphereHalo
+  m_Shader: {fileID: 4800000, guid: 416d17453f72e274f8e3dada1d93a7a2, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Cull: 2
+    - _DiscReach: 16
+    - _Fade: 1
+    - _Falloff: 2.2
+    - _Intensity: 1
+    - _Thickness: 0.12
+    - _TwilightStrength: 0
+    m_Colors:
+    - _CoreColor: {r: 0.54999995, g: 0.8, b: 1, a: 1}
+    - _HaloColor: {r: 0.19999996, g: 0.45, b: 1, a: 1}
+    - _LightDirection: {r: 0, g: 1, b: 0, a: 0}
+    - _TwilightColor: {r: 1, g: 0.5, b: 0.24999997, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

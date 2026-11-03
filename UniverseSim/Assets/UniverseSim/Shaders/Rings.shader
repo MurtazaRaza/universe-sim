@@ -7,6 +7,14 @@
 // The side facing the light is lit; the other side gets a fraction of it (light that passed through), a
 // display choice. The planet's shadow is the ray from the ring toward the light hitting the planet, an
 // ellipsoid given by its world-to-local matrix (the body mesh is a unit sphere).
+//
+// In the stylized style (A-09, keyword USIM_STYLE_STYLIZED) the optical depth also sets the color, from a sparse to
+// a dense palette color, and the opacity and brightness are raised (docs/ART_DIRECTION.md section 6). The radii,
+// profile, slant opacity, lit and unlit sides and the shadow are as above. The parameters are globals set by
+// StylizedRings.cs, neutral at zero (x = 0 draws the realistic rings):
+// - _UsimRings: x the optical depth where the dense color is reached, y optical depth gain - 1, z brightness - 1.
+// - _UsimRingSparse, _UsimRingDense: the palette's two colors (linear).
+// Color luminance, opacity and brightness all rise with the optical depth, so a denser region never looks thinner.
 Shader "UniverseSim/Rings"
 {
     Properties
@@ -32,6 +40,7 @@ Shader "UniverseSim/Rings"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile _ USIM_STYLE_STYLIZED
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -44,6 +53,11 @@ Shader "UniverseSim/Rings"
 
             TEXTURE2D(_Profile);
             SAMPLER(sampler_Profile);
+
+            // The stylized rings (see the top of this file); global, neutral at zero.
+            float4 _UsimRings;
+            half4 _UsimRingSparse;
+            half4 _UsimRingDense;
 
             struct Attributes
             {
@@ -94,9 +108,17 @@ Shader "UniverseSim/Rings"
                 float3 toCamera = normalize(GetCameraPositionWS() - input.positionWS);
                 float3 light = _LightDirection.xyz;
                 float muView = max(abs(dot(normal, toCamera)), 1e-3);
-                float alpha = 1.0 - exp(-tau / muView);
                 bool litSide = dot(normal, light) * dot(normal, toCamera) > 0.0;
                 float brightness = (litSide ? 1.0 : _UnlitSide) * PlanetShadow(input.positionWS, light);
+            #if defined(USIM_STYLE_STYLIZED)
+                if (_UsimRings.x > 0.0)
+                {
+                    float stylizedAlpha = 1.0 - exp(-tau * (1.0 + _UsimRings.y) / muView);
+                    half3 color = lerp(_UsimRingSparse.rgb, _UsimRingDense.rgb, (half)saturate(tau / _UsimRings.x));
+                    return half4(color * ((half)(1.0 + _UsimRings.z) * brightness + 0.02), stylizedAlpha);
+                }
+            #endif
+                float alpha = 1.0 - exp(-tau / muView);
                 return half4(_BaseColor.rgb * (brightness + 0.02), alpha);
             }
             ENDHLSL

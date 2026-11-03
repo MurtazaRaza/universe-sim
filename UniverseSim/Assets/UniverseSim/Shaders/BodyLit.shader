@@ -175,11 +175,15 @@ Shader "UniverseSim/BodyLit"
                 color += saturate(albedo * 1.8 + 0.08) * (dayMask * _UsimSheen.x * pow(ndh, max(_UsimSheen.y, 1.0)));
 
                 // Rims: along the sunlit limb, fading in after the terminator; along the night limb, fading out
-                // before it.
+                // before it. They outline the body seen from afar, so they fade out as the camera comes down to the
+                // ground (below 5 % of the radius, in the mesh's unit-sphere space), where every view is grazing.
+                float height = length(TransformWorldToObject(GetCameraPositionWS())) - 1.0;
+                float rimFade = smoothstep(0.005, 0.05, height);
                 float ndv = saturate(dot(n, toCamera));
                 half3 rimColor = lerp(1.0, saturate(albedo * 1.6 + 0.25), _UsimRim.z);
-                color += rimColor * (pow(1.0 - ndv, max(_UsimRim.y, 0.5)) * _UsimRim.x * smoothstep(0.0, 0.25, ndl));
-                float nightRim = pow(1.0 - ndv, max(_UsimNightRim.y, 0.5)) * smoothstep(0.0, 0.3, -ndl);
+                color += rimColor * (pow(1.0 - ndv, max(_UsimRim.y, 0.5)) * _UsimRim.x * smoothstep(0.0, 0.25, ndl) *
+                                     rimFade);
+                float nightRim = pow(1.0 - ndv, max(_UsimNightRim.y, 0.5)) * smoothstep(0.0, 0.3, -ndl) * rimFade;
                 color += _UsimNightRimColor.rgb * (nightRim * _UsimNightRim.x);
 
                 // The cap keeps surfaces below the bloom threshold: the color scaled down as a whole, so its hue holds.
