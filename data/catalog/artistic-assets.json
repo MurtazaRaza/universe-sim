@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "description": "Artistic assets of the Unity viewer (A-04, ADR-0015 decision 6): effect textures, artist's impressions, icons, UI art and models that are original or licensed rather than taken from a verified source. Each file lives under UniverseSim/Assets/UniverseSim/Art/ and is listed here with its author, origin and license; an artist's impression also names its body and the references it is based on. `usim-pipeline attribution` (and `usim-pipeline textures`) writes them into ATTRIBUTION.md. List an asset here before committing it. So far every effect, icon, cursor and model is drawn by code, so the list is empty.",
+  "assets": []
+}

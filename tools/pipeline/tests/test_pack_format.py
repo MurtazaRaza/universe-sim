@@ -19,7 +19,7 @@ def test_round_trip_preserves_everything():
     content = synthetic_content()
     header, back = read_pack(write_pack(content))
     assert back == canonical(content)
-    assert header.format_major == 1 and header.format_minor == 3
+    assert header.format_major == 1 and header.format_minor == 4
     assert header.lock_sha256 == content.lock_sha256
     assert back.bodies[4].name == "Test Körper"
     assert back.approximations == [PackApproximation(naif(1003), naif(1000), "Synthetic: no segment; placed at its primary")]
@@ -141,6 +141,60 @@ def test_star_and_ring_sections_are_optional():
     # A pack without stars and rings has no STAR or RING section at all.
     plain = dataclasses.replace(synthetic_content(), star_catalog=None, rings=[])
     assert {"STAR", "RING"}.isdisjoint(read_header(write_pack(plain)).sections)
+
+
+def test_surface_conditions_go_to_their_own_optional_section():
+    content = synthetic_content()
+    data = write_pack(content)
+    header = read_header(data)
+    assert header.format_minor == 4 and "SURF" in header.sections
+    surface = {Field.MEAN_TEMPERATURE, Field.SURFACE_PRESSURE, Field.REFERENCE_PRESSURE}
+    # QNTY keeps the format 1.0 fields; SURF holds the four surface records, in the QNTY record layout.
+    qnty_count = struct.unpack_from("<I", data, header.sections["QNTY"][0])[0]
+    surf_count = struct.unpack_from("<I", data, header.sections["SURF"][0])[0]
+    assert qnty_count == sum(q.field not in surface for q in content.quantities)
+    assert surf_count == sum(q.field in surface for q in content.quantities) == 4
+    # A reader that does not know SURF (format 1.3) reads the rest.
+    index = list(header.sections).index("SURF")
+    _, back = read_pack(_rehash(_patch(data, HEADER.size + index * SECTION.size, b"ZZZS")))
+    assert [q for q in back.quantities if q.field in surface] == []
+    assert len(back.quantities) == qnty_count
+    plain = dataclasses.replace(content, quantities=[q for q in content.quantities if q.field not in surface])
+    assert "SURF" not in read_header(write_pack(plain)).sections
+
+
+@pytest.mark.parametrize(
+    "field, unit, value, message",
+    [
+        (Field.MEAN_TEMPERATURE, Unit.K, 0.0, "must be positive"),
+        (Field.REFERENCE_PRESSURE, Unit.PA, -1.0, "must be positive"),
+        (Field.SURFACE_PRESSURE, Unit.PA, -1.0, "must not be negative"),
+        (Field.SURFACE_PRESSURE, Unit.K, 1.0, "expected PA"),
+    ],
+)
+def test_writer_rejects_invalid_surface_conditions(field, unit, value, message):
+    content = synthetic_content()
+    content.quantities.append(PackQuantity(naif(1003), field, unit, value, None, "S-TEST-A", "x"))
+    with pytest.raises(PipelineError, match=message):
+        write_pack(content)
+
+
+def test_a_body_has_at_most_one_kind_of_reference_surface():
+    content = synthetic_content()  # the test planet has a reference pressure
+    content.quantities.append(PackQuantity(naif(1001), Field.SURFACE_PRESSURE, Unit.PA, 1.0, None, "S-TEST-A", "x"))
+    with pytest.raises(PipelineError, match="both a surface pressure and a reference pressure"):
+        write_pack(content)
+
+
+def test_a_surface_field_in_qnty_is_rejected():
+    # Move SURF's records into QNTY by swapping the two section ids: each section then holds the other's fields.
+    data = write_pack(synthetic_content())
+    header = read_header(data)
+    names = list(header.sections)
+    swapped = _patch(data, HEADER.size + names.index("QNTY") * SECTION.size, b"SURF")
+    swapped = _patch(swapped, HEADER.size + names.index("SURF") * SECTION.size, b"QNTY")
+    with pytest.raises(PipelineError, match="does not belong in section"):
+        read_pack(_rehash(swapped))
 
 
 def test_orientation_section_is_optional_and_shares_the_coefficient_data():

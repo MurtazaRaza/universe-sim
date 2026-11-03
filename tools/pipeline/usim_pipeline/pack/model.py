@@ -43,16 +43,22 @@ class Unit(IntEnum):
     RAD = 4
     RAD_PER_S = 5
     KM3_PER_S2 = 6
+    K = 7  # kelvin (format 1.4)
+    PA = 8  # pascal (format 1.4)
 
 
 class Field(IntEnum):
-    """Catalog fields a quantity record can fill, with the unit each requires (FIELD_UNITS)."""
+    """Catalog fields a quantity record can fill, with the unit each requires (FIELD_UNITS). Fields 1 to 5 are
+    stored in section QNTY, the surface conditions 6 to 8 in section SURF (format 1.4, ADR-0017)."""
 
     GM = 1
     MEAN_RADIUS = 2
     RADIUS_A = 3
     RADIUS_B = 4
     RADIUS_C = 5
+    MEAN_TEMPERATURE = 6  # at the reference surface, averaged over the body, K
+    SURFACE_PRESSURE = 7  # at the solid surface, Pa
+    REFERENCE_PRESSURE = 8  # the pressure level the reference radii refer to, Pa
 
 
 FIELD_UNITS = {
@@ -61,7 +67,13 @@ FIELD_UNITS = {
     Field.RADIUS_A: Unit.KM,
     Field.RADIUS_B: Unit.KM,
     Field.RADIUS_C: Unit.KM,
+    Field.MEAN_TEMPERATURE: Unit.K,
+    Field.SURFACE_PRESSURE: Unit.PA,
+    Field.REFERENCE_PRESSURE: Unit.PA,
 }
+
+# The fields stored in section SURF; the others go to QNTY.
+SURFACE_FIELDS = frozenset({Field.MEAN_TEMPERATURE, Field.SURFACE_PRESSURE, Field.REFERENCE_PRESSURE})
 
 
 class Frame(IntEnum):
@@ -387,7 +399,17 @@ def check_content(content: PackContent) -> None:
             raise PipelineError(f"pack: {what} has unit {q.unit.name}, expected {FIELD_UNITS[q.field].name}")
         if not math.isfinite(q.value) or (q.uncertainty is not None and not (math.isfinite(q.uncertainty) and q.uncertainty >= 0)):
             raise PipelineError(f"pack: {what} is not finite or has an invalid uncertainty")
+        # The SURF constraints (format 1.4).
+        if q.field == Field.MEAN_TEMPERATURE and not q.value > 0.0:
+            raise PipelineError(f"pack: {what} must be positive")
+        if q.field == Field.SURFACE_PRESSURE and not q.value >= 0.0:
+            raise PipelineError(f"pack: {what} must not be negative")
+        if q.field == Field.REFERENCE_PRESSURE and not q.value > 0.0:
+            raise PipelineError(f"pack: {what} must be positive")
         check_source(q.source_id, what)
+    for b in content.bodies:
+        if (b.id, Field.SURFACE_PRESSURE) in seen_fields and (b.id, Field.REFERENCE_PRESSURE) in seen_fields:
+            raise PipelineError(f"pack: {b.id} has both a surface pressure and a reference pressure")
     rotation_bodies = [r.body for r in content.rotations]
     if len(set(rotation_bodies)) != len(rotation_bodies):
         raise PipelineError("pack: two rotation models for one body")

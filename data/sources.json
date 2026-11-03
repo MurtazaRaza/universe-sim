@@ -196,13 +196,15 @@
           "name": "ReadMe",
           "path": "cds/V50/ReadMe",
           "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/ReadMe",
-          "publisher_checksums": null
+          "publisher_checksums": null,
+          "mirrors": ["https://vizier.cfa.harvard.edu/ftp/cats/V/50/ReadMe"]
         },
         {
           "name": "catalog.gz",
           "path": "cds/V50/catalog.gz",
           "url": "https://cdsarc.cds.unistra.fr/ftp/V/50/catalog.gz",
-          "publisher_checksums": null
+          "publisher_checksums": null,
+          "mirrors": ["https://vizier.cfa.harvard.edu/ftp/cats/V/50/catalog.gz"]
         }
       ]
     },
@@ -224,6 +226,56 @@
       "url": "https://pds-rings.seti.org/saturn/saturn_tables.html",
       "citation": "PDS Ring-Moon Systems Node, 'Vital Statistics for Saturn's Rings and Inner Satellites', table 'Rings of Saturn' (https://pds-rings.seti.org/saturn/saturn_tables.html, read 2026-10-22); a compilation whose rows cite the published sources (for example Colwell et al. 2009, French et al. 2017, Murray and Dermott 1999). Used for ring optical depths only, labeled Tier 2. Values enter through data/catalog/rings.json.",
       "license": "NASA Planetary Data System public web content; cite the PDS Ring-Moon Systems Node and the references of each row.",
+      "files": []
+    },
+    {
+      "id": "S-NSSDC-FACT",
+      "title": "NASA Planetary Fact Sheets (NSSDCA)",
+      "provider": "NASA Goddard Space Flight Center, NASA Space Science Data Coordinated Archive (NSSDCA); curator David R. Williams",
+      "tier": 2,
+      "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/",
+      "citation": "Williams, D. R., 'Planetary Fact Sheet - Metric' (https://nssdc.gsfc.nasa.gov/planetary/factsheet/, last updated 18 March 2025), its 'Planetary Fact Sheet Notes' (planetfact_notes.html, last updated 20 December 2021) and the Jupiter, Saturn and Uranus fact sheets (jupiterfact.html, saturnfact.html, uranusfact.html), NASA Space Science Data Coordinated Archive, read 2026-11-02. A compilation; used for surface conditions only, labeled Tier 2 (ADR-0017). Values enter through data/catalog/manual/surface-conditions.json.",
+      "license": "NASA web content. NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA content 'generally [is] not subject to copyright in the United States'; 'NASA should be acknowledged as the source of the material'.",
+      "files": []
+    },
+    {
+      "id": "S-NASA-PJ-SKIES",
+      "title": "NASA Photojournal captions of Mars sky images (Mars Pathfinder PIA00917 and PIA01547)",
+      "provider": "NASA/JPL (Mars Pathfinder Imager for Mars Pathfinder team), on NASA Science's Photojournal",
+      "tier": 1,
+      "url": "https://science.nasa.gov/photojournal/",
+      "citation": "NASA/JPL, PIA00917 'Color Variations in the Sky at Sunset' (added 1997-08-28, https://science.nasa.gov/photojournal/color-variations-in-the-sky-at-sunset) and PIA01547 'True Color of Mars - Pathfinder Sol 24 at 4 PM' (added 1999-06-22, https://science.nasa.gov/photojournal/true-color-of-mars-pathfinder-sol-24-at-4-pm), read 2026-11-02. Qualitative sky colors only, as sky cues (ADR-0018); values enter through data/catalog/sky-cues.json.",
+      "license": "NASA web content. NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA content 'generally [is] not subject to copyright in the United States'; 'NASA should be acknowledged as the source of the material'. Only short quotations of the captions are kept; no image is used.",
+      "files": []
+    },
+    {
+      "id": "S-NASA-EO-ISS",
+      "title": "NASA Earth Observatory astronaut photographs of the Earth's limb (ISS070-E-76065)",
+      "provider": "NASA Johnson Space Center, ISS Crew Earth Observations Facility and Earth Science and Remote Sensing Unit, on NASA Earth Observatory",
+      "tier": 1,
+      "url": "https://science.nasa.gov/earth/earth-observatory/",
+      "citation": "NASA Earth Observatory, 'Sundown and Lights Up Over the U.S. Northeast' (Image of the Day 2024-05-12; astronaut photograph ISS070-E-76065 of 2024-01-17; caption by Wilfredo García López, Jacobs-JETS II Contract at NASA-JSC), https://science.nasa.gov/earth/earth-observatory/sundown-and-lights-up-over-the-us-northeast-152802, read 2026-11-02. Qualitative colors of the limb only, as sky cues (ADR-0018).",
+      "license": "NASA web content. NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA should be acknowledged as the source. Only short quotations of the caption are kept; no image is used.",
+      "files": []
+    },
+    {
+      "id": "S-PIETERS-1986",
+      "title": "Pieters et al. (1986), The color of the surface of Venus, Science 234 (Venera 13 multispectral images)",
+      "provider": "C. M. Pieters, J. W. Head, W. Patterson, S. Pratt (Brown University) and J. Garvin (NASA Goddard Space Flight Center); record in the NASA Technical Reports Server",
+      "tier": 1,
+      "url": "https://ntrs.nasa.gov/citations/19870039592",
+      "citation": "Pieters, C. M., Head, J. W., Patterson, W., Pratt, S., Garvin, J. (1986). The color of the surface of Venus. Science, 234, published 1986-12-12. Abstract read in NASA Technical Reports Server record 19870039592 (https://ntrs.nasa.gov/citations/19870039592) on 2026-11-02; the record gives no pages or DOI. Peer reviewed. The color of daylight at the surface only, as a sky cue (ADR-0018).",
+      "license": "Journal article (copyright of its publisher). Only a short quotation of the abstract is kept, with this citation; nothing is redistributed.",
+      "files": []
+    },
+    {
+      "id": "S-NASA-SPACEPLACE",
+      "title": "NASA Space Place, 'Why Is the Sky Blue?' (Tier 2)",
+      "provider": "NASA Science (NASA Space Place)",
+      "tier": 2,
+      "url": "https://spaceplace.nasa.gov/blue-sky/en/",
+      "citation": "NASA Space Place, 'Why Is the Sky Blue?', https://spaceplace.nasa.gov/blue-sky/en/ (page last updated 2026-07-31), read 2026-11-02. An educational summary; used, labeled Tier 2, only for the Earth's daytime sky color (ADR-0018), for which no Tier 1 statement was found in an accessible form.",
+      "license": "NASA web content. NASA Images and Media Usage Guidelines (https://www.nasa.gov/nasa-brand-center/images-and-media/, read 2026-10-23): NASA should be acknowledged as the source. Only a short quotation is kept.",
       "files": []
     },
     {

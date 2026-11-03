@@ -544,7 +544,11 @@ def build_textures(repo: Repo, log: Callable[[str], None] = print) -> list[Path]
         written.append(path)
         log(f"wrote {path} ({len(texture.jpeg)} bytes) from {entry.image_file}")
     (out_dir / MANIFEST_NAME).write_text(_unity_manifest(manifest, built), encoding="utf-8")
-    (repo.root / ATTRIBUTION_PATH).write_text(_attribution(manifest, built, sources), encoding="utf-8")
+    # The surface maps, then the artistic assets (A-04), the section `usim-pipeline attribution` rewrites alone.
+    from .artistic import attribution_section, load_artistic_assets, splice_attribution
+
+    text = splice_attribution(_attribution(manifest, built, sources), attribution_section(load_artistic_assets(repo)))
+    (repo.root / ATTRIBUTION_PATH).write_text(text, encoding="utf-8")
     written += [out_dir / MANIFEST_NAME, repo.root / ATTRIBUTION_PATH]
     log(f"wrote {out_dir / MANIFEST_NAME} and {repo.root / ATTRIBUTION_PATH}")
     return written

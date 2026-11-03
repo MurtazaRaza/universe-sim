@@ -221,6 +221,9 @@ def apply_manual_entries(
                 "provided by a kernel; manual entries are only for values with no machine-readable source"
             )
         result.append(
-            PackQuantity(key[0], entry.field, entry.unit, entry.value, entry.uncertainty, entry.source_id, entry.locator)
+            PackQuantity(
+                key[0], entry.field, entry.unit, entry.value, entry.uncertainty, entry.source_id, entry.locator,
+                entry.derivation,
+            )
         )
     return result

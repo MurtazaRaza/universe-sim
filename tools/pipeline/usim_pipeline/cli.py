@@ -1,4 +1,4 @@
-"""Command line: fetch, verify, build, info, textures and reference (ARCHITECTURE section 4)."""
+"""Command line: fetch, verify, build, info, textures, attribution, sky-cues and reference (ARCHITECTURE section 4)."""
 
 from __future__ import annotations
 
@@ -47,6 +47,21 @@ def _cmd_textures(repo: Repo, args: argparse.Namespace) -> int:
     from .textures import build_textures
 
     build_textures(repo)
+    return 0
+
+
+def _cmd_attribution(repo: Repo, args: argparse.Namespace) -> int:
+    from .artistic import write_attribution
+    from .textures import ATTRIBUTION_PATH
+
+    write_attribution(repo, ATTRIBUTION_PATH)
+    return 0
+
+
+def _cmd_sky_cues(repo: Repo, args: argparse.Namespace) -> int:
+    from .sky_cues import build_sky_cues
+
+    build_sky_cues(repo)
     return 0
 
 
@@ -104,6 +119,18 @@ def main(argv: list[str] | None = None) -> int:
         help="reproject the surface maps of data/catalog/textures.json into the Unity project, with ATTRIBUTION.md",
     )
     textures.set_defaults(run=_cmd_textures)
+
+    attribution = commands.add_parser(
+        "attribution",
+        help="check data/catalog/artistic-assets.json against UniverseSim/Assets/UniverseSim/Art/ and rewrite the "
+        "artistic assets section of ATTRIBUTION.md",
+    )
+    attribution.set_defaults(run=_cmd_attribution)
+
+    sky_cues = commands.add_parser(
+        "sky-cues", help="validate data/catalog/sky-cues.json and write the sky cue manifest into the Unity project"
+    )
+    sky_cues.set_defaults(run=_cmd_sky_cues)
 
     reference = commands.add_parser(
         "reference",

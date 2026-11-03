@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import math
+import re
 from pathlib import Path
 
 import pytest
@@ -114,10 +116,48 @@ def test_the_moons_pack_earth_orientation_records_equal_the_raw_pck_bytes():
     assert last.init_s + (last.record_count - 1) * last.interval_s < moons.window[1]
 
 
+_NUMBER = re.compile(r"-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
+
+# CSPICE's results differ in their last bits between platforms. Measured 2026-11-02, Windows x64 against the
+# fixtures generated on macOS arm64 (SpiceyPy 8.2.0): 10 of the file's numbers differ, 9 by 1 to 2 ulp of the
+# largest number on their line and one near-zero residual (TDB from TT at J2000: 2.75e-21 s against 0.0), far
+# below an ulp of the inputs on its line. Text and structure must still match exactly.
+_FIXTURE_ULPS = 4
+
+
+def _fixture_differences(generated: str, committed: str, ulps: int = _FIXTURE_ULPS) -> list[str]:
+    """Where two generated fixture files differ beyond `ulps` units in the last place of the largest number on
+    each line; the text between the numbers must be identical."""
+    a_lines, b_lines = generated.splitlines(), committed.splitlines()
+    if len(a_lines) != len(b_lines):
+        return [f"{len(a_lines)} lines generated, {len(b_lines)} committed"]
+    problems = []
+    for number, (a, b) in enumerate(zip(a_lines, b_lines), start=1):
+        if a == b:
+            continue
+        if _NUMBER.split(a) != _NUMBER.split(b):
+            problems.append(f"line {number}: the text differs: {a!r} != {b!r}")
+            continue
+        xs = [float(x) for x in _NUMBER.findall(a)]
+        ys = [float(y) for y in _NUMBER.findall(b)]
+        tolerance = ulps * math.ulp(max(abs(y) for y in ys))
+        problems += [f"line {number}: {x!r} != {y!r}" for x, y in zip(xs, ys) if abs(x - y) > tolerance]
+    return problems
+
+
 @needs_kernels
 def test_committed_unit_fixtures_are_current(tmp_path):
     out = unit_fixtures.generate(REAL_REPO, tmp_path / "spice_reference.hpp", log=quiet)
-    assert out.read_text() == (REAL_REPO.core_fixtures / "spice_reference.hpp").read_text()
+    assert _fixture_differences(out.read_text(), (REAL_REPO.core_fixtures / "spice_reference.hpp").read_text()) == []
+
+
+def test_fixture_comparison_allows_only_last_bit_differences():
+    committed = "inline constexpr Case k[] = {\n    {32.18392726322383, 2.7542962514259453e-21},\n};\n"
+    assert _fixture_differences(committed.replace("2.7542962514259453e-21", "0.0"), committed) == []
+    assert _fixture_differences(committed.replace("32.18392726322383", "32.18392726322384"), committed) == []
+    assert _fixture_differences(committed.replace("32.18392726322383", "32.1839272632239"), committed) != []
+    assert _fixture_differences(committed.replace("k[]", "j[]"), committed) != []
+    assert _fixture_differences(committed + "\n", committed) != []
 
 
 def test_committed_test_pack_is_current(tmp_path):

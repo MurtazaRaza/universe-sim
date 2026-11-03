@@ -58,6 +58,10 @@ def test_real_registry_is_valid():
         (lambda s: s["files"][0].update(path="/abs/data.bin"), "plain relative POSIX path"),
         (lambda s: s["files"][0].update(url="https://example.invalid/a/other.bin"), "same file name"),
         (lambda s: s.pop("citation"), "missing field 'citation'"),
+        (lambda s: s["files"][0].update(mirrors="https://example.invalid/b/data.bin"), "must be a list of URLs"),
+        (lambda s: s["files"][0].update(mirrors=["http://example.invalid/b/data.bin"]), "must use https"),
+        (lambda s: s["files"][0].update(mirrors=["https://example.invalid/b/other.bin"]), "must end with the file name"),
+        (lambda s: s["files"][0].update(mirrors=[URL]), "must differ"),
     ],
 )
 def test_registry_validation(change, message):
@@ -210,6 +214,71 @@ def test_changed_publisher_file_is_refused_until_update(repo, server):
     assert repo.lock_file.read_bytes() == before
     assert run(repo, server, update=True).actions == [("S-TEST-A/data.bin", "repinned")]
     assert load_lock(repo.lock_file)[("S-TEST-A", "data.bin")].size == len(DATA) + len(b"changed")
+
+
+MIRROR = "https://mirror.example.invalid/copy/data.bin"
+MIRROR_2 = "https://other-mirror.example.invalid/copy/data.bin"
+
+
+def declare_with_mirrors(repo, *mirrors: str) -> None:
+    write_sources(repo, [
+        {"name": "data.bin", "path": "test/data.bin", "url": URL, "publisher_checksums": None, "mirrors": list(mirrors)},
+    ])  # fmt: skip
+
+
+def test_a_pinned_file_comes_from_a_mirror_when_its_url_fails(repo, server):
+    declare_with_mirrors(repo, MIRROR)
+    server.files[URL] = DATA
+    run(repo, server)
+    before = repo.lock_file.read_bytes()
+    (repo.raw / "test" / "data.bin").unlink()
+    del server.files[URL]  # the publisher cannot be reached
+    server.files[MIRROR] = DATA
+    server.requests.clear()
+    assert run(repo, server).actions == [("S-TEST-A/data.bin", "downloaded")]
+    assert server.requests == [URL, MIRROR]
+    assert (repo.raw / "test" / "data.bin").read_bytes() == DATA
+    assert repo.lock_file.read_bytes() == before  # the pin, with the publisher's URL, is unchanged
+    assert verify(repo, log=quiet) == []
+
+
+def test_a_mirror_copy_that_differs_from_the_pin_is_passed_over(repo, server):
+    declare_with_mirrors(repo, MIRROR, MIRROR_2)
+    server.files[URL] = DATA
+    run(repo, server)
+    (repo.raw / "test" / "data.bin").unlink()
+    del server.files[URL]
+    server.files[MIRROR] = DATA + b"stale"
+    server.files[MIRROR_2] = DATA
+    assert run(repo, server).actions == [("S-TEST-A/data.bin", "downloaded")]
+    assert (repo.raw / "test" / "data.bin").read_bytes() == DATA
+    # With no copy that matches the pin, fetch fails and leaves nothing behind.
+    (repo.raw / "test" / "data.bin").unlink()
+    server.files[MIRROR_2] = DATA + b"stale"
+    with pytest.raises(PipelineError, match="no copy matching the lock file"):
+        run(repo, server)
+    assert not (repo.raw / "test").exists() or list((repo.raw / "test").iterdir()) == []
+
+
+def test_a_changed_publisher_file_is_refused_even_with_a_mirror(repo, server):
+    declare_with_mirrors(repo, MIRROR)
+    server.files[URL] = DATA
+    run(repo, server)
+    (repo.raw / "test" / "data.bin").unlink()
+    server.files[URL] = DATA + b"changed"
+    server.files[MIRROR] = DATA
+    with pytest.raises(PipelineError, match="publisher may have replaced it"):
+        run(repo, server)
+    assert MIRROR not in server.requests
+
+
+def test_new_pins_never_come_from_a_mirror(repo, server):
+    declare_with_mirrors(repo, MIRROR)
+    server.files[MIRROR] = DATA  # only the mirror can be reached
+    with pytest.raises(PipelineError, match="404"):
+        run(repo, server)
+    assert server.requests == [URL]
+    assert load_lock(repo.lock_file) == {}
 
 
 def test_update_of_an_unchanged_file_keeps_its_retrieval_record(repo, server):

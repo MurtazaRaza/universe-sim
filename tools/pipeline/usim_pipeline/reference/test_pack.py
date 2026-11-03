@@ -95,6 +95,13 @@ def synthetic_content() -> PackContent:
             PackQuantity(naif(1001), Field.MEAN_RADIUS, Unit.KM, volumetric_mean_radius(a, b, c), None, "S-TEST-B",
                          "synthetic-b.txt RADII", MEAN_RADIUS_DERIVATION.format(keyword="RADII")),
             PackQuantity(naif(1002), Field.GM, Unit.KM3_PER_S2, 0.0625, 0.001953125, "S-TEST-A", "synthetic-a.bin GM2"),
+            # Surface conditions (section SURF, format 1.4): the planet's reference surface is a pressure level, the
+            # moon's is solid, and the dwarf planet has none (unknown).
+            PackQuantity(naif(1001), Field.MEAN_TEMPERATURE, Unit.K, 123.5, None, "S-TEST-B", "synthetic-b.txt TEMP",
+                         "converted from -149.65 celsius (synthetic)"),
+            PackQuantity(naif(1001), Field.REFERENCE_PRESSURE, Unit.PA, 250000.0, None, "S-TEST-B", "synthetic-b.txt LEVEL"),
+            PackQuantity(naif(1002), Field.MEAN_TEMPERATURE, Unit.K, 42.25, 0.5, "S-TEST-A", "synthetic-a.bin TEMP2"),
+            PackQuantity(naif(1002), Field.SURFACE_PRESSURE, Unit.PA, 0.5, None, "S-TEST-A", "synthetic-a.bin PRES2"),
         ],  # fmt: skip
         rotations=[
             PackRotation(naif(1000), Frame.ICRF, "S-TEST-A", "synthetic-a.bin ROT1", (1.0,), (2.0,), (3.0, 4.0)),

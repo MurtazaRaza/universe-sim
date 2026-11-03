@@ -32,13 +32,14 @@ from .model import (
     PackStar,
     PackStarCatalog,
     PackTime,
+    SURFACE_FIELDS,
     Unit,
     check_content,
 )
 
 MAGIC = b"USIMPACK"
 FORMAT_MAJOR = 1
-FORMAT_MINOR = 3
+FORMAT_MINOR = 4
 ENDIAN_MARKER = 0x01020304
 SECTION_VERSION = 1
 ALIGNMENT = 8
@@ -64,13 +65,13 @@ ORIENTATION = struct.Struct("<IIIIIIIIdddIIIIII")  # 80
 ORIENTATION_SEGMENT = struct.Struct("<IiiIddddQIIII")  # 72
 
 # Sections in the order they are written. The format 1.0 sections are required; APPX (1.1) is optional and
-# always written; STAR and RING (1.2) and ORNT (1.3) are optional and written only when the pack has stars,
-# rings or orientation models.
+# always written; STAR and RING (1.2), ORNT (1.3) and SURF (1.4) are optional and written only when the pack has
+# stars, rings, orientation models or surface conditions.
 SECTION_ORDER = (
     b"META", b"SRCS", b"FILE", b"BODY", b"QNTY", b"ROTN", b"TIME", b"EPHS", b"APPX", b"STAR", b"RING", b"ORNT",
-    b"STRS", b"EPHD",
+    b"SURF", b"STRS", b"EPHD",
 )  # fmt: skip
-OPTIONAL_SECTIONS = (b"APPX", b"STAR", b"RING", b"ORNT")
+OPTIONAL_SECTIONS = (b"APPX", b"STAR", b"RING", b"ORNT", b"SURF")
 REQUIRED_SECTIONS = tuple(s for s in SECTION_ORDER if s not in OPTIONAL_SECTIONS)
 
 QUANTITY_HAS_UNCERTAINTY = 1
@@ -163,15 +164,22 @@ def write_pack(content: PackContent) -> bytes:
         bodies += BODY.pack(b.id[0], int(b.kind), b.id[1], primary[0], 0, primary[1], *strings.ref(b.name))
     sections[b"BODY"] = bytes(bodies)
 
+    # Quantities in QNTY, the surface conditions in SURF (format 1.4): the same record layout.
     quantities = sorted(content.quantities, key=lambda q: (body_index[q.body], int(q.field)))
-    qnty = bytearray(COUNTS.pack(len(quantities), 0))
-    for q in quantities:
-        flags = QUANTITY_HAS_UNCERTAINTY if q.uncertainty is not None else 0
-        qnty += QUANTITY.pack(
-            body_index[q.body], int(q.field), int(q.unit), flags, q.value, q.uncertainty or 0.0,
-            source_index[q.source_id], 0, *strings.ref(q.locator), *strings.ref(q.derivation),
-        )  # fmt: skip
-    sections[b"QNTY"] = bytes(qnty)
+    for section_id, records in (
+        (b"QNTY", [q for q in quantities if q.field not in SURFACE_FIELDS]),
+        (b"SURF", [q for q in quantities if q.field in SURFACE_FIELDS]),
+    ):
+        if section_id == b"SURF" and not records:
+            continue
+        payload = bytearray(COUNTS.pack(len(records), 0))
+        for q in records:
+            flags = QUANTITY_HAS_UNCERTAINTY if q.uncertainty is not None else 0
+            payload += QUANTITY.pack(
+                body_index[q.body], int(q.field), int(q.unit), flags, q.value, q.uncertainty or 0.0,
+                source_index[q.source_id], 0, *strings.ref(q.locator), *strings.ref(q.derivation),
+            )  # fmt: skip
+        sections[section_id] = bytes(payload)
 
     pool: list[float] = []
 
@@ -435,17 +443,27 @@ def read_pack(data: bytes) -> tuple[PackHeader, PackContent]:
             raise PipelineError("pack: body index out of range")
         return bodies[index].id
 
-    qty = view("QNTY")
-    count, _ = qty.unpack(COUNTS, 0)
     quantities = []
-    for r in qty.records(QUANTITY, COUNTS.size, count):
-        try:
-            field, unit = Field(r[1]), Unit(r[2])
-        except ValueError:
-            raise PipelineError(f"pack: unknown quantity field {r[1]} or unit {r[2]}") from None
-        uncertainty = r[5] if r[3] & QUANTITY_HAS_UNCERTAINTY else None
-        locator, derivation = strings(r, 8, 10)
-        quantities.append(PackQuantity(body_ref(r[0]), field, unit, r[4], uncertainty, source_id(r[6]), locator, derivation))
+    for section_id in ("QNTY", "SURF"):
+        if section_id == "SURF" and "SURF" not in header.sections:
+            continue
+        qty = view(section_id)
+        count, _ = qty.unpack(COUNTS, 0)
+        for r in qty.records(QUANTITY, COUNTS.size, count):
+            try:
+                field, unit = Field(r[1]), Unit(r[2])
+            except ValueError:
+                raise PipelineError(f"pack: unknown quantity field {r[1]} or unit {r[2]}") from None
+            if (field in SURFACE_FIELDS) != (section_id == "SURF"):
+                raise PipelineError(f"pack: field {field.name.lower()} does not belong in section {section_id}")
+            uncertainty = r[5] if r[3] & QUANTITY_HAS_UNCERTAINTY else None
+            locator, derivation = strings(r, 8, 10)
+            quantities.append(
+                PackQuantity(body_ref(r[0]), field, unit, r[4], uncertainty, source_id(r[6]), locator, derivation)
+            )
+    # The order canonical() gives: by body, then field, across both sections.
+    body_order = {b.id: i for i, b in enumerate(bodies)}
+    quantities.sort(key=lambda q: (body_order[q.body], int(q.field)))
 
     rot = view("ROTN")
     count, pool_count = rot.unpack(COUNTS, 0)

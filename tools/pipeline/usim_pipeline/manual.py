@@ -10,7 +10,8 @@ Format:
       "entries": [
         {
           "naif_id": 999,
-          "field": "gm",                    one of: gm, mean_radius, radius_a, radius_b, radius_c
+          "field": "gm",                    gm, mean_radius, radius_a, radius_b, radius_c, mean_temperature,
+                                            surface_pressure or reference_pressure
           "value": 869.6,                   in `unit`
           "unit": "km3_per_s2",             must be the field's unit
           "uncertainty": null,              optional one-sigma value in `unit`
@@ -22,13 +23,19 @@ Format:
         }
       ]
     }
+
+Instead of "value", an entry may give the source's own text and unit, "text": "-65" and "text_unit": "celsius" (to
+kelvin) or "bar" (to pascals). The pipeline converts it by definition in exact decimal arithmetic and records the
+conversion as the quantity's derivation (ADR-0017).
 """
 
 from __future__ import annotations
 
 import datetime
 import math
+import re
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 from . import PipelineError
@@ -37,6 +44,15 @@ from .pack.model import FIELD_UNITS, Field, Unit
 from .sources import Source
 
 REQUIRED_TEXT = ("source_id", "url", "accessed", "table", "transcriber_note")
+
+# Unit conversions by definition, NIST Special Publication 811 (2008), Appendix B.8 (read 2026-11-02): T/K =
+# t/degC + 273.15, and 1 bar = 1.0 E+05 Pa (exact). text_unit -> (the unit converted to, the conversion, a
+# description for the derivation).
+_DECIMAL_TEXT = re.compile(r"-?\d{1,3}(,\d{3})*(\.\d+)?|-?\d+(\.\d+)?")
+CONVERSIONS = {
+    "celsius": (Unit.K, lambda t: t + Decimal("273.15"), "T/K = t/degC + 273.15"),
+    "bar": (Unit.PA, lambda t: t * Decimal(100000), "1 bar = 100000 Pa"),
+}
 
 
 @dataclass(frozen=True)
@@ -53,6 +69,7 @@ class ManualEntry:
     accessed: str
     table: str
     transcriber_note: str
+    derivation: str = ""  # the conversion of a "text" entry, empty for a "value" entry
 
     @property
     def locator(self) -> str:
@@ -81,7 +98,7 @@ def parse_manual_file(document: object, file: str, sources: tuple[Source, ...]) 
         for key in REQUIRED_TEXT:
             if not isinstance(entry.get(key), str) or not entry[key].strip():
                 raise PipelineError(f"{where}: '{key}' is required and must be non-empty")
-        known = {"naif_id", "field", "value", "unit", "uncertainty", *REQUIRED_TEXT}
+        known = {"naif_id", "field", "value", "text", "text_unit", "unit", "uncertainty", *REQUIRED_TEXT}
         unknown = set(entry) - known
         if unknown:
             raise PipelineError(f"{where}: unknown keys {sorted(unknown)}")
@@ -108,6 +125,7 @@ def parse_manual_file(document: object, file: str, sources: tuple[Source, ...]) 
             datetime.date.fromisoformat(entry["accessed"])
         except ValueError:
             raise PipelineError(f"{where}: 'accessed' must be a date like 2026-10-20") from None
+        value, derivation = _value(entry, unit, where)
         result.append(
             ManualEntry(
                 file=file,
@@ -115,16 +133,37 @@ def parse_manual_file(document: object, file: str, sources: tuple[Source, ...]) 
                 naif_id=naif_id,
                 field=field,
                 unit=unit,
-                value=_number(entry.get("value"), f"{where}: value"),
+                value=value,
                 uncertainty=uncertainty,
                 source_id=entry["source_id"],
                 url=entry["url"],
                 accessed=entry["accessed"],
                 table=entry["table"],
                 transcriber_note=entry["transcriber_note"],
+                derivation=derivation,
             )
         )
     return result
+
+
+def _value(entry: dict, unit: Unit, where: str) -> tuple[float, str]:
+    """The entry's value in `unit` and, for a "text" entry, the conversion that gave it."""
+    if ("value" in entry) == ("text" in entry):
+        raise PipelineError(f"{where}: give either 'value' or 'text' with 'text_unit'")
+    if "value" in entry:
+        if "text_unit" in entry:
+            raise PipelineError(f"{where}: 'text_unit' goes with 'text'")
+        return _number(entry["value"], f"{where}: value"), ""
+    text, text_unit = entry.get("text"), entry.get("text_unit")
+    if not isinstance(text, str) or not _DECIMAL_TEXT.fullmatch(text):
+        raise PipelineError(f"{where}: 'text' must be a decimal number as the source writes it, for example '12,104'")
+    if text_unit not in CONVERSIONS:
+        raise PipelineError(f"{where}: 'text_unit' must be one of {sorted(CONVERSIONS)}")
+    target, convert, rule = CONVERSIONS[text_unit]
+    if target != unit:
+        raise PipelineError(f"{where}: text in {text_unit} converts to {target.name.lower()}, not {unit.name.lower()}")
+    converted = convert(Decimal(text.replace(",", "")))
+    return float(converted), f"converted from {text} {text_unit} ({rule}, NIST SP 811 Appendix B.8)"
 
 
 def load_manual_entries(catalog_dir: Path, sources: tuple[Source, ...]) -> list[ManualEntry]:

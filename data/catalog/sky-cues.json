@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "description": "Sky cues (A-07, B-06, ADR-0018): qualitative colors of skies and twilight that the stylized style draws, each with the sentence of its source that states it. A cue names a hue from a fixed vocabulary; the colors that draw the hues are display choices (docs/ART_DIRECTION.md section 5). Whether a body has an atmosphere at all comes from the pack's surface conditions through the core, not from this file. Written by `usim-pipeline sky-cues` to UniverseSim/Assets/UniverseSim/Data/SkyCues.json.",
+  "output": "UniverseSim/Assets/UniverseSim/Data/SkyCues.json",
+  "cues": [
+    {
+      "naif_id": 299,
+      "body": "Venus",
+      "cue": "daytime_sky",
+      "hue": "orange",
+      "source_id": "S-PIETERS-1986",
+      "url": "https://ntrs.nasa.gov/citations/19870039592",
+      "accessed": "2026-11-02",
+      "reference": "Pieters et al. (1986), Science 234, abstract (NASA Technical Reports Server record 19870039592)",
+      "quote": "Multispectral images of the basaltic surface of Venus obtained by Venera 13 were processed to remove the effects of orange-colored incident radiation resulting from interactions with the thick Venusian atmosphere.",
+      "note": "The light reaching the surface is orange; the cue's meaning includes daylight at the surface (ADR-0018)."
+    },
+    {
+      "naif_id": 399,
+      "body": "Earth",
+      "cue": "daytime_sky",
+      "hue": "blue",
+      "source_id": "S-NASA-SPACEPLACE",
+      "url": "https://spaceplace.nasa.gov/blue-sky/en/",
+      "accessed": "2026-11-02",
+      "reference": "NASA Space Place, 'Why Is the Sky Blue?'",
+      "quote": "This is why we see a blue sky most of the time.",
+      "note": "Tier 2, labeled: no Tier 1 statement of the daytime sky's color was found in an accessible form."
+    },
+    {
+      "naif_id": 399,
+      "body": "Earth",
+      "cue": "twilight",
+      "hue": "red_and_yellow",
+      "source_id": "S-NASA-EO-ISS",
+      "url": "https://science.nasa.gov/earth/earth-observatory/sundown-and-lights-up-over-the-us-northeast-152802",
+      "accessed": "2026-11-02",
+      "reference": "NASA Earth Observatory, 'Sundown and Lights Up Over the U.S. Northeast', astronaut photograph ISS070-E-76065",
+      "quote": "The troposphere, the lowest layer of the atmosphere, appears red and yellow.",
+      "note": "The caption describes the limb as the Sun dips below the curvature of the Earth: 'As the Sun dips below the curvature of Earth, the varying layers of the atmosphere appear as different hues in this oblique photograph of Earth’s limb.'"
+    },
+    {
+      "naif_id": 499,
+      "body": "Mars",
+      "cue": "daytime_sky",
+      "hue": "brownish_gray",
+      "source_id": "S-NASA-PJ-SKIES",
+      "url": "https://science.nasa.gov/photojournal/true-color-of-mars-pathfinder-sol-24-at-4-pm",
+      "accessed": "2026-11-02",
+      "reference": "NASA/JPL, PIA01547, 'True Color of Mars - Pathfinder Sol 24 at 4 PM'",
+      "quote": "The brownish gray sky as it would be seen by an observer on Mars in this four-frame, true color mosaic taken on sol 24 (at approximately 1610 LST).",
+      "note": "The same caption: 'The sky near the sun is a pale blue color.' PIA00917 adds that the dust 'absorbs blue light, giving the sky its red color'."
+    },
+    {
+      "naif_id": 499,
+      "body": "Mars",
+      "cue": "twilight",
+      "hue": "blue",
+      "source_id": "S-NASA-PJ-SKIES",
+      "url": "https://science.nasa.gov/photojournal/color-variations-in-the-sky-at-sunset",
+      "accessed": "2026-11-02",
+      "reference": "NASA/JPL, PIA00917, 'Color Variations in the Sky at Sunset'",
+      "quote": "The blue color only becomes apparent near sunrise and sunset, when the light has to pass through the largest amount of dust.",
+      "note": "The same caption: 'The blue color near the Sun is not caused by clouds of water ice, but by the martian dust itself.' Curiosity saw the same (NASA/JPL-Caltech/MSSS/Texas A&M Univ., PIA19400)."
+    }
+  ]
+}

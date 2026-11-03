@@ -126,6 +126,60 @@ def test_invalid_manual_entries(changes, message):
         parse_manual_file(manual(**changes), "manual/test.json", SOURCES)
 
 
+def test_a_text_entry_is_converted_by_definition_and_records_the_conversion():
+    # Synthetic values: the page text and its unit, converted in exact decimal arithmetic.
+    (cold,) = parse_manual_file(
+        manual(field="mean_temperature", unit="k", value=..., uncertainty=..., text="-12.5", text_unit="celsius"),
+        "manual/test.json", SOURCES)  # fmt: skip
+    assert (cold.field, cold.unit, cold.value) == (Field.MEAN_TEMPERATURE, Unit.K, 260.65)
+    assert cold.derivation == "converted from -12.5 celsius (T/K = t/degC + 273.15, NIST SP 811 Appendix B.8)"
+    (thin,) = parse_manual_file(
+        manual(field="surface_pressure", unit="pa", value=..., uncertainty=..., text="0.00003", text_unit="bar"),
+        "manual/test.json", SOURCES)  # fmt: skip
+    assert (thin.unit, thin.value) == (Unit.PA, 3.0) and "1 bar = 100000 Pa" in thin.derivation
+    (wide,) = parse_manual_file(
+        manual(field="reference_pressure", unit="pa", value=..., uncertainty=..., text="1,234.5", text_unit="bar"),
+        "manual/test.json", SOURCES)  # fmt: skip
+    assert wide.value == 123450000.0
+    # A value entry has no derivation.
+    (plain,) = parse_manual_file(manual(), "manual/test.json", SOURCES)
+    assert plain.derivation == ""
+
+
+@pytest.mark.parametrize(
+    "changes, message",
+    [
+        ({"text": "12", "text_unit": "bar"}, "either 'value' or 'text'"),
+        ({"value": ..., "field": "surface_pressure", "unit": "pa", "text": "Unknown*", "text_unit": "bar"}, "decimal number"),
+        ({"value": ..., "field": "surface_pressure", "unit": "pa", "text": "1", "text_unit": "atm"}, "text_unit"),
+        ({"value": ..., "field": "mean_temperature", "unit": "k", "text": "1", "text_unit": "bar"}, "converts to pa"),
+        ({"text_unit": "bar"}, "goes with 'text'"),
+    ],
+)
+def test_invalid_text_entries(changes, message):
+    with pytest.raises(PipelineError, match=message):
+        parse_manual_file(manual(**changes), "manual/test.json", SOURCES)
+
+
+def test_the_committed_surface_conditions_parse():
+    from usim_pipeline.manual import load_manual_entries
+    from usim_pipeline.sources import load_sources
+
+    from .conftest import REAL_REPO
+
+    entries = load_manual_entries(REAL_REPO.catalog, load_sources(REAL_REPO.sources_file))
+    surface = [e for e in entries if e.field in (Field.MEAN_TEMPERATURE, Field.SURFACE_PRESSURE, Field.REFERENCE_PRESSURE)]
+    assert len(surface) == 20 and all(e.derivation.startswith("converted from ") for e in surface)
+    by_body: dict[int, set[Field]] = {}
+    for e in surface:
+        by_body.setdefault(e.naif_id, set()).add(e.field)
+    # Each body has a mean temperature and exactly one of the two pressures (ADR-0017).
+    assert len(by_body) == 10
+    for fields in by_body.values():
+        assert Field.MEAN_TEMPERATURE in fields
+        assert (Field.SURFACE_PRESSURE in fields) != (Field.REFERENCE_PRESSURE in fields)
+
+
 def test_manual_entry_cannot_override_a_kernel_value():
     (entry,) = parse_manual_file(manual(), "manual/test.json", SOURCES)
     selection = [Selection(1001, BodyKind.PLANET, None)]

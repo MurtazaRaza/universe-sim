@@ -1,13 +1,19 @@
 #!/bin/sh
 # Runs the data pipeline in its virtual environment, from any directory:
-#     tools/pipeline/usim-pipeline <fetch|verify|build|info|reference> [options]
+#     tools/pipeline/usim-pipeline <fetch|verify|build|info|reference|textures> [options]
 # Set up the environment first (see CLAUDE.md):
 #     python3 -m venv tools/pipeline/.venv
 #     tools/pipeline/.venv/bin/pip install --require-hashes -r tools/pipeline/requirements.txt
+# On Windows (Git Bash) the environment has the Windows layout, .venv/Scripts/python.exe; create it with any
+# Python 3.12 or newer and install with tools/pipeline/.venv/Scripts/python.exe -m pip.
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
-if [ ! -x "$here/.venv/bin/python" ]; then
+python="$here/.venv/bin/python"
+if [ ! -x "$python" ] && [ -x "$here/.venv/Scripts/python.exe" ]; then
+    python="$here/.venv/Scripts/python.exe"
+fi
+if [ ! -x "$python" ]; then
     echo "error: $here/.venv is missing; create it with the commands at the top of this script" >&2
     exit 1
 fi
-PYTHONPATH="$here" exec "$here/.venv/bin/python" -m usim_pipeline "$@"
+PYTHONPATH="$here" exec "$python" -m usim_pipeline "$@"

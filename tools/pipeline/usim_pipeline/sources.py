@@ -33,6 +33,9 @@ class SourceFile:
     url: str
     publisher_checksums: str | None  # URL of the publisher's MD5 list (NAIF aa_checksums.txt), if any
     optional: bool = False  # large file only optional packs need: fetch skips it unless asked (fetch --optional)
+    # Other servers with byte-identical copies, tried in order when `url` cannot be downloaded. Only for a file the
+    # lock already pins: the copy must match the pin, and new pins come from `url` alone (DATA_SOURCES.md section 2).
+    mirrors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -132,7 +135,10 @@ def parse_sources(document: Any, where: str = "sources.json") -> tuple[Source, .
             optional = item.get("optional", False)
             if not isinstance(optional, bool):
                 raise PipelineError(f"{fat}: field 'optional' must be true or false")
-            unknown = set(item) - {"name", "path", "url", "publisher_checksums", "optional"}
+            mirrors = item.get("mirrors", [])
+            if not isinstance(mirrors, list) or not all(isinstance(m, str) for m in mirrors):
+                raise PipelineError(f"{fat}: field 'mirrors' must be a list of URLs")
+            unknown = set(item) - {"name", "path", "url", "publisher_checksums", "optional", "mirrors"}
             if unknown:
                 raise PipelineError(f"{fat}: unknown fields {sorted(unknown)}")
             _check_raw_path(path, fat)
@@ -141,10 +147,16 @@ def parse_sources(document: Any, where: str = "sources.json") -> tuple[Source, .
                 _check_https(checksums, fat)
             if PurePosixPath(path).name != name or not file_url.endswith("/" + name):
                 raise PipelineError(f"{fat}: name, path and URL must all end with the same file name")
+            for mirror in mirrors:
+                _check_https(mirror, fat)
+                if not mirror.endswith("/" + name):
+                    raise PipelineError(f"{fat}: mirror {mirror!r} must end with the file name")
+            if len(set(mirrors)) != len(mirrors) or file_url in mirrors:
+                raise PipelineError(f"{fat}: mirrors must differ from each other and from the URL")
             if path in seen_paths:
                 raise PipelineError(f"{fat}: path {path!r} is declared twice")
             seen_paths.add(path)
-            files.append(SourceFile(name, path, file_url, checksums, optional))
+            files.append(SourceFile(name, path, file_url, checksums, optional, tuple(mirrors)))
         sources.append(
             Source(
                 id=source_id,

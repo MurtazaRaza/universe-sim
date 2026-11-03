@@ -130,8 +130,10 @@ def fetch(
 ) -> FetchResult:
     """Downloads every file declared in sources.json into data/raw and pins it in sources.lock.json.
 
-    With an existing lock entry the download must match it exactly (the lock is never changed silently);
-    `update=True` re-pins files instead and drops lock entries no longer declared. New files are checked
+    With an existing lock entry the download must match it exactly (the lock is never changed silently); if the
+    file's URL cannot be downloaded, its declared mirrors are tried in order, under the same check. New pins and
+    re-pins come from the file's URL only. `update=True` re-pins files instead and drops lock entries no longer
+    declared. New files are checked
     against the publisher's MD5 list when the source declares one; a local copy that already matches that
     list is pinned without downloading it again.
 
@@ -192,17 +194,11 @@ def _fetch_files(repo, declared, lock, new_lock, checksum_lists, actions, update
                     log(f"verified   {label}")
                     continue
                 log(f"mismatch   {label}: the local copy differs from the lock file, downloading again")
-            part, digests = _download(file.url, destination, opener)
-            if not _matches(entry, digests):
-                part.unlink(missing_ok=True)
-                raise PipelineError(
-                    f"{label}: the downloaded file (size {digests.size}, sha256 {digests.sha256}) does not match "
-                    f"the lock file (size {entry.size}, sha256 {entry.sha256}). The publisher may have replaced "
-                    "it; review the change, then run fetch --update to re-pin."
-                )
+            part, digests, used = _download_pinned(file, entry, destination, opener, label)
             os.replace(part, destination)
             actions.append((label, "downloaded"))
-            log(f"downloaded {label} ({digests.size} bytes, matches the lock file)")
+            via = f", from the mirror {used}" if used != file.url else ""
+            log(f"downloaded {label} ({digests.size} bytes, matches the lock file{via})")
             continue
 
         publisher_md5 = None
@@ -253,6 +249,38 @@ def _fetch_files(repo, declared, lock, new_lock, checksum_lists, actions, update
             checked = " (local copy, publisher MD5 verified)"
         log(f"{action:<10} {label} ({digests.size} bytes, sha256 {digests.sha256}){checked}")
     return changed
+
+
+def _download_pinned(
+    file: SourceFile, entry: LockEntry, destination: Path, opener: Opener, label: str
+) -> tuple[Path, Digests, str]:
+    """Downloads a pinned file from its URL or, when that download fails, from its mirrors in order, and returns
+    the part file, its digests and the URL used. The copy must match the lock entry: a publisher file that does not
+    is an error (it may have been replaced; review, then re-pin with --update), and a mirror copy that does not is
+    passed over for the next mirror."""
+    failures: list[str] = []
+    for url in (file.url, *file.mirrors):
+        try:
+            part, digests = _download(url, destination, opener)
+        except PipelineError as error:
+            failures.append(str(error))
+            continue
+        if _matches(entry, digests):
+            return part, digests, url
+        part.unlink(missing_ok=True)
+        mismatch = (
+            f"(size {digests.size}, sha256 {digests.sha256}) does not match the lock file "
+            f"(size {entry.size}, sha256 {entry.sha256})"
+        )
+        if url == file.url:
+            raise PipelineError(
+                f"{label}: the downloaded file {mismatch}. The publisher may have replaced it; review the change, "
+                "then run fetch --update to re-pin."
+            )
+        failures.append(f"the copy at the mirror {url} {mismatch}")
+    if len(failures) == 1:
+        raise PipelineError(failures[0])
+    raise PipelineError(f"{label}: no copy matching the lock file could be downloaded: " + "; ".join(failures))
 
 
 def _read_checksum_list(url: str, opener: Opener) -> dict[str, str]:
